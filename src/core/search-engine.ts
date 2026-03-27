@@ -1,5 +1,5 @@
 import { StringRecordId } from 'surrealdb'
-import type { GraphApi } from './types.ts'
+import type { GraphApi, EngineConfig } from './types.ts'
 import type { SearchQuery, SearchResult, ScoredMemory } from './types.ts'
 import { countTokens, mergeScores, applyTokenBudget } from './scoring.ts'
 
@@ -12,17 +12,28 @@ interface MemoryRow {
   score?: number
 }
 
-const DEFAULT_WEIGHTS = { vector: 0.5, fulltext: 0.3, graph: 0.2 }
-
 class SearchEngine {
-  constructor(private store: GraphApi) {}
+  private defaultMode: NonNullable<SearchQuery['mode']>
+  private defaultWeights: { vector: number; fulltext: number; graph: number }
+
+  constructor(
+    private store: GraphApi,
+    searchConfig?: EngineConfig['search']
+  ) {
+    this.defaultMode = searchConfig?.defaultMode ?? 'hybrid'
+    this.defaultWeights = {
+      vector: searchConfig?.defaultWeights?.vector ?? 0.5,
+      fulltext: searchConfig?.defaultWeights?.fulltext ?? 0.3,
+      graph: searchConfig?.defaultWeights?.graph ?? 0.2,
+    }
+  }
 
   async search(query: SearchQuery): Promise<SearchResult> {
-    const mode = query.mode ?? 'hybrid'
+    const mode = query.mode ?? this.defaultMode
     const weights = {
-      vector: query.weights?.vector ?? DEFAULT_WEIGHTS.vector,
-      fulltext: query.weights?.fulltext ?? DEFAULT_WEIGHTS.fulltext,
-      graph: query.weights?.graph ?? DEFAULT_WEIGHTS.graph,
+      vector: query.weights?.vector ?? this.defaultWeights.vector,
+      fulltext: query.weights?.fulltext ?? this.defaultWeights.fulltext,
+      graph: query.weights?.graph ?? this.defaultWeights.graph,
     }
     const limit = query.limit ?? 20
 

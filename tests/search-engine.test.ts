@@ -189,6 +189,63 @@ describe('SearchEngine', () => {
     })
   })
 
+  describe('config-driven defaults', () => {
+    test('uses configured defaultMode when query omits mode', async () => {
+      const configuredSearch = new SearchEngine(store, { defaultMode: 'fulltext' })
+
+      await store.createNode('memory', {
+        content: 'config driven default mode test memory',
+        created_at: Date.now(),
+        token_count: 6,
+      })
+
+      const result = await configuredSearch.search({
+        text: 'config driven default',
+        limit: 10,
+      })
+
+      expect(result.mode).toBe('fulltext')
+    })
+
+    test('query mode overrides configured defaultMode', async () => {
+      const configuredSearch = new SearchEngine(store, { defaultMode: 'fulltext' })
+
+      await store.createNode('memory', {
+        content: 'override mode test memory',
+        created_at: Date.now(),
+        token_count: 5,
+      })
+
+      const result = await configuredSearch.search({
+        mode: 'graph',
+        limit: 10,
+      })
+
+      expect(result.mode).toBe('graph')
+    })
+
+    test('uses configured defaultWeights for search', async () => {
+      const configuredSearch = new SearchEngine(store, {
+        defaultWeights: { vector: 0.0, fulltext: 0.8, graph: 0.2 },
+      })
+
+      await store.createNode('memory', {
+        content: 'custom weights test memory content',
+        created_at: Date.now(),
+        token_count: 6,
+      })
+
+      const result = await configuredSearch.search({
+        text: 'custom weights test',
+        limit: 10,
+      })
+
+      // Should work without errors and return results using configured weights
+      expect(result.mode).toBe('hybrid')
+      expect(result.entries.length).toBeGreaterThanOrEqual(1)
+    })
+  })
+
   describe('domain ownership filter', () => {
     test('filters by domain ownership', async () => {
       await store.createNodeWithId('domain:alpha', { name: 'Alpha' })

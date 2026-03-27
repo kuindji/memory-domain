@@ -65,7 +65,7 @@ class MemoryEngine {
     }
 
     // Initialize subsystems
-    this.searchEngine = new SearchEngine(this.graph)
+    this.searchEngine = new SearchEngine(this.graph, config.search)
     this.scheduler = new Scheduler(
       (domainId: string) => this.createDomainContext(domainId),
       this.events
@@ -434,13 +434,11 @@ class MemoryEngine {
       }
     }
 
-    // Search with hybrid mode (no vector for now)
+    // Search with hybrid mode
     const result = await this.search({
-      mode: 'hybrid',
       text,
       limit,
       domains: options?.domains,
-      weights: { vector: 0.0, fulltext: 0.7, graph: 0.3 },
     })
 
     // Apply token budget
@@ -519,11 +517,9 @@ Otherwise, respond with a query plan to find more relevant information.`
 
       // Execute query plan
       const searchQuery: SearchQuery = {
-        mode: 'hybrid',
         text: typeof parsed.text === 'string' ? parsed.text : question,
         tags: Array.isArray(parsed.tags) ? parsed.tags as string[] : options?.tags,
         limit,
-        weights: { vector: 0.0, fulltext: 0.7, graph: 0.3 },
         domains: options?.domains,
       }
 
