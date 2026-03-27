@@ -2,7 +2,7 @@ import { describe, test, expect, beforeEach, afterEach } from 'bun:test'
 import { SchemaRegistry } from '../src/core/schema-registry.ts'
 import { createTestDb } from './helpers.ts'
 import type { Surreal } from 'surrealdb'
-import type { SharedSchema, FlowSchema } from '../src/core/types.ts'
+import type { SharedSchema, DomainSchema } from '../src/core/types.ts'
 
 describe('SchemaRegistry', () => {
   let db: Surreal
@@ -18,7 +18,7 @@ describe('SchemaRegistry', () => {
   })
 
   describe('core schema', () => {
-    test('registerCore creates memory, tag, flow, meta tables', async () => {
+    test('registerCore creates memory, tag, domain, meta tables', async () => {
       await registry.registerCore()
       const ts = Date.now()
       await db.query('CREATE memory SET content = "test", created_at = $ts, token_count = 0', { ts })
@@ -49,86 +49,86 @@ describe('SchemaRegistry', () => {
       await registry.registerCore()
       const schema: SharedSchema = {
         nodes: [
-          { name: 'person', fields: [{ name: 'name', type: 'string' }] }
+          { name: 'entity', fields: [{ name: 'name', type: 'string' }] }
         ],
         edges: [
-          { name: 'knows', from: 'person', to: 'person', fields: [] }
+          { name: 'related_to', from: 'entity', to: 'entity', fields: [] }
         ]
       }
       await registry.registerShared(schema)
-      await db.query('CREATE person SET name = "Alice"')
-      const [persons] = await db.query<[{ count: number }[]]>('SELECT count() FROM person GROUP ALL')
-      expect(persons[0].count).toBe(1)
+      await db.query('CREATE entity SET name = "Alice"')
+      const [entities] = await db.query<[{ count: number }[]]>('SELECT count() FROM entity GROUP ALL')
+      expect(entities[0].count).toBe(1)
     })
 
     test('registerShared creates edge with fields', async () => {
       await registry.registerCore()
       const schema: SharedSchema = {
         nodes: [
-          { name: 'person', fields: [{ name: 'name', type: 'string' }] }
+          { name: 'entity', fields: [{ name: 'name', type: 'string' }] }
         ],
         edges: [
-          { name: 'knows', from: 'person', to: 'person', fields: [{ name: 'since', type: 'int' }] }
+          { name: 'related_to', from: 'entity', to: 'entity', fields: [{ name: 'since', type: 'int' }] }
         ]
       }
       await registry.registerShared(schema)
-      await db.query('CREATE person:a SET name = "Alice"')
-      await db.query('CREATE person:b SET name = "Bob"')
-      await db.query('RELATE person:a->knows->person:b SET since = 2025')
-      const [edges] = await db.query<[{ since: number }[]]>('SELECT since FROM knows')
+      await db.query('CREATE entity:a SET name = "Alice"')
+      await db.query('CREATE entity:b SET name = "Bob"')
+      await db.query('RELATE entity:a->related_to->entity:b SET since = 2025')
+      const [edges] = await db.query<[{ since: number }[]]>('SELECT since FROM related_to')
       expect(edges[0].since).toBe(2025)
     })
   })
 
-  describe('flow schema', () => {
-    test('registerFlow creates flow-specific tables', async () => {
+  describe('domain schema', () => {
+    test('registerDomain creates domain-specific tables', async () => {
       await registry.registerCore()
-      const schema: FlowSchema = {
+      const schema: DomainSchema = {
         nodes: [
-          { name: 'market', fields: [{ name: 'name', type: 'string' }, { name: 'type', type: 'string' }] }
+          { name: 'resource', fields: [{ name: 'name', type: 'string' }, { name: 'kind', type: 'string' }] }
         ],
         edges: [
-          { name: 'affects', from: 'memory', to: 'market', fields: [{ name: 'magnitude', type: 'float' }] }
+          { name: 'impacts', from: 'memory', to: 'resource', fields: [{ name: 'magnitude', type: 'float' }] }
         ]
       }
-      await registry.registerFlow('financial', schema)
-      await db.query('CREATE market SET name = "oil", type = "commodity"')
-      const [markets] = await db.query<[{ count: number }[]]>('SELECT count() FROM market GROUP ALL')
-      expect(markets[0].count).toBe(1)
+      await registry.registerDomain('test_domain', schema)
+      await db.query('CREATE resource SET name = "sample", kind = "abstract"')
+      const [resources] = await db.query<[{ count: number }[]]>('SELECT count() FROM resource GROUP ALL')
+      expect(resources[0].count).toBe(1)
     })
 
-    test('registerFlow extends existing node with new fields', async () => {
+    test('registerDomain extends existing node with new fields', async () => {
       await registry.registerCore()
       const shared: SharedSchema = {
-        nodes: [{ name: 'person', fields: [{ name: 'name', type: 'string' }] }],
+        nodes: [{ name: 'entity', fields: [{ name: 'name', type: 'string' }] }],
         edges: []
       }
       await registry.registerShared(shared)
-      const flowSchema: FlowSchema = {
-        nodes: [{ name: 'person', fields: [
+      const domainSchema: DomainSchema = {
+        nodes: [{ name: 'entity', fields: [
           { name: 'name', type: 'string' },
           { name: 'bio', type: 'string', required: false }
         ] }],
         edges: []
       }
-      await registry.registerFlow('persona', flowSchema)
-      await db.query('CREATE person SET name = "Alice", bio = "A person"')
-      const [persons] = await db.query<[{ name: string; bio: string }[]]>('SELECT name, bio FROM person')
-      expect(persons[0].bio).toBe('A person')
+      await registry.registerDomain('extended', domainSchema)
+      await db.query('CREATE entity SET name = "Alice", bio = "A test entity"')
+      const [entities] = await db.query<[{ name: string; bio: string }[]]>('SELECT name, bio FROM entity')
+      expect(entities[0].bio).toBe('A test entity')
     })
 
-    test('registerFlow throws on field type conflict', async () => {
+    test('registerDomain throws on field type conflict', async () => {
       await registry.registerCore()
       const shared: SharedSchema = {
-        nodes: [{ name: 'person', fields: [{ name: 'name', type: 'string' }] }],
+        nodes: [{ name: 'entity', fields: [{ name: 'name', type: 'string' }] }],
         edges: []
       }
       await registry.registerShared(shared)
-      const flowSchema: FlowSchema = {
-        nodes: [{ name: 'person', fields: [{ name: 'name', type: 'int' }] }],
+      const domainSchema: DomainSchema = {
+        nodes: [{ name: 'entity', fields: [{ name: 'name', type: 'int' }] }],
         edges: []
       }
-      expect(registry.registerFlow('bad_flow', flowSchema)).rejects.toThrow()
+      expect(registry.registerDomain('bad_domain', domainSchema)).rejects.toThrow()
     })
 
     test('getRegisteredNode returns tracked node info', async () => {

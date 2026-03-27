@@ -1,8 +1,8 @@
 import { StringRecordId } from 'surrealdb'
 import type { GraphStore } from './graph-store.ts'
-import type { FlowRegistry } from './flow-registry.ts'
+import type { DomainRegistry } from './domain-registry.ts'
 import type { EventEmitter } from './events.ts'
-import type { FlowContext, OwnedMemory, MemoryEntry } from './types.ts'
+import type { DomainContext, OwnedMemory, MemoryEntry } from './types.ts'
 
 interface RawMemoryRow {
   id: { tb: string; id: string } | string
@@ -28,9 +28,9 @@ class InboxProcessor {
 
   constructor(
     private store: GraphStore,
-    private flowRegistry: FlowRegistry,
+    private domainRegistry: DomainRegistry,
     private events: EventEmitter,
-    private contextFactory: (flowId: string) => FlowContext
+    private contextFactory: (domainId: string) => DomainContext
   ) {}
 
   async processNext(): Promise<boolean> {
@@ -52,7 +52,7 @@ class InboxProcessor {
       tokenCount: raw.token_count,
     }
 
-    // Find owning flows via owned_by edges
+    // Find owning domains via owned_by edges
     const ownedByEdges = await this.store.query<RawOwnedByEdge[]>(
       'SELECT out, attributes, owned_at FROM owned_by WHERE in = $memId',
       { memId: new StringRecordId(memId) }
@@ -66,21 +66,21 @@ class InboxProcessor {
       .map(t => String(t.id))
       .filter(id => id !== 'tag:inbox')
 
-    // Process with each owning flow
+    // Process with each owning domain
     for (const edge of ownedByEdges) {
-      const flowId = String(edge.out)
-      const flowIdShort = flowId.startsWith('flow:') ? flowId.slice(5) : flowId
-      const flow = this.flowRegistry.get(flowIdShort)
-      if (!flow) continue
+      const domainId = String(edge.out)
+      const domainIdShort = domainId.startsWith('domain:') ? domainId.slice(7) : domainId
+      const domain = this.domainRegistry.get(domainIdShort)
+      if (!domain) continue
 
       const owned: OwnedMemory = {
         memory,
-        flowAttributes: edge.attributes ?? {},
+        domainAttributes: edge.attributes ?? {},
         tags,
       }
 
-      const ctx = this.contextFactory(flowIdShort)
-      await flow.processInboxItem(owned, ctx)
+      const ctx = this.contextFactory(domainIdShort)
+      await domain.processInboxItem(owned, ctx)
     }
 
     // Remove inbox tag

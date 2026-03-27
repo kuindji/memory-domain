@@ -4,15 +4,15 @@ import { GraphStore } from './graph-store.ts'
 import { SchemaRegistry } from './schema-registry.ts'
 import { SearchEngine } from './search-engine.ts'
 import { InboxProcessor } from './inbox-processor.ts'
-import { FlowRegistry } from './flow-registry.ts'
+import { DomainRegistry } from './domain-registry.ts'
 import { Scheduler } from './scheduler.ts'
 import { EventEmitter } from './events.ts'
-import { logFlow } from '../flows/log-flow.ts'
+import { logDomain } from '../domains/log-domain.ts'
 import { countTokens, applyTokenBudget } from './scoring.ts'
 import type {
   EngineConfig,
-  FlowConfig,
-  FlowContext,
+  DomainConfig,
+  DomainContext,
   IngestOptions,
   IngestResult,
   SearchQuery,
@@ -32,7 +32,7 @@ class MemoryEngine {
   private schema!: SchemaRegistry
   private searchEngine!: SearchEngine
   private inboxProcessor!: InboxProcessor
-  private flowRegistry = new FlowRegistry()
+  private domainRegistry = new DomainRegistry()
   private scheduler!: Scheduler
   private events = new EventEmitter()
   private llm!: LLMAdapter
@@ -73,42 +73,42 @@ class MemoryEngine {
     // Initialize subsystems
     this.searchEngine = new SearchEngine(this.graph)
     this.scheduler = new Scheduler(
-      (flowId: string) => this.createFlowContext(flowId),
+      (domainId: string) => this.createDomainContext(domainId),
       this.events
     )
     this.inboxProcessor = new InboxProcessor(
       this.graph,
-      this.flowRegistry,
+      this.domainRegistry,
       this.events,
-      (flowId: string) => this.createFlowContext(flowId)
+      (domainId: string) => this.createDomainContext(domainId)
     )
 
-    // Register built-in log flow
-    await this.registerFlow(logFlow)
+    // Register built-in log domain
+    await this.registerDomain(logDomain)
   }
 
-  async registerFlow(flow: FlowConfig): Promise<void> {
+  async registerDomain(domain: DomainConfig): Promise<void> {
     // Register schema if provided
-    if (flow.schema) {
-      await this.schema.registerFlow(flow.id, flow.schema)
+    if (domain.schema) {
+      await this.schema.registerDomain(domain.id, domain.schema)
     }
 
-    // Create flow node in SurrealDB
+    // Create domain node in SurrealDB
     try {
-      await this.graph.createNodeWithId(`flow:${flow.id}`, {
-        name: flow.name,
+      await this.graph.createNodeWithId(`domain:${domain.id}`, {
+        name: domain.name,
       })
     } catch {
       // Already exists — that's fine
     }
 
-    // Register in FlowRegistry
-    this.flowRegistry.register(flow)
+    // Register in DomainRegistry
+    this.domainRegistry.register(domain)
 
     // Register schedules
-    if (flow.schedules) {
-      for (const schedule of flow.schedules) {
-        this.scheduler.registerSchedule(flow.id, schedule)
+    if (domain.schedules) {
+      for (const schedule of domain.schedules) {
+        this.scheduler.registerSchedule(domain.id, schedule)
       }
     }
   }
@@ -147,15 +147,15 @@ class MemoryEngine {
       }
     }
 
-    // Determine target flows — log flow always gets ownership
-    const targetFlowIds = options?.flowIds
-      ? [...new Set([...options.flowIds, 'log'])]
-      : this.flowRegistry.getAllFlowIds()
+    // Determine target domains — log domain always gets ownership
+    const targetDomainIds = options?.domains
+      ? [...new Set([...options.domains, 'log'])]
+      : this.domainRegistry.getAllDomainIds()
 
     // Assign ownership
-    for (const flowId of targetFlowIds) {
-      const fullFlowId = flowId.startsWith('flow:') ? flowId : `flow:${flowId}`
-      await this.graph.relate(memId, 'owned_by', fullFlowId, {
+    for (const domainId of targetDomainIds) {
+      const fullDomainId = domainId.startsWith('domain:') ? domainId : `domain:${domainId}`
+      await this.graph.relate(memId, 'owned_by', fullDomainId, {
         attributes: options?.metadata ?? {},
         owned_at: now,
       })
@@ -168,27 +168,27 @@ class MemoryEngine {
   }
 
   async search(query: SearchQuery): Promise<SearchResult> {
-    // Let flows expand/rank the query
+    // Let domains expand/rank the query
     let expandedQuery = query
-    const targetFlows = query.flowIds ?? this.flowRegistry.getAllFlowIds()
+    const targetDomains = query.domains ?? this.domainRegistry.getAllDomainIds()
 
-    for (const flowId of targetFlows) {
-      const flow = this.flowRegistry.get(flowId)
-      if (flow?.search?.expand) {
-        const ctx = this.createFlowContext(flowId)
-        expandedQuery = await flow.search.expand(expandedQuery, ctx)
+    for (const domainId of targetDomains) {
+      const domain = this.domainRegistry.get(domainId)
+      if (domain?.search?.expand) {
+        const ctx = this.createDomainContext(domainId)
+        expandedQuery = await domain.search.expand(expandedQuery, ctx)
       }
     }
 
     let result = await this.searchEngine.search(expandedQuery)
 
-    // Let flows rank results
-    for (const flowId of targetFlows) {
-      const flow = this.flowRegistry.get(flowId)
-      if (flow?.search?.rank) {
+    // Let domains rank results
+    for (const domainId of targetDomains) {
+      const domain = this.domainRegistry.get(domainId)
+      if (domain?.search?.rank) {
         result = {
           ...result,
-          entries: flow.search.rank(expandedQuery, result.entries),
+          entries: domain.search.rank(expandedQuery, result.entries),
         }
       }
     }
@@ -196,13 +196,13 @@ class MemoryEngine {
     return result
   }
 
-  async releaseOwnership(memoryId: string, flowId: string): Promise<void> {
-    const fullFlowId = flowId.startsWith('flow:') ? flowId : `flow:${flowId}`
+  async releaseOwnership(memoryId: string, domainId: string): Promise<void> {
+    const fullDomainId = domainId.startsWith('domain:') ? domainId : `domain:${domainId}`
 
     // Remove owned_by edge
-    await this.graph.unrelate(memoryId, 'owned_by', fullFlowId)
+    await this.graph.unrelate(memoryId, 'owned_by', fullDomainId)
 
-    this.events.emit('ownershipRemoved', { memoryId, flowId })
+    this.events.emit('ownershipRemoved', { memoryId, domainId })
 
     // Count remaining owners
     const remaining = await this.graph.query<{ count: number }[]>(
@@ -242,13 +242,13 @@ class MemoryEngine {
     }
   }
 
-  createFlowContext(flowId: string): FlowContext {
+  createDomainContext(domainId: string): DomainContext {
     const engine = this
     const graph = this.graph
     const llm = this.llm
 
     return {
-      flowId,
+      domain: domainId,
       graph,
       llm,
 
@@ -273,21 +273,21 @@ class MemoryEngine {
         return results
       },
 
-      async getMemoriesByFlow(targetFlowId: string): Promise<string[]> {
-        const fullId = targetFlowId.startsWith('flow:') ? targetFlowId : `flow:${targetFlowId}`
+      async getMemoriesByDomain(targetDomainId: string): Promise<string[]> {
+        const fullId = targetDomainId.startsWith('domain:') ? targetDomainId : `domain:${targetDomainId}`
         const rows = await graph.query<{ in: unknown }[]>(
-          'SELECT in FROM owned_by WHERE out = $flowId',
-          { flowId: new StringRecordId(fullId) }
+          'SELECT in FROM owned_by WHERE out = $domainId',
+          { domainId: new StringRecordId(fullId) }
         )
         if (!rows) return []
         return rows.map(r => String(r.in))
       },
 
-      async getMemoriesSince(targetFlowId: string, since: number): Promise<string[]> {
-        const fullId = targetFlowId.startsWith('flow:') ? targetFlowId : `flow:${targetFlowId}`
+      async getMemoriesSince(targetDomainId: string, since: number): Promise<string[]> {
+        const fullId = targetDomainId.startsWith('domain:') ? targetDomainId : `domain:${targetDomainId}`
         const rows = await graph.query<{ in: unknown }[]>(
-          'SELECT in FROM owned_by WHERE out = $flowId AND owned_at >= $since',
-          { flowId: new StringRecordId(fullId), since }
+          'SELECT in FROM owned_by WHERE out = $domainId AND owned_at >= $since',
+          { domainId: new StringRecordId(fullId), since }
         )
         if (!rows) return []
         return rows.map(r => String(r.in))
@@ -337,46 +337,46 @@ class MemoryEngine {
 
       async addOwnership(
         memoryId: string,
-        targetFlowId: string,
+        targetDomainId: string,
         attributes?: Record<string, unknown>
       ): Promise<void> {
-        const fullFlowId = targetFlowId.startsWith('flow:') ? targetFlowId : `flow:${targetFlowId}`
-        await graph.relate(memoryId, 'owned_by', fullFlowId, {
+        const fullDomainId = targetDomainId.startsWith('domain:') ? targetDomainId : `domain:${targetDomainId}`
+        await graph.relate(memoryId, 'owned_by', fullDomainId, {
           attributes: attributes ?? {},
           owned_at: Date.now(),
         })
-        engine.events.emit('ownershipAdded', { memoryId, flowId: targetFlowId })
+        engine.events.emit('ownershipAdded', { memoryId, domainId: targetDomainId })
       },
 
-      async releaseOwnership(memoryId: string, targetFlowId: string): Promise<void> {
-        await engine.releaseOwnership(memoryId, targetFlowId)
+      async releaseOwnership(memoryId: string, targetDomainId: string): Promise<void> {
+        await engine.releaseOwnership(memoryId, targetDomainId)
       },
 
       async updateAttributes(memoryId: string, attributes: Record<string, unknown>): Promise<void> {
-        const fullFlowId = flowId.startsWith('flow:') ? flowId : `flow:${flowId}`
+        const fullDomainId = domainId.startsWith('domain:') ? domainId : `domain:${domainId}`
         await graph.query(
-          'UPDATE owned_by SET attributes = $attrs WHERE in = $memId AND out = $flowId',
+          'UPDATE owned_by SET attributes = $attrs WHERE in = $memId AND out = $domainId',
           {
             memId: new StringRecordId(memoryId),
-            flowId: new StringRecordId(fullFlowId),
+            domainId: new StringRecordId(fullDomainId),
             attrs: attributes,
           }
         )
       },
 
-      async search(query: Omit<SearchQuery, 'flowIds'>): Promise<SearchResult> {
-        return engine.search({ ...query, flowIds: [flowId] })
+      async search(query: Omit<SearchQuery, 'domains'>): Promise<SearchResult> {
+        return engine.search({ ...query, domains: [domainId] })
       },
 
       async getMeta(key: string): Promise<string | null> {
-        const metaId = `meta:${flowId}_${key}`
+        const metaId = `meta:${domainId}_${key}`
         const node = await graph.getNode(metaId)
         if (!node) return null
         return (node.value as string) ?? null
       },
 
       async setMeta(key: string, value: string): Promise<void> {
-        const metaId = `meta:${flowId}_${key}`
+        const metaId = `meta:${domainId}_${key}`
         try {
           await graph.createNodeWithId(metaId, { value })
         } catch {
@@ -390,12 +390,12 @@ class MemoryEngine {
     const budgetTokens = options?.budgetTokens ?? 4000
     const limit = options?.maxMemories ?? 50
 
-    // Check if a target flow has custom buildContext
-    if (options?.flowIds?.length === 1) {
-      const flow = this.flowRegistry.get(options.flowIds[0]!)
-      if (flow?.buildContext) {
-        const ctx = this.createFlowContext(options.flowIds[0]!)
-        return flow.buildContext(text, budgetTokens, ctx)
+    // Check if a target domain has custom buildContext
+    if (options?.domains?.length === 1) {
+      const domain = this.domainRegistry.get(options.domains[0]!)
+      if (domain?.buildContext) {
+        const ctx = this.createDomainContext(options.domains[0]!)
+        return domain.buildContext(text, budgetTokens, ctx)
       }
     }
 
@@ -404,7 +404,7 @@ class MemoryEngine {
       mode: 'hybrid',
       text,
       limit,
-      flowIds: options?.flowIds,
+      domains: options?.domains,
       weights: { vector: 0.0, fulltext: 0.7, graph: 0.3 },
     })
 
@@ -489,7 +489,7 @@ Otherwise, respond with a query plan to find more relevant information.`
         tags: Array.isArray(parsed.tags) ? parsed.tags as string[] : options?.tags,
         limit,
         weights: { vector: 0.0, fulltext: 0.7, graph: 0.3 },
-        flowIds: options?.flowIds,
+        domains: options?.domains,
       }
 
       const result = await this.search(searchQuery)
@@ -531,8 +531,8 @@ Otherwise, respond with a query plan to find more relevant information.`
     return this.graph
   }
 
-  getFlowRegistry(): FlowRegistry {
-    return this.flowRegistry
+  getDomainRegistry(): DomainRegistry {
+    return this.domainRegistry
   }
 
   getEvents(): EventEmitter {

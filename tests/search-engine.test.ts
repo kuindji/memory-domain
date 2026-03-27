@@ -58,24 +58,24 @@ describe('SearchEngine', () => {
   describe('fulltext search', () => {
     test('finds memories by keyword', async () => {
       await store.createNode('memory', {
-        content: 'Iran sanctions impact on oil markets',
+        content: 'scheduled maintenance window for database servers',
         created_at: Date.now(),
         token_count: 7,
       })
       await store.createNode('memory', {
-        content: 'Weather forecast for tomorrow',
+        content: 'weather forecast for tomorrow',
         created_at: Date.now(),
         token_count: 5,
       })
 
       const result = await search.search({
-        text: 'Iran sanctions',
+        text: 'database maintenance',
         mode: 'fulltext',
         limit: 10,
       })
 
       expect(result.entries.length).toBeGreaterThanOrEqual(1)
-      expect(result.entries[0].content).toContain('Iran')
+      expect(result.entries[0].content).toContain('maintenance')
     })
   })
 
@@ -100,33 +100,33 @@ describe('SearchEngine', () => {
     })
   })
 
-  describe('flow ownership filter', () => {
-    test('filters by flow ownership', async () => {
-      await store.createNodeWithId('flow:conflict', { name: 'Conflict' })
-      await store.createNodeWithId('flow:financial', { name: 'Financial' })
+  describe('domain ownership filter', () => {
+    test('filters by domain ownership', async () => {
+      await store.createNodeWithId('domain:alpha', { name: 'Alpha' })
+      await store.createNodeWithId('domain:beta', { name: 'Beta' })
 
       const m1 = await store.createNode('memory', {
-        content: 'conflict memory',
+        content: 'alpha domain memory',
         created_at: Date.now(),
         token_count: 3,
       })
       const m2 = await store.createNode('memory', {
-        content: 'financial memory',
+        content: 'beta domain memory',
         created_at: Date.now(),
         token_count: 3,
       })
 
-      await store.relate(m1, 'owned_by', 'flow:conflict', { attributes: {}, owned_at: Date.now() })
-      await store.relate(m2, 'owned_by', 'flow:financial', { attributes: {}, owned_at: Date.now() })
+      await store.relate(m1, 'owned_by', 'domain:alpha', { attributes: {}, owned_at: Date.now() })
+      await store.relate(m2, 'owned_by', 'domain:beta', { attributes: {}, owned_at: Date.now() })
 
       const result = await search.search({
         mode: 'graph',
-        flowIds: ['conflict'],
+        domains: ['alpha'],
         limit: 10,
       })
 
       expect(result.entries.length).toBe(1)
-      expect(result.entries[0].content).toBe('conflict memory')
+      expect(result.entries[0].content).toBe('alpha domain memory')
     })
   })
 })

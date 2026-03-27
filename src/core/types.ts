@@ -17,7 +17,7 @@ export interface Tag {
 
 export interface MemoryOwnership {
   memoryId: string
-  flowId: string
+  domain: string
   attributes: Record<string, unknown>
   ownedAt: number
 }
@@ -87,7 +87,7 @@ export interface EdgeDef {
   fields?: FieldDef[]
 }
 
-export interface FlowSchema {
+export interface DomainSchema {
   nodes: NodeDef[]
   edges: EdgeDef[]
 }
@@ -108,7 +108,7 @@ export interface SearchQuery {
     depth?: number
   }
   tags?: string[]
-  flowIds?: string[]
+  domains?: string[]
   attributes?: Record<string, unknown>
   since?: number
   limit?: number
@@ -143,7 +143,7 @@ export interface ScoredMemory {
     graph?: number
   }
   tags: string[]
-  flowAttributes: Record<string, Record<string, unknown>>
+  domainAttributes: Record<string, Record<string, unknown>>
   eventTime: number | null
   createdAt: number
   connections?: {
@@ -151,59 +151,59 @@ export interface ScoredMemory {
   }
 }
 
-// --- Flow types ---
+// --- Domain types ---
 
 export interface OwnedMemory {
   memory: MemoryEntry
-  flowAttributes: Record<string, unknown>
+  domainAttributes: Record<string, unknown>
   tags: string[]
 }
 
-export interface FlowContext {
-  flowId: string
+export interface DomainContext {
+  domain: string
   graph: GraphApi
   llm: LLMAdapter
   getMemory(id: string): Promise<MemoryEntry | null>
   getMemories(ids: string[]): Promise<MemoryEntry[]>
-  getMemoriesByFlow(flowId: string): Promise<string[]>
-  getMemoriesSince(flowId: string, since: number): Promise<string[]>
+  getMemoriesByDomain(domainId: string): Promise<string[]>
+  getMemoriesSince(domainId: string, since: number): Promise<string[]>
   addTag(path: string): Promise<void>
   tagMemory(memoryId: string, tagId: string): Promise<void>
   untagMemory(memoryId: string, tagId: string): Promise<void>
   getTagDescendants(tagPath: string): Promise<string[]>
-  addOwnership(memoryId: string, flowId: string, attributes?: Record<string, unknown>): Promise<void>
-  releaseOwnership(memoryId: string, flowId: string): Promise<void>
+  addOwnership(memoryId: string, domainId: string, attributes?: Record<string, unknown>): Promise<void>
+  releaseOwnership(memoryId: string, domainId: string): Promise<void>
   updateAttributes(memoryId: string, attributes: Record<string, unknown>): Promise<void>
-  search(query: Omit<SearchQuery, 'flowIds'>): Promise<SearchResult>
+  search(query: Omit<SearchQuery, 'domains'>): Promise<SearchResult>
   getMeta(key: string): Promise<string | null>
   setMeta(key: string, value: string): Promise<void>
 }
 
-export interface FlowSchedule {
+export interface DomainSchedule {
   id: string
   name: string
   intervalMs: number
-  run: (context: FlowContext) => Promise<void>
+  run: (context: DomainContext) => Promise<void>
 }
 
-export interface FlowConfig {
+export interface DomainConfig {
   id: string
   name: string
-  schema?: FlowSchema
-  processInboxItem(entry: OwnedMemory, context: FlowContext): Promise<void>
+  schema?: DomainSchema
+  processInboxItem(entry: OwnedMemory, context: DomainContext): Promise<void>
   search?: {
     rank?(query: SearchQuery, candidates: ScoredMemory[]): ScoredMemory[]
-    expand?(query: SearchQuery, context: FlowContext): Promise<SearchQuery>
+    expand?(query: SearchQuery, context: DomainContext): Promise<SearchQuery>
   }
-  buildContext?(text: string, budgetTokens: number, context: FlowContext): Promise<ContextResult>
+  buildContext?(text: string, budgetTokens: number, context: DomainContext): Promise<ContextResult>
   describe?(): string
-  schedules?: FlowSchedule[]
+  schedules?: DomainSchedule[]
 }
 
 // --- Ingestion types ---
 
 export interface IngestOptions {
-  flowIds?: string[]
+  domains?: string[]
   eventTime?: number
   tags?: string[]
   metadata?: Record<string, unknown>
@@ -224,7 +224,7 @@ export interface RepetitionConfig {
 // --- Context building types ---
 
 export interface ContextOptions {
-  flowIds?: string[]
+  domains?: string[]
   budgetTokens?: number
   maxMemories?: number
 }
@@ -238,7 +238,7 @@ export interface ContextResult {
 // --- Ask types ---
 
 export interface AskOptions {
-  flowIds?: string[]
+  domains?: string[]
   tags?: string[]
   budgetTokens?: number
   limit?: number

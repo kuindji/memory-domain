@@ -45,9 +45,9 @@ class SearchEngine {
         candidates = new Map()
     }
 
-    // Apply flow ownership filter
-    if (query.flowIds && query.flowIds.length > 0) {
-      candidates = await this.filterByFlowOwnership(candidates, query.flowIds)
+    // Apply domain ownership filter
+    if (query.domains && query.domains.length > 0) {
+      candidates = await this.filterByDomainOwnership(candidates, query.domains)
     }
 
     // Compute final merged scores
@@ -90,7 +90,7 @@ class SearchEngine {
   }
 
   private getTokenCount(mem: ScoredMemory): number {
-    // tokenCount is stored in flowAttributes under __tokenCount or computed from content
+    // tokenCount is stored in domainAttributes under __tokenCount or computed from content
     const stored = (mem as unknown as Record<string, unknown>).tokenCount
     if (typeof stored === 'number') return stored
     return countTokens(mem.content)
@@ -136,7 +136,7 @@ class SearchEngine {
         score: row.score ?? 0.5,
         scores: { fulltext: row.score ?? 0.5 },
         tags,
-        flowAttributes: {},
+        domainAttributes: {},
         eventTime: row.event_time ?? null,
         createdAt: row.created_at,
         tokenCount: row.token_count,
@@ -186,7 +186,7 @@ class SearchEngine {
             score: 1.0,
             scores: { graph: 1.0 },
             tags,
-            flowAttributes: {},
+            domainAttributes: {},
             eventTime: row.event_time ?? null,
             createdAt: row.created_at,
             tokenCount: row.token_count,
@@ -216,7 +216,7 @@ class SearchEngine {
             score: 1.0,
             scores: { graph: 1.0 },
             tags,
-            flowAttributes: {},
+            domainAttributes: {},
             eventTime: row.event_time ?? null,
             createdAt: row.created_at,
             tokenCount: row.token_count,
@@ -243,7 +243,7 @@ class SearchEngine {
           score: 0.5,
           scores: { graph: 0.5 },
           tags,
-          flowAttributes: {},
+          domainAttributes: {},
           eventTime: row.event_time ?? null,
           createdAt: row.created_at,
           tokenCount: row.token_count,
@@ -291,17 +291,17 @@ class SearchEngine {
     return merged
   }
 
-  private async filterByFlowOwnership(
+  private async filterByDomainOwnership(
     candidates: Map<string, ScoredMemory>,
-    flowIds: string[]
+    domainIds: string[]
   ): Promise<Map<string, ScoredMemory>> {
     const filtered = new Map<string, ScoredMemory>()
-    const flowRefs = flowIds.map(f => f.startsWith('flow:') ? f : `flow:${f}`)
+    const domainRefs = domainIds.map(d => d.startsWith('domain:') ? d : `domain:${d}`)
 
-    // Query all owned_by edges for the given flows
+    // Query all owned_by edges for the given domains
     const ownedEdges = await this.store.query<{ in: unknown; out: unknown }[]>(
-      `SELECT in, out FROM owned_by WHERE out IN $flowRefs`,
-      { flowRefs: flowRefs.map(f => new StringRecordId(f)) }
+      `SELECT in, out FROM owned_by WHERE out IN $domainRefs`,
+      { domainRefs: domainRefs.map(d => new StringRecordId(d)) }
     )
 
     if (!ownedEdges) return filtered

@@ -1,9 +1,9 @@
-import type { FlowSchedule, FlowContext } from './types.ts'
+import type { DomainSchedule, DomainContext } from './types.ts'
 import type { EventEmitter } from './events.ts'
 
 interface ScheduleEntry {
-  flowId: string
-  schedule: FlowSchedule
+  domain: string
+  schedule: DomainSchedule
   lastRunAt: number
 }
 
@@ -12,18 +12,18 @@ export class Scheduler {
   private timer: ReturnType<typeof setInterval> | null = null
 
   constructor(
-    private contextFactory: (flowId: string) => FlowContext,
+    private contextFactory: (domainId: string) => DomainContext,
     private events?: EventEmitter
   ) {}
 
-  registerSchedule(flowId: string, schedule: FlowSchedule): void {
-    const key = `${flowId}:${schedule.id}`
-    this.entries.set(key, { flowId, schedule, lastRunAt: 0 })
+  registerSchedule(domainId: string, schedule: DomainSchedule): void {
+    const key = `${domainId}:${schedule.id}`
+    this.entries.set(key, { domain: domainId, schedule, lastRunAt: 0 })
   }
 
-  unregisterFlow(flowId: string): void {
+  unregisterDomain(domainId: string): void {
     for (const key of this.entries.keys()) {
-      if (key.startsWith(`${flowId}:`)) {
+      if (key.startsWith(`${domainId}:`)) {
         this.entries.delete(key)
       }
     }
@@ -36,9 +36,9 @@ export class Scheduler {
       if (elapsed >= entry.schedule.intervalMs) {
         entry.lastRunAt = now
         try {
-          const ctx = this.contextFactory(entry.flowId)
+          const ctx = this.contextFactory(entry.domain)
           await entry.schedule.run(ctx)
-          this.events?.emit('scheduleRun', { flowId: entry.flowId, scheduleId: entry.schedule.id })
+          this.events?.emit('scheduleRun', { domainId: entry.domain, scheduleId: entry.schedule.id })
         } catch (err) {
           this.events?.emit('error', { source: 'scheduler', error: err })
         }
@@ -58,10 +58,10 @@ export class Scheduler {
     }
   }
 
-  async runNow(flowId: string, scheduleId?: string): Promise<void> {
+  async runNow(domainId: string, scheduleId?: string): Promise<void> {
     for (const entry of this.entries.values()) {
-      if (entry.flowId === flowId && (!scheduleId || entry.schedule.id === scheduleId)) {
-        const ctx = this.contextFactory(entry.flowId)
+      if (entry.domain === domainId && (!scheduleId || entry.schedule.id === scheduleId)) {
+        const ctx = this.contextFactory(entry.domain)
         await entry.schedule.run(ctx)
       }
     }

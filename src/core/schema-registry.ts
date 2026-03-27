@@ -1,5 +1,5 @@
 import type { Surreal } from 'surrealdb'
-import type { SharedSchema, FlowSchema, NodeDef, EdgeDef, FieldDef, IndexDef } from './types.ts'
+import type { SharedSchema, DomainSchema, NodeDef, EdgeDef, FieldDef, IndexDef } from './types.ts'
 
 interface RegisteredNode {
   name: string
@@ -35,9 +35,9 @@ class SchemaRegistry {
     `)
 
     await this.db.query(`
-      DEFINE TABLE IF NOT EXISTS flow SCHEMAFULL;
-      DEFINE FIELD IF NOT EXISTS name ON flow TYPE string;
-      DEFINE FIELD IF NOT EXISTS settings ON flow TYPE option<object> FLEXIBLE;
+      DEFINE TABLE IF NOT EXISTS domain SCHEMAFULL;
+      DEFINE FIELD IF NOT EXISTS name ON domain TYPE string;
+      DEFINE FIELD IF NOT EXISTS settings ON domain TYPE option<object> FLEXIBLE;
     `)
 
     await this.db.query(`
@@ -49,7 +49,7 @@ class SchemaRegistry {
     await this.db.query(`
       DEFINE TABLE IF NOT EXISTS tagged SCHEMALESS TYPE RELATION IN memory OUT tag;
       DEFINE TABLE IF NOT EXISTS child_of SCHEMALESS TYPE RELATION IN tag OUT tag;
-      DEFINE TABLE IF NOT EXISTS owned_by SCHEMALESS TYPE RELATION IN memory OUT flow;
+      DEFINE TABLE IF NOT EXISTS owned_by SCHEMALESS TYPE RELATION IN memory OUT domain;
     `)
 
     await this.db.query(`
@@ -64,7 +64,7 @@ class SchemaRegistry {
     `)
 
     await this.db.query(`
-      DEFINE TABLE IF NOT EXISTS has_rule SCHEMALESS TYPE RELATION IN tag OUT flow;
+      DEFINE TABLE IF NOT EXISTS has_rule SCHEMALESS TYPE RELATION IN tag OUT domain;
     `)
 
     // Track core nodes in memory
@@ -87,8 +87,8 @@ class SchemaRegistry {
       ],
       contributors: ['core'],
     })
-    this.registeredNodes.set('flow', {
-      name: 'flow',
+    this.registeredNodes.set('domain', {
+      name: 'domain',
       fields: [
         { name: 'name', type: 'string' },
         { name: 'settings', type: 'option<object>' },
@@ -109,9 +109,9 @@ class SchemaRegistry {
     await this.registerEdges(schema.edges, 'shared')
   }
 
-  async registerFlow(flowId: string, schema: FlowSchema): Promise<void> {
-    await this.registerNodes(schema.nodes, flowId)
-    await this.registerEdges(schema.edges, flowId)
+  async registerDomain(domainId: string, schema: DomainSchema): Promise<void> {
+    await this.registerNodes(schema.nodes, domainId)
+    await this.registerEdges(schema.edges, domainId)
   }
 
   getRegisteredNode(name: string): RegisteredNode | undefined {

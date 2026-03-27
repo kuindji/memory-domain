@@ -4,7 +4,7 @@ export { GraphStore } from './core/graph-store.ts'
 export { SchemaRegistry } from './core/schema-registry.ts'
 export { SearchEngine } from './core/search-engine.ts'
 export { InboxProcessor } from './core/inbox-processor.ts'
-export { FlowRegistry } from './core/flow-registry.ts'
+export { DomainRegistry } from './core/domain-registry.ts'
 export { Scheduler } from './core/scheduler.ts'
 export { EventEmitter } from './core/events.ts'
 
@@ -14,10 +14,10 @@ export type {
   GraphApi,
   Node,
   Edge,
-  FlowConfig,
-  FlowContext,
-  FlowSchema,
-  FlowSchedule,
+  DomainConfig,
+  DomainContext,
+  DomainSchema,
+  DomainSchedule,
   SharedSchema,
   NodeDef,
   EdgeDef,
@@ -43,8 +43,8 @@ export type {
   MemoryEventName,
 } from './core/types.ts'
 
-// Flows
-export { logFlow } from './flows/log-flow.ts'
+// Domains
+export { logDomain } from './domains/log-domain.ts'
 
 // Adapters
 export { ClaudeCliAdapter } from './adapters/llm/claude-cli.ts'
