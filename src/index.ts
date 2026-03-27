@@ -18,7 +18,6 @@ export type {
   DomainContext,
   DomainSchema,
   DomainSchedule,
-  SharedSchema,
   NodeDef,
   EdgeDef,
   FieldDef,

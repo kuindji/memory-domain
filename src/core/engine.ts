@@ -52,13 +52,6 @@ class MemoryEngine {
     this.schema = new SchemaRegistry(db)
     await this.schema.registerCore()
 
-    // Register shared schemas
-    if (config.sharedSchemas) {
-      for (const shared of config.sharedSchemas) {
-        await this.schema.registerShared(shared)
-      }
-    }
-
     // Create inbox tag
     this.graph = new GraphStore(db)
     try {

@@ -1,5 +1,5 @@
 import type { Surreal } from 'surrealdb'
-import type { SharedSchema, DomainSchema, NodeDef, EdgeDef, FieldDef, IndexDef } from './types.ts'
+import type { DomainSchema, NodeDef, EdgeDef, FieldDef, IndexDef } from './types.ts'
 
 interface RegisteredNode {
   name: string
@@ -102,11 +102,6 @@ class SchemaRegistry {
       ],
       contributors: ['core'],
     })
-  }
-
-  async registerShared(schema: SharedSchema): Promise<void> {
-    await this.registerNodes(schema.nodes, 'shared')
-    await this.registerEdges(schema.edges, 'shared')
   }
 
   async registerDomain(domainId: string, schema: DomainSchema): Promise<void> {

@@ -92,11 +92,6 @@ export interface DomainSchema {
   edges: EdgeDef[]
 }
 
-export interface SharedSchema {
-  nodes: NodeDef[]
-  edges: EdgeDef[]
-}
-
 // --- Search types ---
 
 export interface SearchQuery {
@@ -276,7 +271,6 @@ export interface EngineConfig {
     dimension: number
   }
   repetition?: RepetitionConfig
-  sharedSchemas?: SharedSchema[]
   search?: {
     defaultMode?: 'vector' | 'fulltext' | 'hybrid'
     defaultWeights?: { vector?: number; fulltext?: number; graph?: number }
