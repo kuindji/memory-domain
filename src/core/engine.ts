@@ -362,12 +362,26 @@ class MemoryEngine {
 
       async getTagDescendants(tagPath: string): Promise<string[]> {
         const tagId = tagPath.startsWith('tag:') ? tagPath : `tag:${tagPath}`
-        const descendants = await graph.query<string[]>(
-          'SELECT VALUE id FROM tag WHERE ->child_of->tag CONTAINS $tagId',
-          { tagId: new StringRecordId(tagId) }
-        )
-        if (!descendants) return []
-        return descendants.map(d => String(d))
+        const allDescendants = new Set<string>()
+        let frontier = [tagId]
+
+        for (let depth = 0; depth < 10 && frontier.length > 0; depth++) {
+          const refs = frontier.map(id => new StringRecordId(id))
+          const children = await graph.query<string[]>(
+            'SELECT VALUE id FROM tag WHERE ->child_of->tag CONTAINSANY $parentIds',
+            { parentIds: refs }
+          )
+          if (!children || children.length === 0) break
+          frontier = []
+          for (const child of children) {
+            const childStr = String(child)
+            if (!allDescendants.has(childStr) && childStr !== tagId) {
+              allDescendants.add(childStr)
+              frontier.push(childStr)
+            }
+          }
+        }
+        return [...allDescendants]
       },
 
       async addOwnership(
