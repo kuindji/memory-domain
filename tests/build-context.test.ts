@@ -77,11 +77,11 @@ describe('MemoryEngine.buildContext', () => {
       name: 'Custom',
       async processInboxItem() {},
       buildContext(_text, _budget, _ctx) {
-        return {
+        return Promise.resolve({
           context: 'custom context output',
           memories: [],
           totalTokens: 5,
-        }
+        })
       },
     })
 
