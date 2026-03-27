@@ -76,7 +76,7 @@ describe('MemoryEngine.buildContext', () => {
       id: 'custom',
       name: 'Custom',
       async processInboxItem() {},
-      buildContext(_text, _budget, _ctx) {
+      async buildContext(_text, _budget, _ctx) {
         return {
           context: 'custom context output',
           memories: [],

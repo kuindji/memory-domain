@@ -23,7 +23,7 @@ export class MockLLMAdapter implements LLMAdapter {
   consolidate(): Promise<string> {
     return Promise.resolve(this.consolidateResult)
   }
-  generate(): Promise<string> {
+  generate(_prompt: string): Promise<string> {
     return Promise.resolve(this.generateResult)
   }
   synthesize(

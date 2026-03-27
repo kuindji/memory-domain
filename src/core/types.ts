@@ -154,14 +154,22 @@ export interface OwnedMemory {
   tags: string[]
 }
 
+export interface GetMemoriesFilter {
+  ids?: string[]
+  domain?: string
+  since?: number
+}
+
+export interface GetMemoriesOptions {
+  filter?: GetMemoriesFilter
+}
+
 export interface DomainContext {
   domain: string
   graph: GraphApi
   llm: LLMAdapter
   getMemory(id: string): Promise<MemoryEntry | null>
-  getMemories(ids: string[]): Promise<MemoryEntry[]>
-  getMemoriesByDomain(domainId: string): Promise<string[]>
-  getMemoriesSince(domainId: string, since: number): Promise<string[]>
+  getMemories(options?: GetMemoriesOptions): Promise<MemoryEntry[]>
   addTag(path: string): Promise<void>
   tagMemory(memoryId: string, tagId: string): Promise<void>
   untagMemory(memoryId: string, tagId: string): Promise<void>

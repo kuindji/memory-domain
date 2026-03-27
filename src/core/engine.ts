@@ -24,6 +24,7 @@ import type {
   AskOptions,
   AskResult,
   ScoredMemory,
+  GetMemoriesOptions,
 } from './types.ts'
 
 class MemoryEngine {
@@ -259,33 +260,33 @@ class MemoryEngine {
         }
       },
 
-      async getMemories(ids: string[]): Promise<MemoryEntry[]> {
+      async getMemories(options?: GetMemoriesOptions): Promise<MemoryEntry[]> {
+        const filter = options?.filter
+
+        if (filter?.ids) {
+          const results: MemoryEntry[] = []
+          for (const id of filter.ids) {
+            const entry = await this.getMemory(id)
+            if (entry) results.push(entry)
+          }
+          return results
+        }
+
+        const targetDomain = filter?.domain ?? domainId
+        const fullId = targetDomain.startsWith('domain:') ? targetDomain : `domain:${targetDomain}`
+        const query = filter?.since != null
+          ? 'SELECT in FROM owned_by WHERE out = $domainId AND owned_at >= $since'
+          : 'SELECT in FROM owned_by WHERE out = $domainId'
+        const vars: Record<string, unknown> = { domainId: new StringRecordId(fullId) }
+        if (filter?.since != null) vars.since = filter.since
+        const rows = await graph.query<{ in: unknown }[]>(query, vars)
+        if (!rows) return []
         const results: MemoryEntry[] = []
-        for (const id of ids) {
+        for (const id of rows.map(r => String(r.in))) {
           const entry = await this.getMemory(id)
           if (entry) results.push(entry)
         }
         return results
-      },
-
-      async getMemoriesByDomain(targetDomainId: string): Promise<string[]> {
-        const fullId = targetDomainId.startsWith('domain:') ? targetDomainId : `domain:${targetDomainId}`
-        const rows = await graph.query<{ in: unknown }[]>(
-          'SELECT in FROM owned_by WHERE out = $domainId',
-          { domainId: new StringRecordId(fullId) }
-        )
-        if (!rows) return []
-        return rows.map(r => String(r.in))
-      },
-
-      async getMemoriesSince(targetDomainId: string, since: number): Promise<string[]> {
-        const fullId = targetDomainId.startsWith('domain:') ? targetDomainId : `domain:${targetDomainId}`
-        const rows = await graph.query<{ in: unknown }[]>(
-          'SELECT in FROM owned_by WHERE out = $domainId AND owned_at >= $since',
-          { domainId: new StringRecordId(fullId), since }
-        )
-        if (!rows) return []
-        return rows.map(r => String(r.in))
       },
 
       async addTag(path: string): Promise<void> {

@@ -10,4 +10,4 @@
 
 **Important:** Avoid disabling eslint rules when working on linting issues. Try to find proper solution.
 
-**Important:** Run `bun run lint` to check for linting issues. The project uses ESLint 9 with typescript-eslint type-checked rules.
+**Important:** Run lint, typecheck and test commands after making changes.

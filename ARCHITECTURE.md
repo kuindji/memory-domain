@@ -122,9 +122,8 @@ When a domain processes items or runs schedules, it receives a `DomainContext` p
 
 | Method | Purpose |
 |--------|---------|
-| `getMemory` / `getMemories` | Read memory entries by ID |
-| `getMemoriesByDomain` | List all memory IDs owned by a domain |
-| `getMemoriesSince` | List memory IDs owned since a timestamp |
+| `getMemory(id)` | Read a single memory entry by ID |
+| `getMemories(options?)` | Query memories by filter (ids, domain, since) |
 | `addTag` / `tagMemory` / `untagMemory` | Manage tags and tag hierarchies |
 | `getTagDescendants` | Walk the tag tree |
 | `addOwnership` / `releaseOwnership` | Transfer memories between domains |
