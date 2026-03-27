@@ -40,6 +40,7 @@ export type {
   AskOptions,
   AskResult,
   LLMAdapter,
+  EmbeddingAdapter,
   MemoryEventName,
 } from './core/types.ts'
 

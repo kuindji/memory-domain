@@ -1,5 +1,5 @@
 import { StringRecordId } from 'surrealdb'
-import type { GraphApi, EngineConfig } from './types.ts'
+import type { GraphApi, EngineConfig, EmbeddingAdapter } from './types.ts'
 import type { SearchQuery, SearchResult, ScoredMemory } from './types.ts'
 import { countTokens, mergeScores, applyTokenBudget } from './scoring.ts'
 
@@ -18,13 +18,17 @@ class SearchEngine {
 
   constructor(
     private store: GraphApi,
-    searchConfig?: EngineConfig['search']
+    searchConfig?: EngineConfig['search'],
+    private embeddingAdapter?: EmbeddingAdapter
   ) {
     this.defaultMode = searchConfig?.defaultMode ?? 'hybrid'
     this.defaultWeights = {
       vector: searchConfig?.defaultWeights?.vector ?? 0.5,
       fulltext: searchConfig?.defaultWeights?.fulltext ?? 0.3,
       graph: searchConfig?.defaultWeights?.graph ?? 0.2,
+    }
+    if (!embeddingAdapter) {
+      this.defaultWeights.vector = 0
     }
   }
 
@@ -41,7 +45,7 @@ class SearchEngine {
 
     switch (mode) {
       case 'vector':
-        candidates = this.vectorSearch(query)
+        candidates = await this.vectorSearch(query)
         break
       case 'fulltext':
         candidates = await this.fulltextSearch(query)
@@ -118,11 +122,39 @@ class SearchEngine {
     return countTokens(mem.content)
   }
 
-  private vectorSearch(_query: SearchQuery): Map<string, ScoredMemory> {
-    // Vector search requires embeddings — fail gracefully if not available
+  private async vectorSearch(query: SearchQuery): Promise<Map<string, ScoredMemory>> {
     const candidates = new Map<string, ScoredMemory>()
-    // KNN search would go here once embedding model is configured
-    // For now, return empty results
+    if (!this.embeddingAdapter || !query.text) return candidates
+
+    const queryVec = await this.embeddingAdapter.embed(query.text)
+
+    const rows = await this.store.query<(MemoryRow & { score: number })[]>(
+      `SELECT *, vector::similarity::cosine(embedding, $queryVec) AS score
+       FROM memory
+       WHERE embedding IS NOT NONE
+       ORDER BY score DESC
+       LIMIT $limit`,
+      { queryVec, limit: query.limit ?? 20 }
+    )
+
+    if (!rows) return candidates
+
+    for (const row of rows) {
+      const id = String(row.id)
+      const tags = await this.getMemoryTags(id)
+      candidates.set(id, {
+        id,
+        content: row.content,
+        score: row.score,
+        scores: { vector: row.score },
+        tags,
+        domainAttributes: {},
+        eventTime: row.event_time ?? null,
+        createdAt: row.created_at,
+        tokenCount: row.token_count,
+      } as ScoredMemory & { tokenCount: number })
+    }
+
     return candidates
   }
 
@@ -280,10 +312,10 @@ class SearchEngine {
     query: SearchQuery,
     weights: { vector: number; fulltext: number; graph: number }
   ): Promise<Map<string, ScoredMemory>> {
-    const vectorCandidates = weights.vector > 0 ? this.vectorSearch(query) : new Map<string, ScoredMemory>()
-    const [fulltextCandidates, graphCandidates] = await Promise.all([
-      weights.fulltext > 0 && query.text ? this.fulltextSearch(query) : new Map<string, ScoredMemory>(),
-      weights.graph > 0 ? this.graphSearch(query) : new Map<string, ScoredMemory>(),
+    const [vectorCandidates, fulltextCandidates, graphCandidates] = await Promise.all([
+      weights.vector > 0 ? this.vectorSearch(query) : Promise.resolve(new Map<string, ScoredMemory>()),
+      weights.fulltext > 0 && query.text ? this.fulltextSearch(query) : Promise.resolve(new Map<string, ScoredMemory>()),
+      weights.graph > 0 ? this.graphSearch(query) : Promise.resolve(new Map<string, ScoredMemory>()),
     ])
 
     return this.mergeCandidates(vectorCandidates, fulltextCandidates, graphCandidates)

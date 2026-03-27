@@ -259,6 +259,14 @@ export interface LLMAdapter {
   generate?(prompt: string): Promise<string>
 }
 
+// --- Embedding adapter ---
+
+export interface EmbeddingAdapter {
+  embed(text: string): Promise<number[]>
+  embedBatch(texts: string[]): Promise<number[][]>
+  readonly dimension: number
+}
+
 // --- Config types ---
 
 export interface EngineConfig {
@@ -267,11 +275,7 @@ export interface EngineConfig {
   database?: string
   credentials?: { user: string; pass: string }
   llm: LLMAdapter
-  embeddingModel?: {
-    path: string
-    name: string
-    dimension: number
-  }
+  embedding?: EmbeddingAdapter
   repetition?: RepetitionConfig
   search?: {
     defaultMode?: 'vector' | 'fulltext' | 'hybrid'

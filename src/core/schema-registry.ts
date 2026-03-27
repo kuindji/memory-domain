@@ -17,7 +17,7 @@ class SchemaRegistry {
 
   constructor(private db: Surreal) {}
 
-  async registerCore(): Promise<void> {
+  async registerCore(embeddingDimension?: number): Promise<void> {
     // Core node tables
     await this.db.query(`
       DEFINE TABLE IF NOT EXISTS memory SCHEMAFULL;
@@ -66,6 +66,15 @@ class SchemaRegistry {
     await this.db.query(`
       DEFINE TABLE IF NOT EXISTS has_rule SCHEMALESS TYPE RELATION IN tag OUT domain;
     `)
+
+    if (embeddingDimension) {
+      await this.defineIndex('memory', {
+        name: 'idx_memory_embedding',
+        fields: ['embedding'],
+        type: 'hnsw',
+        config: { dimension: embeddingDimension, dist: 'COSINE' },
+      })
+    }
 
     // Track core nodes in memory
     this.registeredNodes.set('memory', {

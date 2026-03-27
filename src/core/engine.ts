@@ -19,6 +19,7 @@ import type {
   SearchResult,
   MemoryEntry,
   LLMAdapter,
+  EmbeddingAdapter,
   ContextOptions,
   ContextResult,
   AskOptions,
@@ -37,6 +38,7 @@ class MemoryEngine {
   private scheduler!: Scheduler
   private events = new EventEmitter()
   private llm!: LLMAdapter
+  private embedding?: EmbeddingAdapter
 
   async initialize(config: EngineConfig): Promise<void> {
     const db = new Surreal({ engines: createNodeEngines() })
@@ -48,10 +50,11 @@ class MemoryEngine {
 
     this.db = db
     this.llm = config.llm
+    this.embedding = config.embedding
 
     // Set up schema
     this.schema = new SchemaRegistry(db)
-    await this.schema.registerCore()
+    await this.schema.registerCore(config.embedding?.dimension)
 
     // Create inbox tag
     this.graph = new GraphStore(db)
@@ -65,7 +68,7 @@ class MemoryEngine {
     }
 
     // Initialize subsystems
-    this.searchEngine = new SearchEngine(this.graph, config.search)
+    this.searchEngine = new SearchEngine(this.graph, config.search, config.embedding)
     this.scheduler = new Scheduler(
       (domainId: string) => this.createDomainContext(domainId),
       this.events
@@ -121,6 +124,11 @@ class MemoryEngine {
       memData.event_time = options.eventTime
     }
     const memId = await this.graph.createNode('memory', memData)
+
+    if (this.embedding) {
+      const vec = await this.embedding.embed(text)
+      await this.graph.updateNode(memId, { embedding: vec })
+    }
 
     // Tag with inbox
     await this.graph.relate(memId, 'tagged', 'tag:inbox')
