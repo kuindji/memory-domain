@@ -4,6 +4,16 @@
 
 A single domain (`project-knowledge`) that captures the invisible knowledge layer around a codebase: architectural decisions and their rationale, business logic semantics, design direction, and the relationships between system components. This knowledge cannot be derived from code or git history alone — it lives in conversations, developers' heads, and ephemeral agent sessions.
 
+## Goals
+
+Given sufficient history (either accumulated through continuous use or thoroughly backfilled), the project-knowledge domain should contain enough structured knowledge to generate:
+
+- **Technical architecture overviews** — system component maps, data flows, service interactions, technology choices and their rationale
+- **Business architecture overviews** — domain model explanations, data semantics, business rule documentation, entity relationships and their real-world meaning
+- **Project documentation** — to the extent that decisions, rationale, and direction are captured, the domain becomes a source for generating and maintaining architectural docs, onboarding guides, and decision logs
+
+This is a long-term goal that validates the domain's value: if the knowledge graph is rich enough to produce these artifacts, it means the domain is capturing what matters.
+
 ## Key Design Decisions
 
 - **Single domain, not two.** Initially considered separate Codebase and BusinessLogic domains, but the processing logic is identical — only the audience differs. Consumer asymmetry (non-technical users shouldn't see implementation details) is handled via audience tags and `buildContext` filtering, not domain separation.
