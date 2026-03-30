@@ -39,7 +39,7 @@ describe('formatOutput - JSON mode', () => {
 
   it('returns JSON for domain-skills command', () => {
     const skills: DomainSkill[] = [
-      { id: 'sk1', name: 'Skill One', description: 'A skill', scope: 'internal', content: 'full content' },
+      { id: 'sk1', name: 'Skill One', description: 'A skill', scope: 'internal' },
     ]
     const data = { domainId: 'dom1', skills }
     const result = formatOutput('domain-skills', data, true)
@@ -47,7 +47,7 @@ describe('formatOutput - JSON mode', () => {
   })
 
   it('returns JSON for domain-skill command', () => {
-    const skill: DomainSkill = {
+    const skill = {
       id: 'sk1',
       name: 'Skill One',
       description: 'A skill',
@@ -159,8 +159,8 @@ describe('formatOutput - text mode: domain-structure', () => {
 describe('formatOutput - text mode: domain-skills', () => {
   it('formats skills without content', () => {
     const skills: DomainSkill[] = [
-      { id: 'sk1', name: 'Skill One', description: 'First skill', scope: 'internal', content: 'very long content here' },
-      { id: 'sk2', name: 'Skill Two', description: 'Second skill', scope: 'external', content: 'other content' },
+      { id: 'sk1', name: 'Skill One', description: 'First skill', scope: 'internal' },
+      { id: 'sk2', name: 'Skill Two', description: 'Second skill', scope: 'external' },
     ]
     const data = { domainId: 'dom1', skills }
     const result = formatOutput('domain-skills', data, false)
@@ -183,7 +183,7 @@ describe('formatOutput - text mode: domain-skills', () => {
 
 describe('formatOutput - text mode: domain-skill', () => {
   it('prints the skill content', () => {
-    const skill: DomainSkill = {
+    const skill = {
       id: 'sk1',
       name: 'Skill One',
       description: 'A skill',

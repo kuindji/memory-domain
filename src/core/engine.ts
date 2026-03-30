@@ -322,10 +322,13 @@ class MemoryEngine {
     const domain = this.domainRegistry.get(domainId)
     // Exclude the built-in log domain from visibility resolution since it
     // auto-owns every memory and would bypass domain filtering.
+    // But always include the domain itself so it can see its own data.
     const allIds = this.domainRegistry.getAllDomainIds().filter(id => id !== 'log')
+    const ensureSelf = (ids: string[]) =>
+      ids.includes(domainId) ? ids : [domainId, ...ids]
 
     if (!domain?.settings?.includeDomains && !domain?.settings?.excludeDomains) {
-      return allIds
+      return ensureSelf(allIds)
     }
 
     if (domain.settings.includeDomains) {
@@ -337,10 +340,10 @@ class MemoryEngine {
     if (domain.settings.excludeDomains) {
       const blocked = new Set(domain.settings.excludeDomains)
       blocked.delete(domainId)
-      return allIds.filter(id => !blocked.has(id))
+      return ensureSelf(allIds.filter(id => !blocked.has(id)))
     }
 
-    return allIds
+    return ensureSelf(allIds)
   }
 
   private mergeContext(requestContext?: RequestContext): RequestContext {

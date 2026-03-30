@@ -13,10 +13,10 @@ describe('User domain - config', () => {
     expect(domain.name).toBe('User')
   })
 
-  test('has structure (non-empty string) and 3 skills', () => {
+  test('has baseDir and 3 skills', () => {
     const domain = createUserDomain()
-    expect(domain.structure).toBeTypeOf('string')
-    expect(domain.structure!.length).toBeGreaterThan(0)
+    expect(domain.baseDir).toBeTypeOf('string')
+    expect(domain.baseDir!.length).toBeGreaterThan(0)
     expect(domain.skills).toHaveLength(3)
     const skillIds = domain.skills!.map(s => s.id)
     expect(skillIds).toContain('user-data')
@@ -152,9 +152,6 @@ describe('User domain - integration', () => {
   })
 
   test('another domain can link its memory to user via about_user edge', async () => {
-    const ctx = engine.createDomainContext(USER_DOMAIN_ID)
-    await ctx.graph.createNodeWithId('user:test-user', { userId: 'test-user' })
-
     const notesDomain: DomainConfig = {
       id: 'notes',
       name: 'Notes',
@@ -162,6 +159,10 @@ describe('User domain - integration', () => {
       async processInboxItem(_entry: OwnedMemory, _context: DomainContext) {},
     }
     await engine.registerDomain(notesDomain)
+
+    // Create context after registering notes so it's in visible domains
+    const ctx = engine.createDomainContext(USER_DOMAIN_ID)
+    await ctx.graph.createNodeWithId('user:test-user', { userId: 'test-user' })
 
     const ingestResult = await engine.ingest(
       'User mentioned they enjoy hiking on weekends',

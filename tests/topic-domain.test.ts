@@ -200,12 +200,12 @@ describe('Topic domain - merge schedule', () => {
 })
 
 describe('Topic domain - config', () => {
-  test('topic domain registers with correct structure and skills', () => {
+  test('topic domain registers with correct baseDir and skills', () => {
     const domain = createTopicDomain()
     expect(domain.id).toBe(TOPIC_DOMAIN_ID)
     expect(domain.name).toBe('Topic')
-    expect(domain.structure).toBeTypeOf('string')
-    expect(domain.structure!.length).toBeGreaterThan(0)
+    expect(domain.baseDir).toBeTypeOf('string')
+    expect(domain.baseDir!.length).toBeGreaterThan(0)
     expect(domain.skills).toHaveLength(3)
     const skillIds = domain.skills!.map(s => s.id)
     expect(skillIds).toContain('topic-management')
