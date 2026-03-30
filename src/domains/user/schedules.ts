@@ -54,7 +54,7 @@ export async function consolidateUserProfile(context: DomainContext): Promise<vo
         tags: [`${USER_TAG}/profile-summary`],
         ownership: { domain: USER_DOMAIN_ID, attributes: {} },
       })
-      await context.graph.relate(summaryId, 'about_user', userNodeId)
+      await context.graph.relate(summaryId, 'about_user', userNodeId, { domain: USER_DOMAIN_ID })
     }
   }
 }
