@@ -15,6 +15,7 @@ interface ParsedCommand {
 interface CommandResult {
   output: unknown
   exitCode: number
+  formatCommand?: string
 }
 
 type CommandHandler = (
