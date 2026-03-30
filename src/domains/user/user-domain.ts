@@ -67,11 +67,17 @@ export function createUserDomain(options?: UserDomainOptions): DomainConfig {
       return 'Built-in primitive for tracking facts about individual users. Manages user identity, preferences, expertise, goals, and automatic profile consolidation.'
     },
     search: {
-      expand(query: SearchQuery, context: DomainContext): Promise<SearchQuery> {
-        // Placeholder: if a userId is present in requestContext, could expand query
-        // to include user-linked memories. Returns query unchanged for now.
-        void context
-        return Promise.resolve(query)
+      async expand(query: SearchQuery, context: DomainContext): Promise<SearchQuery> {
+        const userId = context.requestContext.userId as string | undefined
+        if (!userId) return query
+
+        // Check if user node exists
+        const userNodeId = `user:${userId}`
+        const userNode = await context.graph.getNode(userNodeId)
+        if (!userNode) return query
+
+        // User exists — future enhancement: augment query with user preferences/expertise
+        return query
       },
     },
   }
