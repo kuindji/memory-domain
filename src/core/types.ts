@@ -206,7 +206,6 @@ export interface DomainSkill {
   name: string
   description: string
   scope: 'internal' | 'external' | 'both'
-  content: string
 }
 
 export interface DomainSettings {
@@ -225,8 +224,8 @@ export interface DomainSummary {
 export interface DomainConfig {
   id: string
   name: string
+  baseDir?: string
   schema?: DomainSchema
-  structure?: string
   skills?: DomainSkill[]
   settings?: DomainSettings
   processInboxItem(entry: OwnedMemory, context: DomainContext): Promise<void>

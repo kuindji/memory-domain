@@ -106,4 +106,16 @@ describe('DomainRegistry', () => {
     registry.unregister('ghost')
     expect(registry.has('ghost')).toBe(false)
   })
+
+  test('domain with baseDir is accepted', () => {
+    const registry = new DomainRegistry()
+    const domain: DomainConfig = {
+      id: 'typed',
+      name: 'Typed Domain',
+      baseDir: '/some/path',
+      async processInboxItem() {},
+    }
+    registry.register(domain)
+    expect(registry.get('typed')?.baseDir).toBe('/some/path')
+  })
 })
