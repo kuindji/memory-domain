@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test'
 import { MemoryEngine } from '../src/core/engine.ts'
 import { MockLLMAdapter, MockEmbeddingAdapter } from './helpers.ts'
-import type { DomainConfig, OwnedMemory, DomainContext, RequestContext } from '../src/core/types.ts'
+import type { DomainConfig, RequestContext } from '../src/core/types.ts'
 
 describe('Request context', () => {
   let engine: MemoryEngine
