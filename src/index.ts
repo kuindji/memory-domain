@@ -52,10 +52,12 @@ export type {
   RequestContext,
 } from './core/types.ts'
 export type { TopicAttributes, TopicDomainOptions, TopicStatus } from './domains/topic/types.ts'
+export type { UserDomainOptions } from './domains/user/types.ts'
 
 // Domains
 export { logDomain } from './domains/log-domain.ts'
 export { createTopicDomain, topicDomain } from './domains/topic/index.ts'
+export { createUserDomain, userDomain } from './domains/user/index.ts'
 
 // Adapters
 export { ClaudeCliAdapter } from './adapters/llm/claude-cli.ts'
