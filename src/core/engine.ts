@@ -602,6 +602,9 @@ class MemoryEngine {
       async getNodeEdges(nodeId: string, direction?: 'in' | 'out' | 'both'): Promise<Edge[]> {
         const dir = direction ?? 'both'
         const conditions: string[] = []
+        // SurrealDB edge.in = source, edge.out = target
+        // direction 'out' = edges going out from this node (node is source → in = nodeId)
+        // direction 'in' = edges coming into this node (node is target → out = nodeId)
         if (dir === 'out' || dir === 'both') conditions.push('in = $nodeId')
         if (dir === 'in' || dir === 'both') conditions.push('out = $nodeId')
         const where = conditions.join(' OR ')
