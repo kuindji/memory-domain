@@ -1,6 +1,9 @@
 import { describe, test, expect } from 'bun:test'
+import { join } from 'node:path'
 import { DomainRegistry } from '../src/core/domain-registry.ts'
 import type { DomainConfig } from '../src/core/types.ts'
+
+const FIXTURES_DIR = join(import.meta.dir, 'fixtures', 'test-domain')
 
 function makeDomain(id: string, name?: string): DomainConfig {
   return {
@@ -117,5 +120,93 @@ describe('DomainRegistry', () => {
     }
     registry.register(domain)
     expect(registry.get('typed')?.baseDir).toBe('/some/path')
+  })
+})
+
+describe('Lazy loading', () => {
+  test('getStructure loads structure.md from baseDir', async () => {
+    const registry = new DomainRegistry()
+    registry.register({
+      id: 'fixtured',
+      name: 'Fixtured',
+      baseDir: FIXTURES_DIR,
+      async processInboxItem() {},
+    })
+    const structure = await registry.getStructure('fixtured')
+    expect(structure).toContain('## Tags')
+    expect(structure).toContain('test/category')
+  })
+
+  test('getStructure returns null when no baseDir', async () => {
+    const registry = new DomainRegistry()
+    registry.register({
+      id: 'nobase',
+      name: 'No Base',
+      async processInboxItem() {},
+    })
+    const structure = await registry.getStructure('nobase')
+    expect(structure).toBeNull()
+  })
+
+  test('getStructure returns null when structure.md does not exist', async () => {
+    const registry = new DomainRegistry()
+    registry.register({
+      id: 'emptydir',
+      name: 'Empty Dir',
+      baseDir: join(import.meta.dir, 'fixtures'),
+      async processInboxItem() {},
+    })
+    const structure = await registry.getStructure('emptydir')
+    expect(structure).toBeNull()
+  })
+
+  test('getSkillContent loads skill md from baseDir/skills/', async () => {
+    const registry = new DomainRegistry()
+    registry.register({
+      id: 'fixtured',
+      name: 'Fixtured',
+      baseDir: FIXTURES_DIR,
+      skills: [
+        { id: 'consumption', name: 'Consumption', description: 'desc', scope: 'external' },
+      ],
+      async processInboxItem() {},
+    })
+    const content = await registry.getSkillContent('fixtured', 'consumption')
+    expect(content).toContain('test/category')
+  })
+
+  test('getSkillContent returns null when skill md does not exist', async () => {
+    const registry = new DomainRegistry()
+    registry.register({
+      id: 'fixtured',
+      name: 'Fixtured',
+      baseDir: FIXTURES_DIR,
+      skills: [
+        { id: 'nonexistent', name: 'Missing', description: 'desc', scope: 'external' },
+      ],
+      async processInboxItem() {},
+    })
+    const content = await registry.getSkillContent('fixtured', 'nonexistent')
+    expect(content).toBeNull()
+  })
+
+  test('getSkillContent returns null when no baseDir', async () => {
+    const registry = new DomainRegistry()
+    registry.register({
+      id: 'nobase',
+      name: 'No Base',
+      skills: [
+        { id: 'any', name: 'Any', description: 'desc', scope: 'external' },
+      ],
+      async processInboxItem() {},
+    })
+    const content = await registry.getSkillContent('nobase', 'any')
+    expect(content).toBeNull()
+  })
+
+  test('getSkillContent returns null for unknown domain', async () => {
+    const registry = new DomainRegistry()
+    const content = await registry.getSkillContent('unknown', 'any')
+    expect(content).toBeNull()
   })
 })

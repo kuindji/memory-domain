@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import type { DomainConfig, DomainSkill, DomainSummary } from './types.ts'
 
 export class DomainRegistry {
@@ -56,12 +58,32 @@ export class DomainRegistry {
     return domain?.skills?.find(s => s.id === skillId)
   }
 
+  async getStructure(domainId: string): Promise<string | null> {
+    const domain = this.domains.get(domainId)
+    if (!domain?.baseDir) return null
+    try {
+      return await readFile(join(domain.baseDir, 'structure.md'), 'utf-8')
+    } catch {
+      return null
+    }
+  }
+
+  async getSkillContent(domainId: string, skillId: string): Promise<string | null> {
+    const domain = this.domains.get(domainId)
+    if (!domain?.baseDir) return null
+    try {
+      return await readFile(join(domain.baseDir, 'skills', `${skillId}.md`), 'utf-8')
+    } catch {
+      return null
+    }
+  }
+
   listSummaries(): DomainSummary[] {
     return this.list().map(d => ({
       id: d.id,
       name: d.name,
       description: d.describe?.(),
-      hasStructure: d.structure != null,
+      hasStructure: d.baseDir != null,
       skillCount: d.skills?.length ?? 0,
     }))
   }
