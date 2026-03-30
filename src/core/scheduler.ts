@@ -12,7 +12,7 @@ export class Scheduler {
   private timer: ReturnType<typeof setInterval> | null = null
 
   constructor(
-    private contextFactory: (domainId: string) => DomainContext,
+    private contextFactory: (domainId: string, requestContext?: Record<string, unknown>) => DomainContext,
     private events?: EventEmitter
   ) {}
 

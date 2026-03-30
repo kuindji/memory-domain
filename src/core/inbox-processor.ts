@@ -36,7 +36,7 @@ class InboxProcessor {
     private store: GraphStore,
     private domainRegistry: DomainRegistry,
     private events: EventEmitter,
-    private contextFactory: (domainId: string) => DomainContext
+    private contextFactory: (domainId: string, requestContext?: Record<string, unknown>) => DomainContext
   ) {}
 
   async processNext(): Promise<boolean> {

@@ -28,6 +28,8 @@ import type {
   MemoryFilter,
   RepetitionConfig,
   WriteMemoryEntry,
+  RequestContext,
+  Edge,
 } from './types.ts'
 
 class MemoryEngine {
@@ -42,6 +44,7 @@ class MemoryEngine {
   private llm!: LLMAdapter
   private embedding?: EmbeddingAdapter
   private repetitionConfig?: RepetitionConfig
+  private defaultContext: RequestContext = {}
 
   async initialize(config: EngineConfig): Promise<void> {
     const db = new Surreal({ engines: createNodeEngines() })
@@ -83,6 +86,8 @@ class MemoryEngine {
       this.events,
       (domainId: string) => this.createDomainContext(domainId)
     )
+
+    this.defaultContext = config.context ?? {}
 
     // Register built-in log domain
     await this.registerDomain(logDomain)
@@ -232,7 +237,7 @@ class MemoryEngine {
     for (const domainId of targetDomains) {
       const domain = this.domainRegistry.get(domainId)
       if (domain?.search?.expand) {
-        const ctx = this.createDomainContext(domainId)
+        const ctx = this.createDomainContext(domainId, query.context)
         expandedQuery = await domain.search.expand(expandedQuery, ctx)
       }
     }
@@ -338,7 +343,12 @@ class MemoryEngine {
     return allIds
   }
 
-  createDomainContext(domainId: string): DomainContext {
+  private mergeContext(requestContext?: RequestContext): RequestContext {
+    if (!requestContext) return { ...this.defaultContext }
+    return { ...this.defaultContext, ...requestContext }
+  }
+
+  createDomainContext(domainId: string, requestContext?: RequestContext): DomainContext {
     const graph = this.graph
     const llm = this.llm
     const embedding = this.embedding
@@ -346,11 +356,14 @@ class MemoryEngine {
     const visibleDomains = this.resolveVisibleDomains(domainId)
     const releaseOwnership = this.releaseOwnership.bind(this)
     const search = this.search.bind(this)
+    const mergedContext = this.mergeContext(requestContext)
+    const schema = this.schema
 
     return {
       domain: domainId,
       graph,
       llm,
+      requestContext: mergedContext,
 
       getVisibleDomains(): string[] {
         return [...visibleDomains]
@@ -577,6 +590,37 @@ class MemoryEngine {
           await graph.updateNode(metaId, { value })
         }
       },
+
+      async getMemoryTags(memoryId: string): Promise<string[]> {
+        const rows = await graph.query<string[]>(
+          'SELECT VALUE out.label FROM tagged WHERE in = $memId',
+          { memId: new StringRecordId(memoryId) }
+        )
+        return (rows ?? []).filter((label): label is string => typeof label === 'string')
+      },
+
+      async getNodeEdges(nodeId: string, direction?: 'in' | 'out' | 'both'): Promise<Edge[]> {
+        const dir = direction ?? 'both'
+        const conditions: string[] = []
+        if (dir === 'out' || dir === 'both') conditions.push('in = $nodeId')
+        if (dir === 'in' || dir === 'both') conditions.push('out = $nodeId')
+        const where = conditions.join(' OR ')
+
+        const edgeNames = schema.getRegisteredEdgeNames()
+        const coreEdges = ['tagged', 'owned_by', 'reinforces', 'contradicts', 'summarizes', 'refines', 'child_of', 'has_rule']
+        const allEdges = [...new Set([...coreEdges, ...edgeNames])]
+
+        const results: Edge[] = []
+        const nodeRef = new StringRecordId(nodeId)
+        for (const edgeName of allEdges) {
+          const rows = await graph.query<Edge[]>(
+            `SELECT * FROM ${edgeName} WHERE ${where}`,
+            { nodeId: nodeRef }
+          )
+          if (rows) results.push(...rows)
+        }
+        return results
+      },
     }
   }
 
@@ -588,7 +632,7 @@ class MemoryEngine {
     if (options?.domains?.length === 1) {
       const domain = this.domainRegistry.get(options.domains[0])
       if (domain?.buildContext) {
-        const ctx = this.createDomainContext(options.domains[0])
+        const ctx = this.createDomainContext(options.domains[0], options?.context)
         return domain.buildContext(text, budgetTokens, ctx)
       }
     }
