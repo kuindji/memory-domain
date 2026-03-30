@@ -210,6 +210,14 @@ export interface DomainSettings {
   excludeDomains?: string[]
 }
 
+export interface DomainSummary {
+  id: string
+  name: string
+  description?: string
+  hasStructure: boolean
+  skillCount: number
+}
+
 export interface DomainConfig {
   id: string
   name: string

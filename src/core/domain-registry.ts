@@ -1,12 +1,4 @@
-import type { DomainConfig, DomainSkill } from './types.ts'
-
-interface DomainSummary {
-  id: string
-  name: string
-  description?: string
-  hasStructure: boolean
-  skillCount: number
-}
+import type { DomainConfig, DomainSkill, DomainSummary } from './types.ts'
 
 export class DomainRegistry {
   private domains = new Map<string, DomainConfig>()

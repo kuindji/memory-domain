@@ -23,6 +23,7 @@ export type {
   DomainSchedule,
   DomainSkill,
   DomainSettings,
+  DomainSummary,
   WriteMemoryEntry,
   NodeDef,
   EdgeDef,
