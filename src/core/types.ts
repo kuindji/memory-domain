@@ -174,6 +174,7 @@ export interface DomainContext {
   domain: string
   graph: GraphApi
   llm: LLMAdapter
+  getVisibleDomains(): string[]
   getMemory(id: string): Promise<MemoryEntry | null>
   getMemories(filter?: MemoryFilter): Promise<MemoryEntry[]>
   writeMemory(entry: WriteMemoryEntry): Promise<string>
@@ -196,10 +197,26 @@ export interface DomainSchedule {
   run: (context: DomainContext) => Promise<void>
 }
 
+export interface DomainSkill {
+  id: string
+  name: string
+  description: string
+  scope: 'internal' | 'external' | 'both'
+  content: string
+}
+
+export interface DomainSettings {
+  includeDomains?: string[]
+  excludeDomains?: string[]
+}
+
 export interface DomainConfig {
   id: string
   name: string
   schema?: DomainSchema
+  structure?: string
+  skills?: DomainSkill[]
+  settings?: DomainSettings
   processInboxItem(entry: OwnedMemory, context: DomainContext): Promise<void>
   search?: {
     rank?(query: SearchQuery, candidates: ScoredMemory[]): ScoredMemory[]
