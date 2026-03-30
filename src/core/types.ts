@@ -118,6 +118,7 @@ export interface SearchQuery extends MemoryFilter {
     fulltext?: number
     graph?: number
   }
+  context?: RequestContext
 }
 
 export interface SearchResult {
@@ -188,6 +189,9 @@ export interface DomainContext {
   search(query: Omit<SearchQuery, 'domains'>): Promise<SearchResult>
   getMeta(key: string): Promise<string | null>
   setMeta(key: string, value: string): Promise<void>
+  requestContext: RequestContext
+  getMemoryTags(memoryId: string): Promise<string[]>
+  getNodeEdges(nodeId: string, direction?: 'in' | 'out' | 'both'): Promise<Edge[]>
 }
 
 export interface DomainSchedule {
@@ -243,6 +247,7 @@ export interface IngestOptions {
   tags?: string[]
   metadata?: Record<string, unknown>
   skipDedup?: boolean
+  context?: RequestContext
 }
 
 export interface IngestResult {
@@ -262,6 +267,7 @@ export interface ContextOptions {
   domains?: string[]
   budgetTokens?: number
   maxMemories?: number
+  context?: RequestContext
 }
 
 export interface ContextResult {
@@ -277,6 +283,7 @@ export interface AskOptions {
   tags?: string[]
   budgetTokens?: number
   limit?: number
+  context?: RequestContext
 }
 
 export interface AskResult {
@@ -320,6 +327,7 @@ export interface EngineConfig {
     defaultWeights?: { vector?: number; fulltext?: number; graph?: number }
     defaultEf?: number
   }
+  context?: RequestContext
 }
 
 // --- Event types ---
@@ -336,3 +344,7 @@ export type MemoryEventName =
   | 'scheduleRun'
   | 'error'
   | 'warning'
+
+// --- Request context ---
+
+export type RequestContext = Record<string, unknown>

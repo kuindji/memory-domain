@@ -49,6 +49,7 @@ export type {
   LLMAdapter,
   EmbeddingAdapter,
   MemoryEventName,
+  RequestContext,
 } from './core/types.ts'
 export type { TopicAttributes, TopicDomainOptions, TopicStatus } from './domains/topic/types.ts'
 
