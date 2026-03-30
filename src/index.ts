@@ -50,9 +50,11 @@ export type {
   EmbeddingAdapter,
   MemoryEventName,
 } from './core/types.ts'
+export type { TopicAttributes, TopicDomainOptions, TopicStatus } from './domains/topic/types.ts'
 
 // Domains
 export { logDomain } from './domains/log-domain.ts'
+export { createTopicDomain, topicDomain } from './domains/topic/index.ts'
 
 // Adapters
 export { ClaudeCliAdapter } from './adapters/llm/claude-cli.ts'
