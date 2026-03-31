@@ -49,3 +49,40 @@ export const AUDIENCE_TAGS: Record<Audience, string> = {
   technical: PROJECT_TECHNICAL_TAG,
   business: PROJECT_BUSINESS_TAG,
 }
+
+// --- Bootstrap types ---
+
+export interface DirEntry {
+  name: string
+  relativePath: string
+  isDirectory: boolean
+  children?: DirEntry[]
+  files?: string[]
+}
+
+export interface TriageResult {
+  repoSize?: string
+  filesToRead?: string[]
+}
+
+export interface AnalysisModule {
+  name: string
+  path: string
+  kind: string
+  description?: string
+}
+
+export interface AnalysisRelationship {
+  from: string
+  to: string
+  type: string
+  description?: string
+}
+
+export interface AnalysisResult {
+  modules?: AnalysisModule[]
+  data_entities?: Array<{ name: string; source?: string }>
+  concepts?: Array<{ name: string; description?: string }>
+  patterns?: Array<{ name: string; scope?: string }>
+  relationships?: AnalysisRelationship[]
+}
