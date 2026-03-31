@@ -3,15 +3,16 @@ import { CHAT_TAG, CHAT_MESSAGE_TAG } from './types.ts'
 import { TOPIC_TAG, TOPIC_DOMAIN_ID } from '../topic/types.ts'
 
 /**
- * Escapes a tag label containing `/` for use as a SurrealDB record ID.
- * SurrealDB interprets `/` in bare record IDs as a path separator,
- * so hierarchical tags like `chat/message` must be backtick-escaped.
+ * Ensures a tag node exists in the graph with the given label.
+ * Hierarchical tags (containing `/`) need backtick-escaping in SurrealDB
+ * record IDs to prevent `/` being interpreted as a path separator.
  */
-function tagRecordId(label: string): string {
-  if (label.includes('/')) {
-    return `tag:\`${label}\``
-  }
-  return `tag:${label}`
+async function ensureTag(context: DomainContext, label: string): Promise<string> {
+  const tagId = label.includes('/') ? `tag:\`${label}\`` : `tag:${label}`
+  try {
+    await context.graph.createNodeWithId(tagId, { label, created_at: Date.now() })
+  } catch { /* already exists */ }
+  return tagId
 }
 
 export async function processInboxItem(entry: OwnedMemory, context: DomainContext): Promise<void> {
@@ -38,22 +39,12 @@ export async function processInboxItem(entry: OwnedMemory, context: DomainContex
     messageIndex,
   })
 
-  // Ensure tag nodes exist (backtick-escape hierarchical tag IDs)
-  const chatTagId = tagRecordId(CHAT_TAG)
-  const chatMessageTagId = tagRecordId(CHAT_MESSAGE_TAG)
-
-  try {
-    await context.graph.createNodeWithId(chatTagId, { label: CHAT_TAG, created_at: Date.now() })
-  } catch { /* already exists */ }
-  try {
-    await context.graph.createNodeWithId(chatMessageTagId, { label: CHAT_MESSAGE_TAG, created_at: Date.now() })
-  } catch { /* already exists */ }
-  // Establish tag hierarchy: chat/message is child of chat
+  // Ensure tag nodes exist and tag the memory
+  const chatTagId = await ensureTag(context, CHAT_TAG)
+  const chatMessageTagId = await ensureTag(context, CHAT_MESSAGE_TAG)
   try {
     await context.graph.relate(chatMessageTagId, 'child_of', chatTagId)
   } catch { /* already related */ }
-
-  // Tag the memory using escaped tag IDs
   await context.tagMemory(entry.memory.id, chatTagId)
   await context.tagMemory(entry.memory.id, chatMessageTagId)
 
@@ -77,18 +68,11 @@ export async function processInboxItem(entry: OwnedMemory, context: DomainContex
         Record<string, unknown> | undefined
       const currentCount = (topicAttrs?.mentionCount as number | undefined) ?? 0
 
-      // Update topic attributes via topic domain context pattern
-      // We need to update the owned_by edge attributes for the topic domain
-      const fullTopicDomainId = `domain:${TOPIC_DOMAIN_ID}`
-      await context.graph.query(
-        'UPDATE owned_by SET attributes.mentionCount = $count, attributes.lastMentionedAt = $now WHERE in = $memId AND out = $domainId',
-        {
-          memId: topicId,
-          domainId: fullTopicDomainId,
-          count: currentCount + 1,
-          now: Date.now(),
-        }
-      )
+      await context.updateAttributes(topicId, {
+        ...topicAttrs,
+        mentionCount: currentCount + 1,
+        lastMentionedAt: Date.now(),
+      })
     } else {
       // Create new topic
       topicId = await context.writeMemory({
