@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'bun:test'
 import { StringRecordId } from 'surrealdb'
 import { MemoryEngine } from '../src/core/engine.ts'
 import { MockLLMAdapter } from './helpers.ts'
+import { createTopicDomain } from '../src/domains/topic/index.ts'
 import type {
   WriteOptions,
   WriteResult,
@@ -257,5 +258,179 @@ describe('MemoryEngine tagging methods', () => {
   it('returns empty array for non-existent memory', async () => {
     const tags = await engine.getMemoryTags('memory:doesnotexist')
     expect(tags).toEqual([])
+  })
+})
+
+// --- graph methods tests (Task 5) ---
+
+describe('MemoryEngine graph methods', () => {
+  let engine: MemoryEngine
+
+  beforeEach(async () => {
+    engine = new MemoryEngine()
+    await engine.initialize({
+      connection: 'mem://',
+      namespace: 'test',
+      database: `test_graph_${Date.now()}`,
+      llm: new MockLLMAdapter(),
+    })
+  })
+
+  afterEach(async () => {
+    await engine.close()
+  })
+
+  it('relate creates an edge between two memories', async () => {
+    const { id: id1 } = await engine.writeMemory('first memory', { domain: 'log' })
+    const { id: id2 } = await engine.writeMemory('second memory', { domain: 'log' })
+
+    const edgeId = await engine.relate(id1, id2, 'reinforces', 'log')
+    expect(edgeId).toBeTruthy()
+    expect(edgeId).toMatch(/^reinforces:/)
+  })
+
+  it('relate creates an edge with attributes', async () => {
+    const { id: id1 } = await engine.writeMemory('source', { domain: 'log' })
+    const { id: id2 } = await engine.writeMemory('target', { domain: 'log' })
+
+    await engine.relate(id1, id2, 'reinforces', 'log', { strength: 0.9 })
+
+    const edges = await engine.getEdges(id1, 'out')
+    const reinforcesEdges = edges.filter(e => String(e.id).startsWith('reinforces:'))
+    expect(reinforcesEdges.length).toBeGreaterThan(0)
+    const edge = reinforcesEdges.find(e => String(e.out) === id2)
+    expect(edge).toBeDefined()
+    expect(edge!.strength).toBe(0.9)
+  })
+
+  it('getEdges returns edges for a node', async () => {
+    const { id: id1 } = await engine.writeMemory('base memory', { domain: 'log' })
+    const { id: id2 } = await engine.writeMemory('related memory', { domain: 'log' })
+
+    await engine.relate(id1, id2, 'reinforces', 'log')
+
+    const edges = await engine.getEdges(id1)
+    // Should have at least the reinforces edge and owned_by edge
+    expect(edges.length).toBeGreaterThan(0)
+    const edgeIds = edges.map(e => String(e.id))
+    expect(edgeIds.some(id => id.startsWith('reinforces:'))).toBe(true)
+  })
+
+  it('getEdges respects direction filter out', async () => {
+    const { id: id1 } = await engine.writeMemory('outgoing memory', { domain: 'log' })
+    const { id: id2 } = await engine.writeMemory('incoming memory', { domain: 'log' })
+
+    await engine.relate(id1, id2, 'reinforces', 'log')
+
+    const outEdges = await engine.getEdges(id2, 'out')
+    // id2 is target of the reinforces edge, so querying 'out' (outgoing) from id2 should not include it
+    const reinforcesFromId2 = outEdges.filter(e =>
+      String(e.id).startsWith('reinforces:') && String(e.in) === id2
+    )
+    expect(reinforcesFromId2.length).toBe(0)
+
+    const inEdges = await engine.getEdges(id2, 'in')
+    // id2 is target (out side of edge), so querying 'in' (incoming to id2) should include it
+    const reinforcesToId2 = inEdges.filter(e =>
+      String(e.id).startsWith('reinforces:') && String(e.out) === id2
+    )
+    expect(reinforcesToId2.length).toBe(1)
+  })
+
+  it('unrelate removes an edge', async () => {
+    const { id: id1 } = await engine.writeMemory('source to unrelate', { domain: 'log' })
+    const { id: id2 } = await engine.writeMemory('target to unrelate', { domain: 'log' })
+
+    await engine.relate(id1, id2, 'reinforces', 'log')
+
+    // Confirm edge exists
+    const before = await engine.getEdges(id1, 'out')
+    expect(before.some(e => String(e.id).startsWith('reinforces:') && String(e.out) === id2)).toBe(true)
+
+    await engine.unrelate(id1, id2, 'reinforces')
+
+    const after = await engine.getEdges(id1, 'out')
+    expect(after.some(e => String(e.id).startsWith('reinforces:') && String(e.out) === id2)).toBe(false)
+  })
+
+  it('traverse follows edges BFS', async () => {
+    const { id: id1 } = await engine.writeMemory('root node', { domain: 'log' })
+    const { id: id2 } = await engine.writeMemory('level 1 node', { domain: 'log' })
+    const { id: id3 } = await engine.writeMemory('level 2 node', { domain: 'log' })
+
+    await engine.relate(id1, id2, 'reinforces', 'log')
+    await engine.relate(id2, id3, 'reinforces', 'log')
+
+    const depth1 = await engine.traverse(id1, ['reinforces'], 1)
+    expect(depth1.length).toBe(1)
+    expect(depth1[0].id).toBe(id2)
+    expect(depth1[0].depth).toBe(1)
+    expect(depth1[0].edge).toBe('reinforces')
+    expect(depth1[0].direction).toBe('out')
+
+    const depth2 = await engine.traverse(id1, ['reinforces'], 2)
+    expect(depth2.length).toBe(2)
+    const ids = depth2.map(n => n.id)
+    expect(ids).toContain(id2)
+    expect(ids).toContain(id3)
+    expect(depth2.find(n => n.id === id3)!.depth).toBe(2)
+  })
+})
+
+// --- schedule methods tests (Task 6) ---
+
+describe('MemoryEngine schedule methods', () => {
+  let engine: MemoryEngine
+
+  beforeEach(async () => {
+    engine = new MemoryEngine()
+    await engine.initialize({
+      connection: 'mem://',
+      namespace: 'test',
+      database: `test_schedules_${Date.now()}`,
+      llm: new MockLLMAdapter(),
+    })
+    await engine.registerDomain(createTopicDomain())
+  })
+
+  afterEach(async () => {
+    await engine.close()
+  })
+
+  it('listSchedules returns all registered schedules', () => {
+    const schedules = engine.listSchedules()
+    expect(schedules.length).toBeGreaterThan(0)
+    expect(schedules.every(s => s.id && s.domain && s.name && s.interval > 0)).toBe(true)
+  })
+
+  it('listSchedules filters by domain', () => {
+    const topicSchedules = engine.listSchedules('topic')
+    expect(topicSchedules.length).toBeGreaterThan(0)
+    expect(topicSchedules.every(s => s.domain === 'topic')).toBe(true)
+  })
+
+  it('listSchedules returns empty array for unknown domain', () => {
+    const schedules = engine.listSchedules('nonexistent-domain')
+    expect(schedules).toEqual([])
+  })
+
+  it('triggerSchedule runs a schedule', async () => {
+    const schedules = engine.listSchedules('topic')
+    expect(schedules.length).toBeGreaterThan(0)
+    const schedule = schedules[0]
+    // Should not throw
+    await engine.triggerSchedule('topic', schedule.id)
+  })
+
+  it('triggerSchedule throws for unknown schedule', () => {
+    expect(
+      engine.triggerSchedule('topic', 'nonexistent-schedule')
+    ).rejects.toThrow('Schedule not found')
+  })
+
+  it('triggerSchedule throws for unknown domain', () => {
+    expect(
+      engine.triggerSchedule('unknown-domain', 'some-schedule')
+    ).rejects.toThrow('Schedule not found')
   })
 })

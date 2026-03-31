@@ -33,6 +33,8 @@ import type {
   WriteOptions,
   WriteResult,
   UpdateOptions,
+  ScheduleInfo,
+  TraversalNode,
 } from './types.ts'
 
 class MemoryEngine {
@@ -237,6 +239,94 @@ class MemoryEngine {
       { memId: new StringRecordId(id) }
     )
     return (rows ?? []).filter((label): label is string => typeof label === 'string')
+  }
+
+  async getEdges(nodeId: string, direction?: 'in' | 'out' | 'both', domainId?: string): Promise<Edge[]> {
+    if (domainId) {
+      return this.createDomainContext(domainId).getNodeEdges(nodeId, direction)
+    }
+
+    const dir = direction ?? 'both'
+    const conditions: string[] = []
+    if (dir === 'out' || dir === 'both') conditions.push('in = $nodeId')
+    if (dir === 'in' || dir === 'both') conditions.push('out = $nodeId')
+    const where = conditions.join(' OR ')
+
+    const coreEdges = ['tagged', 'owned_by', 'reinforces', 'contradicts', 'summarizes', 'refines', 'child_of', 'has_rule']
+    const registeredEdges = this.schema.getRegisteredEdgeNames()
+    const allEdges = [...new Set([...coreEdges, ...registeredEdges])]
+
+    const results: Edge[] = []
+    const nodeRef = new StringRecordId(nodeId)
+    for (const edgeName of allEdges) {
+      const rows = await this.graph.query<Edge[]>(
+        `SELECT * FROM ${edgeName} WHERE ${where}`,
+        { nodeId: nodeRef }
+      )
+      if (rows) results.push(...rows)
+    }
+    return results
+  }
+
+  async relate(from: string, to: string, edgeType: string, domainId: string, attrs?: Record<string, unknown>): Promise<string> {
+    void domainId
+    return this.graph.relate(from, edgeType, to, attrs)
+  }
+
+  async unrelate(from: string, to: string, edgeType: string): Promise<void> {
+    await this.graph.unrelate(from, edgeType, to)
+  }
+
+  async traverse(startId: string, edgeTypes: string[], depth?: number, domainId?: string): Promise<TraversalNode[]> {
+    const maxDepth = depth ?? 1
+    const visited = new Set<string>()
+    visited.add(startId)
+
+    const results: TraversalNode[] = []
+    let frontier: string[] = [startId]
+
+    for (let d = 1; d <= maxDepth && frontier.length > 0; d++) {
+      const nextFrontier: string[] = []
+
+      for (const nodeId of frontier) {
+        const nodeRef = new StringRecordId(nodeId)
+
+        for (const edgeType of edgeTypes) {
+          const querySource = domainId ? this.createDomainContext(domainId).graph : this.graph
+          const rows = await querySource.query<{ out: unknown }[]>(
+            `SELECT out FROM ${edgeType} WHERE in = $nodeId`,
+            { nodeId: nodeRef }
+          )
+
+          if (!rows) continue
+          for (const row of rows) {
+            const outId = String(row.out)
+            if (!visited.has(outId)) {
+              visited.add(outId)
+              nextFrontier.push(outId)
+              results.push({ id: outId, depth: d, edge: edgeType, direction: 'out' })
+            }
+          }
+        }
+      }
+
+      frontier = nextFrontier
+    }
+
+    return results
+  }
+
+  listSchedules(domainId?: string): ScheduleInfo[] {
+    return this.scheduler.listSchedules(domainId)
+  }
+
+  async triggerSchedule(domainId: string, scheduleId: string): Promise<void> {
+    const schedules = this.scheduler.listSchedules(domainId)
+    const found = schedules.find(s => s.id === scheduleId)
+    if (!found) {
+      throw new Error(`Schedule not found: ${scheduleId} in domain ${domainId}`)
+    }
+    await this.scheduler.runNow(domainId, scheduleId)
   }
 
   async ingest(text: string, options?: IngestOptions): Promise<IngestResult> {

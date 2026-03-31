@@ -1,4 +1,4 @@
-import type { DomainSchedule, DomainContext } from './types.ts'
+import type { DomainSchedule, DomainContext, ScheduleInfo } from './types.ts'
 import type { EventEmitter } from './events.ts'
 
 interface ScheduleEntry {
@@ -56,6 +56,21 @@ export class Scheduler {
       clearInterval(this.timer)
       this.timer = null
     }
+  }
+
+  listSchedules(domainId?: string): ScheduleInfo[] {
+    const result: ScheduleInfo[] = []
+    for (const entry of this.entries.values()) {
+      if (domainId !== undefined && entry.domain !== domainId) continue
+      result.push({
+        id: entry.schedule.id,
+        domain: entry.domain,
+        name: entry.schedule.name,
+        interval: entry.schedule.intervalMs,
+        lastRun: entry.lastRunAt > 0 ? entry.lastRunAt : undefined,
+      })
+    }
+    return result
   }
 
   async runNow(domainId: string, scheduleId?: string): Promise<void> {

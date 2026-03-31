@@ -50,6 +50,11 @@ export type {
   EmbeddingAdapter,
   MemoryEventName,
   RequestContext,
+  WriteOptions,
+  WriteResult,
+  UpdateOptions,
+  ScheduleInfo,
+  TraversalNode,
 } from './core/types.ts'
 export type { TopicAttributes, TopicDomainOptions, TopicStatus } from './domains/topic/types.ts'
 export type { UserDomainOptions } from './domains/user/types.ts'
