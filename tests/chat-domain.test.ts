@@ -1,12 +1,15 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test'
 import { MemoryEngine } from '../src/core/engine.ts'
+import type { DomainContext } from '../src/core/types.ts'
 import { MockLLMAdapter, MockEmbeddingAdapter } from './helpers.ts'
 import { createChatDomain, chatDomain } from '../src/domains/chat/index.ts'
 import { createTopicDomain } from '../src/domains/topic/index.ts'
+import { promoteWorkingMemory } from '../src/domains/chat/schedules.ts'
 import {
   CHAT_DOMAIN_ID,
   CHAT_TAG,
   CHAT_MESSAGE_TAG,
+  CHAT_EPISODIC_TAG,
   DEFAULT_PROMOTE_INTERVAL_MS,
   DEFAULT_CONSOLIDATE_INTERVAL_MS,
   DEFAULT_PRUNE_INTERVAL_MS,
@@ -323,7 +326,7 @@ describe('Chat domain - search', () => {
     const domain = createChatDomain()
     const result = domain.search!.expand!({ text: 'test' }, {
       requestContext: {},
-    } as DomainContext)
+    } as unknown as DomainContext)
     return result.then(q => {
       expect(q.ids).toEqual([])
     })
@@ -334,9 +337,125 @@ describe('Chat domain - search', () => {
     const query = { text: 'test', tags: ['chat'] }
     const result = domain.search!.expand!(query, {
       requestContext: { userId: 'test-user' },
-    } as DomainContext)
+    } as unknown as DomainContext)
     return result.then(q => {
       expect(q).toEqual(query)
     })
+  })
+})
+
+describe('Chat domain - promote working memory', () => {
+  let engine: MemoryEngine
+  let llm: MockLLMAdapter
+
+  beforeEach(async () => {
+    llm = new MockLLMAdapter()
+    llm.extractResult = ['TypeScript'] // for inbox topic extraction
+    engine = new MemoryEngine()
+    await engine.initialize({
+      connection: 'mem://',
+      namespace: 'test',
+      database: `test_${Date.now()}`,
+      context: { userId: 'test-user', chatSessionId: 'session-1' },
+      llm,
+      embedding: new MockEmbeddingAdapter(),
+    })
+    await engine.registerDomain(createTopicDomain({ mergeSchedule: { enabled: false } }))
+    await engine.registerDomain(createChatDomain({
+      promoteSchedule: { enabled: false },
+      consolidateSchedule: { enabled: false },
+      pruneSchedule: { enabled: false },
+    }))
+  })
+
+  afterEach(async () => {
+    await engine.close()
+  })
+
+  test('promotes working memories when capacity exceeded', async () => {
+    // Ingest 3 messages
+    await engine.ingest('First message about cats', { domains: ['chat'], metadata: { role: 'user' } })
+    await engine.processInbox()
+    await engine.ingest('Second message about dogs', { domains: ['chat'], metadata: { role: 'user' } })
+    await engine.processInbox()
+    await engine.ingest('Third message about birds', { domains: ['chat'], metadata: { role: 'user' } })
+    await engine.processInbox()
+
+    const ctx = engine.createDomainContext(CHAT_DOMAIN_ID)
+
+    // Verify we have 3 working memories
+    const workingBefore = await ctx.getMemories({
+      tags: [CHAT_MESSAGE_TAG],
+      attributes: { layer: 'working' },
+    })
+    expect(workingBefore).toHaveLength(3)
+
+    // Set extract result for promotion
+    llm.extractResult = ['Key fact from conversation']
+
+    // Promote with capacity=2 — should promote 1 memory (3 - 2 = 1 over capacity)
+    await promoteWorkingMemory(ctx, { workingMemoryCapacity: 2 })
+
+    // Verify episodic memories were created
+    const episodic = await ctx.getMemories({
+      tags: [CHAT_EPISODIC_TAG],
+      attributes: { layer: 'episodic' },
+    })
+    expect(episodic.length).toBeGreaterThanOrEqual(1)
+    expect(episodic[0].content).toBe('Key fact from conversation')
+  })
+
+  test('skips promotion when under capacity', async () => {
+    // Ingest 1 message
+    await engine.ingest('Single message', { domains: ['chat'], metadata: { role: 'user' } })
+    await engine.processInbox()
+
+    const ctx = engine.createDomainContext(CHAT_DOMAIN_ID)
+
+    llm.extractResult = ['Should not appear']
+
+    // Promote with capacity=50 — should not promote anything
+    await promoteWorkingMemory(ctx, { workingMemoryCapacity: 50 })
+
+    const episodic = await ctx.getMemories({
+      tags: [CHAT_EPISODIC_TAG],
+      attributes: { layer: 'episodic' },
+    })
+    expect(episodic).toHaveLength(0)
+  })
+
+  test('released working memories no longer returned by getMemories', async () => {
+    // Ingest 3 messages with distinct content to avoid dedup
+    await engine.ingest('The weather today is sunny and warm in California', {
+      domains: ['chat'], metadata: { role: 'user' }, skipDedup: true,
+    })
+    await engine.processInbox()
+    await engine.ingest('My favorite programming language is Rust for systems work', {
+      domains: ['chat'], metadata: { role: 'assistant' }, skipDedup: true,
+    })
+    await engine.processInbox()
+    await engine.ingest('I enjoy hiking in the mountains on weekends frequently', {
+      domains: ['chat'], metadata: { role: 'user' }, skipDedup: true,
+    })
+    await engine.processInbox()
+
+    const ctx = engine.createDomainContext(CHAT_DOMAIN_ID)
+
+    const workingBefore = await ctx.getMemories({
+      tags: [CHAT_MESSAGE_TAG],
+      attributes: { layer: 'working' },
+    })
+    expect(workingBefore).toHaveLength(3)
+
+    llm.extractResult = ['Extracted fact']
+
+    // Promote with capacity=2 — should release 1 working memory
+    await promoteWorkingMemory(ctx, { workingMemoryCapacity: 2 })
+
+    const workingAfter = await ctx.getMemories({
+      tags: [CHAT_MESSAGE_TAG],
+      attributes: { layer: 'working' },
+    })
+    expect(workingAfter.length).toBeLessThan(workingBefore.length)
   })
 })
