@@ -30,6 +30,9 @@ import type {
   WriteMemoryEntry,
   RequestContext,
   Edge,
+  WriteOptions,
+  WriteResult,
+  UpdateOptions,
 } from './types.ts'
 
 class MemoryEngine {
@@ -122,6 +125,118 @@ class MemoryEngine {
         this.scheduler.registerSchedule(domain.id, schedule)
       }
     }
+  }
+
+  async writeMemory(text: string, options: WriteOptions): Promise<WriteResult> {
+    const ctx = this.createDomainContext(options.domain, options.context)
+    const id = await ctx.writeMemory({
+      content: text,
+      tags: options.tags,
+      ownership: {
+        domain: options.domain,
+        attributes: options.attributes,
+      },
+    })
+    // Remove inbox tag — writeMemory is direct, not inbox-processed
+    await this.graph.unrelate(id, 'tagged', 'tag:inbox')
+    return { id }
+  }
+
+  async getMemory(id: string): Promise<MemoryEntry | null> {
+    const node = await this.graph.getNode(id)
+    if (!node) return null
+    return {
+      id: node.id,
+      content: node.content as string,
+      eventTime: (node.event_time as number | null) ?? null,
+      createdAt: node.created_at as number,
+      tokenCount: node.token_count as number,
+    }
+  }
+
+  async updateMemory(id: string, options: UpdateOptions): Promise<void> {
+    const node = await this.graph.getNode(id)
+    if (!node) throw new Error(`Memory not found: ${id}`)
+
+    if (options.text !== undefined) {
+      const tokens = countTokens(options.text)
+      const updates: Record<string, unknown> = {
+        content: options.text,
+        token_count: tokens,
+      }
+      if (this.embedding) {
+        updates.embedding = await this.embedding.embed(options.text)
+      }
+      await this.graph.updateNode(id, updates)
+    }
+
+    if (options.attributes !== undefined) {
+      // Merge attributes into owned_by edge for all owners
+      const owners = await this.graph.query<{ out: unknown; attributes: unknown }[]>(
+        'SELECT out, attributes FROM owned_by WHERE in = $memId',
+        { memId: new StringRecordId(id) }
+      )
+      if (owners) {
+        for (const owner of owners) {
+          const existing = (owner.attributes as Record<string, unknown>) ?? {}
+          const merged = { ...existing, ...options.attributes }
+          const fullDomainId = String(owner.out)
+          await this.graph.query(
+            'UPDATE owned_by SET attributes = $attrs WHERE in = $memId AND out = $domainId',
+            {
+              memId: new StringRecordId(id),
+              domainId: new StringRecordId(fullDomainId),
+              attrs: merged,
+            }
+          )
+        }
+      }
+    }
+  }
+
+  async deleteMemory(id: string): Promise<void> {
+    const node = await this.graph.getNode(id)
+    if (!node) throw new Error(`Memory not found: ${id}`)
+
+    // Get all owners and release ownership (cascades to delete when no owners remain)
+    const owners = await this.graph.query<{ out: unknown }[]>(
+      'SELECT out FROM owned_by WHERE in = $memId',
+      { memId: new StringRecordId(id) }
+    )
+    if (owners && owners.length > 0) {
+      for (const owner of owners) {
+        const domainId = String(owner.out).replace(/^domain:/, '')
+        await this.releaseOwnership(id, domainId)
+      }
+    } else {
+      // No owners — delete directly
+      await this.graph.deleteNode(id)
+    }
+  }
+
+  async tagMemory(id: string, tag: string): Promise<void> {
+    const now = Date.now()
+    const tagId = tag.startsWith('tag:') ? tag : `tag:${tag}`
+    const label = tag.startsWith('tag:') ? tag.slice(4) : tag
+    try {
+      await this.graph.createNodeWithId(tagId, { label, created_at: now })
+    } catch {
+      // Already exists
+    }
+    await this.graph.relate(id, 'tagged', tagId)
+  }
+
+  async untagMemory(id: string, tag: string): Promise<void> {
+    const tagId = tag.startsWith('tag:') ? tag : `tag:${tag}`
+    await this.graph.unrelate(id, 'tagged', tagId)
+  }
+
+  async getMemoryTags(id: string): Promise<string[]> {
+    const rows = await this.graph.query<string[]>(
+      'SELECT VALUE out.label FROM tagged WHERE in = $memId',
+      { memId: new StringRecordId(id) }
+    )
+    return (rows ?? []).filter((label): label is string => typeof label === 'string')
   }
 
   async ingest(text: string, options?: IngestOptions): Promise<IngestResult> {

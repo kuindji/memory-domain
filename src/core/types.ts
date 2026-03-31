@@ -347,3 +347,37 @@ export type MemoryEventName =
 // --- Request context ---
 
 export type RequestContext = Record<string, unknown>
+
+// --- Engine API types ---
+
+export interface WriteOptions {
+  domain: string
+  tags?: string[]
+  attributes?: Record<string, unknown>
+  context?: RequestContext
+}
+
+export interface WriteResult {
+  id: string
+}
+
+export interface UpdateOptions {
+  attributes?: Record<string, unknown>
+  text?: string
+}
+
+export interface ScheduleInfo {
+  id: string
+  domain: string
+  name: string
+  interval: number
+  lastRun?: number
+}
+
+export interface TraversalNode {
+  id: string
+  depth: number
+  edge: string
+  direction: 'in' | 'out'
+  memory?: ScoredMemory
+}
