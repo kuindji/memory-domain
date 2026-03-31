@@ -37,7 +37,7 @@ export async function processInboxItem(entry: OwnedMemory, context: DomainContex
   await context.tagMemory(entry.memory.id, chatMessageTagId)
 
   // Extract topics from message content
-  const topicNames = await context.llm.extract(entry.memory.content)
+  const topicNames = await context.llmAt('low').extract(entry.memory.content)
 
   for (const topicName of topicNames) {
     // Search for existing similar topic

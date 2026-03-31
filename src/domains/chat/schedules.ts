@@ -95,7 +95,7 @@ export async function promoteWorkingMemory(context: DomainContext, options?: Cha
     if (contents.length === 0) continue
 
     // Extract key facts via LLM
-    const facts = await context.llm.extract(contents.join('\n'))
+    const facts = await context.llmAt('low').extract(contents.join('\n'))
     if (!facts || facts.length === 0) {
       // Even if no facts extracted, release ownership on promoted memories
       for (const memId of promotedIds) {
@@ -198,7 +198,7 @@ export async function consolidateEpisodic(context: DomainContext, options?: Chat
     if (contents.length === 0) continue
 
     // Call LLM to produce a summary
-    const summary = await context.llm.consolidate(contents)
+    const summary = await context.llmAt('medium').consolidate(contents)
     if (!summary) continue
 
     // Ensure tag nodes exist

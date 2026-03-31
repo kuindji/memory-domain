@@ -3,11 +3,12 @@
  * Spawns a subprocess for each call — no API keys needed.
  */
 
-import type { LLMAdapter, ScoredMemory } from '../../core/types.ts'
+import type { LLMAdapter, ScoredMemory, ModelLevel } from '../../core/types.ts'
 
 interface ClaudeCliConfig {
   command?: string
   model?: string
+  modelLevels?: Partial<Record<ModelLevel, string>>
   maxTokens?: number
   timeout?: number
 }
@@ -18,14 +19,23 @@ const DEFAULT_TIMEOUT = 120_000
 class ClaudeCliAdapter implements LLMAdapter {
   private command: string
   private model: string | undefined
+  private modelLevels: Partial<Record<ModelLevel, string>> | undefined
   private maxTokens: number | undefined
   private timeout: number
+  private originalConfig: ClaudeCliConfig | undefined
 
   constructor(config?: ClaudeCliConfig) {
+    this.originalConfig = config
     this.command = config?.command ?? DEFAULT_COMMAND
     this.model = config?.model
+    this.modelLevels = config?.modelLevels
     this.maxTokens = config?.maxTokens
     this.timeout = config?.timeout ?? DEFAULT_TIMEOUT
+  }
+
+  withLevel(level: ModelLevel): LLMAdapter {
+    const model = this.modelLevels?.[level] ?? this.model
+    return new ClaudeCliAdapter({ ...this.originalConfig, model })
   }
 
   private async run(prompt: string): Promise<string> {

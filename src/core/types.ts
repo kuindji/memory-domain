@@ -152,6 +152,10 @@ export interface ScoredMemory {
   }
 }
 
+// --- Model level types ---
+
+export type ModelLevel = 'low' | 'medium' | 'high'
+
 // --- Domain types ---
 
 export interface OwnedMemory {
@@ -175,6 +179,7 @@ export interface DomainContext {
   domain: string
   graph: GraphApi
   llm: LLMAdapter
+  llmAt(level: ModelLevel): LLMAdapter
   getVisibleDomains(): string[]
   getMemory(id: string): Promise<MemoryEntry | null>
   getMemories(filter?: MemoryFilter): Promise<MemoryEntry[]>
@@ -236,6 +241,7 @@ export interface DomainConfig {
   buildContext?(text: string, budgetTokens: number, context: DomainContext): Promise<ContextResult>
   describe?(): string
   schedules?: DomainSchedule[]
+  bootstrap?(context: DomainContext): Promise<void>
 }
 
 // --- Ingestion types ---
@@ -301,6 +307,7 @@ export interface LLMAdapter {
   rerank?(query: string, candidates: { id: string; content: string }[]): Promise<string[]>
   synthesize?(query: string, memories: ScoredMemory[], tagContext?: string[]): Promise<string>
   generate?(prompt: string): Promise<string>
+  withLevel?(level: ModelLevel): LLMAdapter
 }
 
 // --- Embedding adapter ---

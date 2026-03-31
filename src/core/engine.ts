@@ -5,7 +5,7 @@ import { SchemaRegistry } from './schema-registry.ts'
 import { SearchEngine } from './search-engine.ts'
 import { InboxProcessor } from './inbox-processor.ts'
 import { DomainRegistry } from './domain-registry.ts'
-import { Scheduler } from './scheduler.ts'
+import { Scheduler, MetaScheduleStateStore } from './scheduler.ts'
 import { EventEmitter } from './events.ts'
 import { logDomain } from '../domains/log-domain.ts'
 import { countTokens, applyTokenBudget } from './scoring.ts'
@@ -35,6 +35,7 @@ import type {
   UpdateOptions,
   ScheduleInfo,
   TraversalNode,
+  ModelLevel,
 } from './types.ts'
 
 class MemoryEngine {
@@ -81,9 +82,11 @@ class MemoryEngine {
 
     // Initialize subsystems
     this.searchEngine = new SearchEngine(this.graph, config.search, config.embedding)
+    const stateStore = new MetaScheduleStateStore(this.graph)
     this.scheduler = new Scheduler(
       (domainId: string) => this.createDomainContext(domainId),
-      this.events
+      this.events,
+      stateStore
     )
     this.inboxProcessor = new InboxProcessor(
       this.graph,
@@ -328,6 +331,10 @@ class MemoryEngine {
       throw new Error(`Schedule not found: ${scheduleId} in domain ${domainId}`)
     }
     await this.scheduler.runNow(domainId, scheduleId)
+  }
+
+  async runDueSchedules(): Promise<{ ran: string[] }> {
+    return this.scheduler.tickPersisted()
   }
 
   async ingest(text: string, options?: IngestOptions): Promise<IngestResult> {
@@ -584,6 +591,9 @@ class MemoryEngine {
       domain: domainId,
       graph,
       llm,
+      llmAt(level: ModelLevel): LLMAdapter {
+        return llm.withLevel?.(level) ?? llm
+      },
       requestContext: mergedContext,
 
       getVisibleDomains(): string[] {
@@ -1031,6 +1041,28 @@ Otherwise, respond with a query plan to find more relevant information.`
 
   async processInbox(): Promise<boolean> {
     return this.inboxProcessor.processNext()
+  }
+
+  getBootstrappableDomains(): string[] {
+    return this.domainRegistry.list()
+      .filter(d => d.bootstrap != null)
+      .map(d => d.id)
+  }
+
+  async runBootstrap(domainId?: string): Promise<string[]> {
+    const domains = domainId
+      ? [this.domainRegistry.getOrThrow(domainId)]
+      : this.domainRegistry.list()
+
+    const bootstrapped: string[] = []
+    for (const domain of domains) {
+      if (domain.bootstrap) {
+        const ctx = this.createDomainContext(domain.id)
+        await domain.bootstrap(ctx)
+        bootstrapped.push(domain.id)
+      }
+    }
+    return bootstrapped
   }
 
   async close(): Promise<void> {

@@ -10,10 +10,12 @@ import { writeCommand } from './commands/write.ts'
 import { memoryCommand } from './commands/memory.ts'
 import { graphCommand } from './commands/graph.ts'
 import { scheduleCommand } from './commands/schedule.ts'
+import { initCommand } from './commands/init.ts'
 import { loadConfig } from '../config-loader.ts'
 import type { CommandHandler, CommandResult } from './types.ts'
 
 const COMMANDS: Record<string, CommandHandler> = {
+  init: initCommand,
   ingest: ingestCommand,
   search: searchCommand,
   ask: askCommand,

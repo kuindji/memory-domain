@@ -2,6 +2,7 @@ const USAGE = `
 Usage: active-memory <command> [options]
 
 Commands:
+  init            Initialize database, schemas, and optionally bootstrap domains
   ingest          Store new memory from text or stdin
   search          Search memories by query
   ask             Ask a question against stored memories
@@ -24,6 +25,24 @@ Run "active-memory help <command>" for detailed help on a specific command.
 `.trim()
 
 const COMMAND_HELP: Record<string, string> = {
+  init: `
+Usage: active-memory init [--yes] [--no-bootstrap]
+
+Initialize the database, register schemas, and optionally run domain bootstrap routines.
+
+Options:
+  --yes              Skip confirmation prompt
+  --no-bootstrap     Skip domain bootstrap even if domains support it
+
+Bootstrap routines perform one-time setup for domains (e.g., scanning project structure).
+They may use AI and incur API usage. You will be prompted for confirmation unless --yes is set.
+
+Examples:
+  active-memory init
+  active-memory init --yes
+  active-memory init --no-bootstrap
+`.trim(),
+
   ingest: `
 Usage: active-memory ingest [--text "..."] [--domains d1,d2] [--tags t1,t2] [--event-time <ms>] [--skip-dedup] [--meta key=value]
 
@@ -180,6 +199,7 @@ List or manually trigger domain schedules.
 Subcommands:
   list                 List all registered schedules
   trigger <domain-id> <schedule-id>  Run a schedule now
+  run-due              Check and run all schedules that are due (for cron usage)
 
 Options:
   --domain <id>        Filter schedules by domain (for list)
@@ -188,6 +208,7 @@ Examples:
   active-memory schedule list
   active-memory schedule list --domain topic
   active-memory schedule trigger topic merge-similar-topics
+  active-memory schedule run-due
 `.trim(),
 
   domains: `

@@ -40,7 +40,9 @@ const ENTITY_EXTRACTION_PROMPT =
   'Extract architectural entities referenced in this project knowledge memory. ' +
   'Return only entities explicitly mentioned or clearly implied. ' +
   'Types: module (code packages, services, lambdas), data_entity (domain objects like Order, Payment), ' +
-  'concept (business concepts like reconciliation, return flow), pattern (architectural patterns in use).'
+  'concept (business concepts like reconciliation, return flow), pattern (architectural patterns in use). ' +
+  'Only extract proper nouns in the project context — specific module names, domain objects, named patterns. ' +
+  'Do not extract generic programming terms like "function", "class", "service", "database", "API".'
 
 const CLASSIFICATION_PROMPT =
   'Classify this project knowledge into exactly one category:\n' +
@@ -59,8 +61,9 @@ export async function processInboxItem(entry: OwnedMemory, context: DomainContex
   // Step 1: Determine classification
   let classification = attrs.classification as string | undefined
   if (!classification || !VALID_CLASSIFICATIONS.has(classification)) {
-    if (context.llm.generate) {
-      const result = await context.llm.generate(
+    const classifyLlm = context.llmAt('low')
+    if (classifyLlm.generate) {
+      const result = await classifyLlm.generate(
         `${CLASSIFICATION_PROMPT}\n\nText: ${content}`,
       )
       const normalized = result.trim().toLowerCase()
@@ -109,9 +112,10 @@ export async function processInboxItem(entry: OwnedMemory, context: DomainContex
   }
 
   // Step 5: Extract entities via LLM
-  if (context.llm.extractStructured) {
+  const entityLlm = context.llmAt('medium')
+  if (entityLlm.extractStructured) {
     try {
-      const entities = await context.llm.extractStructured(
+      const entities = await entityLlm.extractStructured(
         content,
         ENTITY_EXTRACTION_SCHEMA,
         ENTITY_EXTRACTION_PROMPT,
@@ -145,7 +149,8 @@ async function detectContradictions(
   content: string,
   context: DomainContext,
 ): Promise<void> {
-  if (!context.llm.generate) return
+  const contradictionLlm = context.llmAt('low')
+  if (!contradictionLlm.generate) return
 
   // Find existing non-superseded decisions about similar topics
   const searchResult = await context.search({
@@ -167,7 +172,8 @@ async function detectContradictions(
       `New: ${content}\n\n` +
       'Respond with ONLY "yes" or "no".'
 
-    const result = await context.llm.generate(prompt)
+    // eslint guard checked above; TypeScript can't narrow across loop iterations
+    const result = await contradictionLlm.generate(prompt)
     if (result.trim().toLowerCase().startsWith('yes')) {
       // New decision supersedes the old one
       await context.graph.relate(memoryId, 'supersedes', existing.id)

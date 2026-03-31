@@ -22,6 +22,7 @@ import type { ProjectDomainOptions } from './types.ts'
 import { projectSkills } from './skills.ts'
 import { processInboxItem } from './inbox.ts'
 import { scanCommits, detectDrift } from './schedules.ts'
+import { bootstrapProject } from './bootstrap.ts'
 
 function buildSchedules(options?: ProjectDomainOptions): DomainSchedule[] {
   const schedules: DomainSchedule[] = []
@@ -104,6 +105,7 @@ export function createProjectDomain(options?: ProjectDomainOptions): DomainConfi
     skills: projectSkills,
     processInboxItem,
     schedules: buildSchedules(options),
+    bootstrap: (context: DomainContext) => bootstrapProject(context, options),
 
     describe() {
       return 'Built-in project knowledge domain that captures the invisible knowledge layer around a codebase: architectural decisions and rationale, business logic semantics, design direction, and relationships between system components.'

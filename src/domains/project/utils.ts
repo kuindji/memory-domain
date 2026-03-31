@@ -47,7 +47,7 @@ export async function linkToTopics(
   memoryId: string,
   content: string,
 ): Promise<void> {
-  const topicNames = await context.llm.extract(content)
+  const topicNames = await context.llmAt('low').extract(content)
 
   for (const topicName of topicNames) {
     const searchResult = await context.search({

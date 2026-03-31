@@ -4,7 +4,7 @@ const scheduleCommand: CommandHandler = async (engine, parsed) => {
   const [subcommand, domainArg, scheduleArg] = parsed.args
 
   if (!subcommand) {
-    return { output: { error: 'Subcommand is required: list, trigger' }, exitCode: 1 }
+    return { output: { error: 'Subcommand is required: list, trigger, run-due' }, exitCode: 1 }
   }
 
   if (subcommand === 'list') {
@@ -20,6 +20,16 @@ const scheduleCommand: CommandHandler = async (engine, parsed) => {
     try {
       await engine.triggerSchedule(domainArg, scheduleArg)
       return { output: { triggered: true, domain: domainArg, schedule: scheduleArg }, exitCode: 0 }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      return { output: { error: message }, exitCode: 1 }
+    }
+  }
+
+  if (subcommand === 'run-due') {
+    try {
+      const result = await engine.runDueSchedules()
+      return { output: { ran: result.ran, count: result.ran.length }, exitCode: 0 }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       return { output: { error: message }, exitCode: 1 }
