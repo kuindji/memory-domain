@@ -6,6 +6,10 @@ import { ingestCommand } from './commands/ingest.ts'
 import { searchCommand } from './commands/search.ts'
 import { askCommand } from './commands/ask.ts'
 import { buildContextCommand } from './commands/build-context.ts'
+import { writeCommand } from './commands/write.ts'
+import { memoryCommand } from './commands/memory.ts'
+import { graphCommand } from './commands/graph.ts'
+import { scheduleCommand } from './commands/schedule.ts'
 import { loadConfig } from '../config-loader.ts'
 import type { CommandHandler, CommandResult } from './types.ts'
 
@@ -16,6 +20,10 @@ const COMMANDS: Record<string, CommandHandler> = {
   'build-context': buildContextCommand,
   domains: domainsCommand,
   domain: domainCommand,
+  write: writeCommand,
+  memory: memoryCommand,
+  graph: graphCommand,
+  schedule: scheduleCommand,
 }
 
 async function main(): Promise<void> {
