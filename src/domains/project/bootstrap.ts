@@ -10,6 +10,7 @@ import {
 } from './types.ts'
 import type { ProjectDomainOptions, DirEntry, TriageResult, AnalysisResult } from './types.ts'
 import { ensureTag, findOrCreateEntity } from './utils.ts'
+import { formatTree, countDirectories, calculateScanDepth } from './bootstrap-utils.ts'
 
 const META_LAST_COMMIT = 'project:lastCommitHash'
 
@@ -100,32 +101,6 @@ async function scanDirectory(
   }
 
   return result
-}
-
-function countDirectories(entries: DirEntry[]): number {
-  let count = 0
-  for (const entry of entries) {
-    if (entry.isDirectory) {
-      count++
-      if (entry.children) {
-        count += countDirectories(entry.children)
-      }
-    }
-  }
-  return count
-}
-
-function formatTree(entries: DirEntry[], indent: string): string {
-  const lines: string[] = []
-  for (const entry of entries) {
-    if (!entry.isDirectory) continue
-    const fileInfo = entry.files?.length ? ` [${entry.files.join(', ')}]` : ''
-    lines.push(`${indent}${entry.name}/${fileInfo}`)
-    if (entry.children?.length) {
-      lines.push(formatTree(entry.children, indent + '  '))
-    }
-  }
-  return lines.join('\n')
 }
 
 async function readFileContent(
@@ -223,9 +198,10 @@ export async function bootstrapProject(
   if (!projectRoot) return
 
   // Step 1: Scan directory structure
-  const tree = await scanDirectory(projectRoot, projectRoot, 0, 4)
-  const treeText = formatTree(tree, '')
+  const tree = await scanDirectory(projectRoot, projectRoot, 0, 6)
   const dirCount = countDirectories(tree)
+  const displayDepth = calculateScanDepth(dirCount)
+  const treeText = formatTree(tree, '', 0, displayDepth)
 
   const llm = context.llmAt('medium')
   if (!llm.generate) return
