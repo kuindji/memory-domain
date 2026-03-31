@@ -11,6 +11,7 @@ Commands:
   memory          Read, update, tag, or delete a memory
   graph           Manage graph edges and traversals
   schedule        List or trigger domain schedules
+  skill           Output combined skill guide for all domains
   domains         List all available domains
   domain          Inspect a specific domain
   help            Show this help text
@@ -209,6 +210,18 @@ Examples:
   active-memory schedule list --domain topic
   active-memory schedule trigger topic merge-similar-topics
   active-memory schedule run-due
+`.trim(),
+
+  skill: `
+Usage: active-memory skill
+
+Output a combined skill guide from all registered domains. Collects all external
+skills across every domain and concatenates their content into a single document.
+
+Use --pretty for readable output, or pipe JSON to extract the content field.
+
+Examples:
+  active-memory skill --pretty
 `.trim(),
 
   domains: `

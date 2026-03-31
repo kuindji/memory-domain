@@ -11,3 +11,7 @@
 **Important:** Avoid disabling eslint rules when working on linting issues. Try to find proper solution.
 
 **Important:** Run lint, typecheck and test commands after making changes.
+
+## Project Memory
+
+This project uses itself for persistent project knowledge. Run `bun src/cli/cli.ts skill --pretty` to get the full usage guide.
