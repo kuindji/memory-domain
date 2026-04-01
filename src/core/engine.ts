@@ -446,6 +446,17 @@ class MemoryEngine {
       throw new Error('Cannot ingest: all target domains are read-only')
     }
 
+    // Add autoOwn domains not already in the list
+    for (const domain of this.domainRegistry.list()) {
+      if (
+        domain.settings?.autoOwn &&
+        !targetDomainIds.includes(domain.id) &&
+        this.domainRegistry.getAccess(domain.id) === 'write'
+      ) {
+        targetDomainIds.push(domain.id)
+      }
+    }
+
     // Assign ownership
     for (const domainId of targetDomainIds) {
       const fullDomainId = domainId.startsWith('domain:') ? domainId : `domain:${domainId}`

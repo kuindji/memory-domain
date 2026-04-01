@@ -91,3 +91,77 @@ describe('Domain access enforcement', () => {
     expect(result.entries).toEqual([])
   })
 })
+
+describe('autoOwn', () => {
+  let engine: MemoryEngine
+
+  beforeEach(async () => {
+    engine = new MemoryEngine()
+    await engine.initialize({
+      connection: 'mem://',
+      namespace: 'test',
+      database: `test_${Date.now()}`,
+      llm: new MockLLMAdapter(),
+    })
+  })
+
+  afterEach(async () => {
+    await engine.close()
+  })
+
+  test('autoOwn domain gets ownership even when not in target list', async () => {
+    await engine.registerDomain({
+      ...makeDomain('auto'),
+      settings: { autoOwn: true },
+    })
+    await engine.registerDomain(makeDomain('explicit'))
+
+    const result = await engine.ingest('test', { domains: ['explicit'] })
+
+    const graph = engine.getGraph()
+    const owners = await graph.query<{ out: unknown }[]>(
+      `SELECT out FROM owned_by WHERE in = $memId`,
+      { memId: new StringRecordId(result.id!) }
+    )
+    const domainIds = (owners ?? []).map(o => String(o.out))
+    expect(domainIds).toContain('domain:explicit')
+    expect(domainIds).toContain('domain:auto')
+  })
+
+  test('autoOwn read-only domain does not get ownership', async () => {
+    await engine.registerDomain(
+      { ...makeDomain('auto-ro'), settings: { autoOwn: true } },
+      { access: 'read' }
+    )
+    await engine.registerDomain(makeDomain('rw'))
+
+    const result = await engine.ingest('test', { domains: ['rw'] })
+
+    const graph = engine.getGraph()
+    const owners = await graph.query<{ out: unknown }[]>(
+      `SELECT out FROM owned_by WHERE in = $memId`,
+      { memId: new StringRecordId(result.id!) }
+    )
+    const domainIds = (owners ?? []).map(o => String(o.out))
+    expect(domainIds).toContain('domain:rw')
+    expect(domainIds).not.toContain('domain:auto-ro')
+  })
+
+  test('autoOwn domain already in target list is not duplicated', async () => {
+    await engine.registerDomain({
+      ...makeDomain('auto'),
+      settings: { autoOwn: true },
+    })
+
+    const result = await engine.ingest('test', { domains: ['auto'] })
+
+    const graph = engine.getGraph()
+    const owners = await graph.query<{ out: unknown }[]>(
+      `SELECT out FROM owned_by WHERE in = $memId`,
+      { memId: new StringRecordId(result.id!) }
+    )
+    const domainIds = (owners ?? []).map(o => String(o.out))
+    const autoCount = domainIds.filter(id => id === 'domain:auto').length
+    expect(autoCount).toBe(1)
+  })
+})
