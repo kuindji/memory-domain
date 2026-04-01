@@ -1,16 +1,18 @@
 import { readFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import type { DomainConfig, DomainSkill, DomainSummary } from './types.ts'
+import type { DomainConfig, DomainSkill, DomainSummary, DomainRegistrationOptions } from './types.ts'
 
 export class DomainRegistry {
   private domains = new Map<string, DomainConfig>()
+  private accessLevels = new Map<string, 'read' | 'write'>()
 
-  register(domain: DomainConfig): void {
+  register(domain: DomainConfig, options?: DomainRegistrationOptions): void {
     if (this.domains.has(domain.id)) {
       throw new Error(`Domain "${domain.id}" is already registered`)
     }
     this.domains.set(domain.id, domain)
+    this.accessLevels.set(domain.id, options?.access ?? 'write')
   }
 
   unregister(domainId: string): void {
@@ -18,6 +20,13 @@ export class DomainRegistry {
       throw new Error('Cannot unregister the built-in log domain')
     }
     this.domains.delete(domainId)
+    this.accessLevels.delete(domainId)
+  }
+
+  getAccess(domainId: string): 'read' | 'write' {
+    const access = this.accessLevels.get(domainId)
+    if (access === undefined) throw new Error(`Domain "${domainId}" not found`)
+    return access
   }
 
   get(domainId: string): DomainConfig | undefined {

@@ -121,6 +121,25 @@ describe('DomainRegistry', () => {
     registry.register(domain)
     expect(registry.get('typed')?.baseDir).toBe('/some/path')
   })
+
+  test('register with access level stores the level', () => {
+    const registry = new DomainRegistry()
+    registry.register(makeDomain('readonly-domain'), { access: 'read' })
+
+    expect(registry.getAccess('readonly-domain')).toBe('read')
+  })
+
+  test('register without options defaults access to write', () => {
+    const registry = new DomainRegistry()
+    registry.register(makeDomain('default-domain'))
+
+    expect(registry.getAccess('default-domain')).toBe('write')
+  })
+
+  test('getAccess throws for unknown domain', () => {
+    const registry = new DomainRegistry()
+    expect(() => registry.getAccess('missing')).toThrow('Domain "missing" not found')
+  })
 })
 
 describe('Lazy loading', () => {

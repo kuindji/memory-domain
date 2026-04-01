@@ -36,6 +36,7 @@ import type {
   ScheduleInfo,
   TraversalNode,
   ModelLevel,
+  DomainRegistrationOptions,
 } from './types.ts'
 
 class MemoryEngine {
@@ -101,7 +102,7 @@ class MemoryEngine {
     await this.registerDomain(logDomain)
   }
 
-  async registerDomain(domain: DomainConfig): Promise<void> {
+  async registerDomain(domain: DomainConfig, options?: DomainRegistrationOptions): Promise<void> {
     // Register schema if provided
     if (domain.schema) {
       await this.schema.registerDomain(domain.id, domain.schema)
@@ -122,7 +123,7 @@ class MemoryEngine {
     }
 
     // Register in DomainRegistry
-    this.domainRegistry.register(domain)
+    this.domainRegistry.register(domain, options)
 
     // Register schedules
     if (domain.schedules) {
