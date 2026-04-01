@@ -51,7 +51,13 @@ export class DomainRegistry {
   getExternalSkills(domainId: string): DomainSkill[] {
     const domain = this.domains.get(domainId)
     if (!domain?.skills) return []
-    return domain.skills.filter(s => s.scope === 'external' || s.scope === 'both')
+    const isReadOnly = this.accessLevels.get(domainId) === 'read'
+    return domain.skills.filter(s => {
+      const isExternal = s.scope === 'external' || s.scope === 'both'
+      if (!isExternal) return false
+      if (isReadOnly && s.writes) return false
+      return true
+    })
   }
 
   getInternalSkills(domainId: string): DomainSkill[] {

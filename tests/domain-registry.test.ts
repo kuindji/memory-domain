@@ -220,3 +220,40 @@ describe('Lazy loading', () => {
     expect(content).toBeNull()
   })
 })
+
+describe('Skill filtering by access level', () => {
+  test('getExternalSkills excludes write skills for read-only domains', () => {
+    const registry = new DomainRegistry()
+    registry.register({
+      id: 'filtered',
+      name: 'Filtered',
+      skills: [
+        { id: 'read-skill', name: 'Read', description: 'read', scope: 'external' },
+        { id: 'write-skill', name: 'Write', description: 'write', scope: 'external', writes: true },
+        { id: 'both-write', name: 'Both', description: 'both', scope: 'both', writes: true },
+        { id: 'internal-write', name: 'Internal', description: 'internal', scope: 'internal', writes: true },
+      ],
+      async processInboxItem() {},
+    }, { access: 'read' })
+
+    const skills = registry.getExternalSkills('filtered')
+    expect(skills.map(s => s.id)).toEqual(['read-skill'])
+  })
+
+  test('getExternalSkills returns all external skills for write-access domains', () => {
+    const registry = new DomainRegistry()
+    registry.register({
+      id: 'full',
+      name: 'Full',
+      skills: [
+        { id: 'read-skill', name: 'Read', description: 'read', scope: 'external' },
+        { id: 'write-skill', name: 'Write', description: 'write', scope: 'external', writes: true },
+        { id: 'both-write', name: 'Both', description: 'both', scope: 'both', writes: true },
+      ],
+      async processInboxItem() {},
+    })
+
+    const skills = registry.getExternalSkills('full')
+    expect(skills).toHaveLength(3)
+  })
+})
