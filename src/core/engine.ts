@@ -133,7 +133,14 @@ class MemoryEngine {
     }
   }
 
+  private assertWriteAccess(domainId: string): void {
+    if (this.domainRegistry.has(domainId) && this.domainRegistry.getAccess(domainId) === 'read') {
+      throw new Error(`Domain "${domainId}" is registered as read-only`)
+    }
+  }
+
   async writeMemory(text: string, options: WriteOptions): Promise<WriteResult> {
+    this.assertWriteAccess(options.domain)
     const ctx = this.createDomainContext(options.domain, options.context)
     const id = await ctx.writeMemory({
       content: text,
@@ -273,8 +280,9 @@ class MemoryEngine {
   }
 
   // domainId is required by the CLI contract for audit/authorization context.
-  // Currently not enforced — reserved for future domain-level access control.
-  async relate(from: string, to: string, edgeType: string, _domainId: string, attrs?: Record<string, unknown>): Promise<string> {
+  // Access is enforced — read-only domains may not create edges.
+  async relate(from: string, to: string, edgeType: string, domainId: string, attrs?: Record<string, unknown>): Promise<string> {
+    this.assertWriteAccess(domainId)
     return this.graph.relate(from, edgeType, to, attrs)
   }
 
@@ -423,10 +431,20 @@ class MemoryEngine {
       }
     }
 
-    // Determine target domains — log domain always gets ownership
-    const targetDomainIds = options?.domains
-      ? [...new Set([...options.domains, 'log'])]
+    // Determine target domains
+    let targetDomainIds = options?.domains
+      ? [...options.domains]
       : this.domainRegistry.getAllDomainIds()
+
+    // Filter out read-only domains
+    targetDomainIds = targetDomainIds.filter(id => {
+      if (!this.domainRegistry.has(id)) return true
+      return this.domainRegistry.getAccess(id) === 'write'
+    })
+
+    if (targetDomainIds.length === 0) {
+      throw new Error('Cannot ingest: all target domains are read-only')
+    }
 
     // Assign ownership
     for (const domainId of targetDomainIds) {
@@ -473,6 +491,7 @@ class MemoryEngine {
   }
 
   async releaseOwnership(memoryId: string, domainId: string): Promise<void> {
+    this.assertWriteAccess(domainId)
     const fullDomainId = domainId.startsWith('domain:') ? domainId : `domain:${domainId}`
 
     // Remove owned_by edge
@@ -575,6 +594,7 @@ class MemoryEngine {
     const search = this.search.bind(this)
     const mergedContext = this.mergeContext(requestContext)
     const schema = this.schema
+    const domainRegistry = this.domainRegistry
 
     async function isMemoryVisible(memoryId: string): Promise<boolean> {
       const owners = await graph.query<{ out: unknown }[]>(
@@ -780,6 +800,9 @@ class MemoryEngine {
         targetDomainId: string,
         attributes?: Record<string, unknown>
       ): Promise<void> {
+        if (domainRegistry.has(targetDomainId) && domainRegistry.getAccess(targetDomainId) === 'read') {
+          throw new Error(`Domain "${targetDomainId}" is registered as read-only`)
+        }
         const fullDomainId = targetDomainId.startsWith('domain:') ? targetDomainId : `domain:${targetDomainId}`
         await graph.relate(memoryId, 'owned_by', fullDomainId, {
           attributes: attributes ?? {},

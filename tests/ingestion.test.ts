@@ -94,7 +94,6 @@ describe('MemoryEngine', () => {
       const memId = result.id!
 
       await engine.releaseOwnership(memId, 'domain_a')
-      await engine.releaseOwnership(memId, 'log')
 
       const memory = await engine.getGraph().getNode(memId)
       expect(memory).toBeNull()
@@ -106,8 +105,13 @@ describe('MemoryEngine', () => {
         name: 'A',
         async processInboxItem() {},
       })
+      await engine.registerDomain({
+        id: 'domain_b',
+        name: 'B',
+        async processInboxItem() {},
+      })
 
-      const result = await engine.ingest('Shared content', { domains: ['domain_a'] })
+      const result = await engine.ingest('Shared content', { domains: ['domain_a', 'domain_b'] })
       const memId = result.id!
 
       await engine.releaseOwnership(memId, 'domain_a')
