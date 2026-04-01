@@ -1,10 +1,10 @@
 {
-  "name": "active-memory",
+  "name": "memory-domain",
   "version": "0.1.0",
   "type": "module",
   "main": "src/index.ts",
   "bin": {
-    "active-memory": "bin/active-memory"
+    "memory-domain": "bin/memory-domain"
   },
   "scripts": {
     "test": "bun test",
@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "active-memory": "bin/active-memory"
+    "memory-domain": "bin/memory-domain"
   },
   "dependencies": {
     "surrealdb": "^2.0.0",

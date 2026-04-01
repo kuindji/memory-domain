@@ -6,7 +6,7 @@ import { createProjectDomain } from './src/domains/project/index.ts'
 const engine = new MemoryEngine()
 
 await engine.initialize({
-  connection: `surrealkv://${import.meta.dir}/.active-memory/db`,
+  connection: `surrealkv://${import.meta.dir}/.memory-domain/db`,
   namespace: 'default',
   database: 'memory',
   llm: new ClaudeCliAdapter({

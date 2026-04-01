@@ -4,7 +4,7 @@
 
 set -e
 
-MODEL_DIR="$(cd "$(dirname "$0")/.." && pwd)/.active-memory/model"
+MODEL_DIR="$(cd "$(dirname "$0")/.." && pwd)/.memory-domain/model"
 mkdir -p "$MODEL_DIR"
 
 HF_BASE="https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main"

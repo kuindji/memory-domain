@@ -1,5 +1,5 @@
 const USAGE = `
-Usage: active-memory <command> [options]
+Usage: memory-domain <command> [options]
 
 Commands:
   init            Initialize database, schemas, and optionally bootstrap domains
@@ -22,12 +22,12 @@ Global Flags:
   --pretty              Output as human-readable text (default: JSON)
   --meta key=value      Set request context metadata (repeatable)
 
-Run "active-memory help <command>" for detailed help on a specific command.
+Run "memory-domain help <command>" for detailed help on a specific command.
 `.trim()
 
 const COMMAND_HELP: Record<string, string> = {
   init: `
-Usage: active-memory init [--yes] [--no-bootstrap]
+Usage: memory-domain init [--yes] [--no-bootstrap]
 
 Initialize the database, register schemas, and optionally run domain bootstrap routines.
 
@@ -39,13 +39,13 @@ Bootstrap routines perform one-time setup for domains (e.g., scanning project st
 They may use AI and incur API usage. You will be prompted for confirmation unless --yes is set.
 
 Examples:
-  active-memory init
-  active-memory init --yes
-  active-memory init --no-bootstrap
+  memory-domain init
+  memory-domain init --yes
+  memory-domain init --no-bootstrap
 `.trim(),
 
   ingest: `
-Usage: active-memory ingest [--text "..."] [--domains d1,d2] [--tags t1,t2] [--event-time <ms>] [--skip-dedup] [--meta key=value]
+Usage: memory-domain ingest [--text "..."] [--domains d1,d2] [--tags t1,t2] [--event-time <ms>] [--skip-dedup] [--meta key=value]
 
 Store a new memory. Reads from stdin if piped, otherwise requires --text.
 
@@ -58,12 +58,12 @@ Options:
   --meta key=value     Request context metadata (repeatable)
 
 Examples:
-  echo "Meeting notes..." | active-memory ingest --domains work
-  active-memory ingest --text "Buy milk" --tags shopping --meta user-id=abc
+  echo "Meeting notes..." | memory-domain ingest --domains work
+  memory-domain ingest --text "Buy milk" --tags shopping --meta user-id=abc
 `.trim(),
 
   search: `
-Usage: active-memory search <query> [--mode vector|fulltext|graph|hybrid] [--domains d1,d2] [--tags t1,t2] [--limit N] [--budget N] [--min-score N] [--meta key=value]
+Usage: memory-domain search <query> [--mode vector|fulltext|graph|hybrid] [--domains d1,d2] [--tags t1,t2] [--limit N] [--budget N] [--min-score N] [--meta key=value]
 
 Search stored memories by query string.
 
@@ -80,12 +80,12 @@ Options:
   --meta key=value     Request context metadata (repeatable)
 
 Examples:
-  active-memory search "project deadlines" --mode vector --limit 5
-  active-memory search "shopping list" --domains personal --meta user-id=abc
+  memory-domain search "project deadlines" --mode vector --limit 5
+  memory-domain search "shopping list" --domains personal --meta user-id=abc
 `.trim(),
 
   ask: `
-Usage: active-memory ask <question> [--domains d1,d2] [--tags t1,t2] [--budget N] [--limit N] [--meta key=value]
+Usage: memory-domain ask <question> [--domains d1,d2] [--tags t1,t2] [--budget N] [--limit N] [--meta key=value]
 
 Ask a natural language question and retrieve relevant memories as an answer.
 
@@ -100,12 +100,12 @@ Options:
   --meta key=value     Request context metadata (repeatable)
 
 Examples:
-  active-memory ask "What did I decide about the API design?"
-  active-memory ask "What are my tasks?" --domains work --meta user-id=abc
+  memory-domain ask "What did I decide about the API design?"
+  memory-domain ask "What are my tasks?" --domains work --meta user-id=abc
 `.trim(),
 
   'build-context': `
-Usage: active-memory build-context <text> [--domains d1,d2] [--budget N] [--max-memories N] [--meta key=value]
+Usage: memory-domain build-context <text> [--domains d1,d2] [--budget N] [--max-memories N] [--meta key=value]
 
 Build a context block from memories relevant to the provided text.
 
@@ -119,12 +119,12 @@ Options:
   --meta key=value     Request context metadata (repeatable)
 
 Examples:
-  active-memory build-context "Summarize the project status" --budget 2000
-  active-memory build-context "Auth flow" --domains codebase --meta session-id=xyz
+  memory-domain build-context "Summarize the project status" --budget 2000
+  memory-domain build-context "Auth flow" --domains codebase --meta session-id=xyz
 `.trim(),
 
   write: `
-Usage: active-memory write --domain <id> --text <text> [--tags t1,t2] [--attr key=value] [--meta key=value]
+Usage: memory-domain write --domain <id> --text <text> [--tags t1,t2] [--attr key=value] [--meta key=value]
 
 Create a memory with direct domain ownership. No deduplication or inbox processing.
 
@@ -136,12 +136,12 @@ Options:
   --meta key=value     Request context metadata (repeatable)
 
 Examples:
-  active-memory write --domain topic --text "Machine Learning" --tags topic --attr status=active
-  active-memory write --domain user --text "Prefers dark mode" --tags preference --meta user-id=abc
+  memory-domain write --domain topic --text "Machine Learning" --tags topic --attr status=active
+  memory-domain write --domain user --text "Prefers dark mode" --tags preference --meta user-id=abc
 `.trim(),
 
   memory: `
-Usage: active-memory memory <id> [subcommand] [options]
+Usage: memory-domain memory <id> [subcommand] [options]
 
 Read, update, tag, or delete a specific memory.
 
@@ -160,15 +160,15 @@ Options:
   --domain <id>        Domain to release (for release)
 
 Examples:
-  active-memory memory memory:abc123
-  active-memory memory memory:abc123 update --text "New content"
-  active-memory memory memory:abc123 tag important
-  active-memory memory memory:abc123 release --domain topic
-  active-memory memory memory:abc123 delete
+  memory-domain memory memory:abc123
+  memory-domain memory memory:abc123 update --text "New content"
+  memory-domain memory memory:abc123 tag important
+  memory-domain memory memory:abc123 release --domain topic
+  memory-domain memory memory:abc123 delete
 `.trim(),
 
   graph: `
-Usage: active-memory graph <subcommand> [options]
+Usage: memory-domain graph <subcommand> [options]
 
 Manage graph edges and run traversals.
 
@@ -186,14 +186,14 @@ Options:
   --depth <N>          Traversal depth (for traverse, default: 1)
 
 Examples:
-  active-memory graph edges memory:abc123 --direction out
-  active-memory graph relate memory:abc topic:ml about_topic --domain topic
-  active-memory graph unrelate memory:abc topic:ml about_topic
-  active-memory graph traverse topic:ml --edges subtopic_of,related_to --depth 2
+  memory-domain graph edges memory:abc123 --direction out
+  memory-domain graph relate memory:abc topic:ml about_topic --domain topic
+  memory-domain graph unrelate memory:abc topic:ml about_topic
+  memory-domain graph traverse topic:ml --edges subtopic_of,related_to --depth 2
 `.trim(),
 
   schedule: `
-Usage: active-memory schedule <subcommand> [options]
+Usage: memory-domain schedule <subcommand> [options]
 
 List or manually trigger domain schedules.
 
@@ -206,14 +206,14 @@ Options:
   --domain <id>        Filter schedules by domain (for list)
 
 Examples:
-  active-memory schedule list
-  active-memory schedule list --domain topic
-  active-memory schedule trigger topic merge-similar-topics
-  active-memory schedule run-due
+  memory-domain schedule list
+  memory-domain schedule list --domain topic
+  memory-domain schedule trigger topic merge-similar-topics
+  memory-domain schedule run-due
 `.trim(),
 
   skill: `
-Usage: active-memory skill
+Usage: memory-domain skill
 
 Output a combined skill guide from all registered domains. Collects all external
 skills across every domain and concatenates their content into a single document.
@@ -221,21 +221,21 @@ skills across every domain and concatenates their content into a single document
 Use --pretty for readable output, or pipe JSON to extract the content field.
 
 Examples:
-  active-memory skill --pretty
+  memory-domain skill --pretty
 `.trim(),
 
   domains: `
-Usage: active-memory domains
+Usage: memory-domain domains
 
 List all available domains and their descriptions.
 
 Examples:
-  active-memory domains
-  active-memory domains --pretty
+  memory-domain domains
+  memory-domain domains --pretty
 `.trim(),
 
   domain: `
-Usage: active-memory domain <id> <subcommand>
+Usage: memory-domain domain <id> <subcommand>
 
 Inspect a specific domain by its ID.
 
@@ -248,20 +248,20 @@ Subcommands:
   skill <skill-id>     Show details for a specific skill
 
 Examples:
-  active-memory domain topic structure
-  active-memory domain topic skills
-  active-memory domain topic skill topic-management
+  memory-domain domain topic structure
+  memory-domain domain topic skills
+  memory-domain domain topic skill topic-management
 `.trim(),
 
   help: `
-Usage: active-memory help [<command>]
+Usage: memory-domain help [<command>]
 
 Show help text. Pass a command name to see detailed help for that command.
 
 Examples:
-  active-memory help
-  active-memory help write
-  active-memory --help
+  memory-domain help
+  memory-domain help write
+  memory-domain --help
 `.trim(),
 }
 

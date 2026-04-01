@@ -7,7 +7,7 @@ Retrieve conversational memory using search and context building.
 Use `build-context` to assemble a token-budgeted context string from all three memory tiers:
 
 ```sh
-node active-memory build-context "<content-to-build-context-for>" \
+node memory-domain build-context "<content-to-build-context-for>" \
   --domains chat \
   --budget 4000 \
   --meta userId=user-123 \
@@ -24,13 +24,13 @@ The assembled context contains three sections:
 
 ```sh
 # Find episodic memories for a user
-active-memory search "<query>" \
+memory-domain search "<query>" \
   --domains chat \
   --tags chat/episodic \
   --meta userId=user-123
 
 # Find working memories for a session
-active-memory search "" \
+memory-domain search "" \
   --domains chat \
   --tags chat/message \
   --meta userId=user-123 \

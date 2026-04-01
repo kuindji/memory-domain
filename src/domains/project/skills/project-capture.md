@@ -14,7 +14,7 @@ Do NOT capture: implementation details visible in code, commit messages, or exis
 ## Ingesting Project Knowledge
 
 ```sh
-node active-memory ingest --domains project \
+node memory-domain ingest --domains project \
   --meta classification=decision \
   --meta audience=technical,business \
   --text "We chose event sourcing for the order pipeline because we need full audit trail for compliance"
@@ -52,10 +52,10 @@ When writing about specific architectural components, create entity nodes and li
 
 ```sh
 # Link a memory to an entity
-node active-memory graph relate <memory-id> <entity-id> about_entity --domain project
+node memory-domain graph relate <memory-id> <entity-id> about_entity --domain project
 
 # Relate two entities
-node active-memory graph relate <module-id> <data-entity-id> manages --domain project
+node memory-domain graph relate <module-id> <data-entity-id> manages --domain project
 ```
 
 ## When to Capture

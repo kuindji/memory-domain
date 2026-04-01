@@ -3,9 +3,9 @@ import { join, isAbsolute } from 'path'
 import type { MemoryEngine } from './core/engine.ts'
 
 const CONFIG_NAMES = [
-  'active-memory.config.ts',
-  'active-memory.config.js',
-  'active-memory.config.mjs',
+  'memory-domain.config.ts',
+  'memory-domain.config.js',
+  'memory-domain.config.mjs',
 ]
 
 function resolveConfigPath(cwd: string, explicitPath?: string): string | null {
@@ -33,7 +33,7 @@ async function loadConfig(cwd?: string, configPath?: string): Promise<MemoryEngi
 
   if (!resolved) {
     throw new Error(
-      `No active-memory config file found in ${dir}. ` +
+      `No memory-domain config file found in ${dir}. ` +
       `Expected one of: ${CONFIG_NAMES.join(', ')}`
     )
   }

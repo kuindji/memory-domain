@@ -1,4 +1,4 @@
-# Active Memory — Architecture Overview
+# Memory Domain — Architecture Overview
 
 A graph-backed memory engine where **domains** own, process, and query memories independently while sharing a unified data layer.
 

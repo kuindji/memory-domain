@@ -15,29 +15,29 @@ describe('Config loader', () => {
     if (existsSync(tmpDir)) rmSync(tmpDir, { recursive: true })
   })
 
-  test('resolveConfigPath finds active-memory.config.ts', () => {
-    writeFileSync(join(tmpDir, 'active-memory.config.ts'), 'export default {}')
+  test('resolveConfigPath finds memory-domain.config.ts', () => {
+    writeFileSync(join(tmpDir, 'memory-domain.config.ts'), 'export default {}')
     const result = resolveConfigPath(tmpDir)
-    expect(result).toBe(join(tmpDir, 'active-memory.config.ts'))
+    expect(result).toBe(join(tmpDir, 'memory-domain.config.ts'))
   })
 
-  test('resolveConfigPath finds active-memory.config.js', () => {
-    writeFileSync(join(tmpDir, 'active-memory.config.js'), 'export default {}')
+  test('resolveConfigPath finds memory-domain.config.js', () => {
+    writeFileSync(join(tmpDir, 'memory-domain.config.js'), 'export default {}')
     const result = resolveConfigPath(tmpDir)
-    expect(result).toBe(join(tmpDir, 'active-memory.config.js'))
+    expect(result).toBe(join(tmpDir, 'memory-domain.config.js'))
   })
 
-  test('resolveConfigPath finds active-memory.config.mjs', () => {
-    writeFileSync(join(tmpDir, 'active-memory.config.mjs'), 'export default {}')
+  test('resolveConfigPath finds memory-domain.config.mjs', () => {
+    writeFileSync(join(tmpDir, 'memory-domain.config.mjs'), 'export default {}')
     const result = resolveConfigPath(tmpDir)
-    expect(result).toBe(join(tmpDir, 'active-memory.config.mjs'))
+    expect(result).toBe(join(tmpDir, 'memory-domain.config.mjs'))
   })
 
   test('resolveConfigPath prefers .ts over .js', () => {
-    writeFileSync(join(tmpDir, 'active-memory.config.ts'), 'export default {}')
-    writeFileSync(join(tmpDir, 'active-memory.config.js'), 'export default {}')
+    writeFileSync(join(tmpDir, 'memory-domain.config.ts'), 'export default {}')
+    writeFileSync(join(tmpDir, 'memory-domain.config.js'), 'export default {}')
     const result = resolveConfigPath(tmpDir)
-    expect(result).toBe(join(tmpDir, 'active-memory.config.ts'))
+    expect(result).toBe(join(tmpDir, 'memory-domain.config.ts'))
   })
 
   test('resolveConfigPath returns null when no config found', () => {

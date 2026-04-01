@@ -8,25 +8,25 @@ Write a memory with the `user` domain and link it to the user node:
 
 ```sh
 # Store a preference
-node active-memory write --domain user \
+node memory-domain write --domain user \
   --text "Prefers concise responses without bullet lists" \
   --tags user/preference \
   --meta userId=user-123
 
 # Store an identity fact
-node active-memory write --domain user \
+node memory-domain write --domain user \
   --text "User prefers to be addressed as Alex" \
   --tags user/identity \
   --meta userId=user-123
 
 # Store expertise
-node active-memory write --domain user \
+node memory-domain write --domain user \
   --text "Senior backend engineer with 10 years of Go experience" \
   --tags user/expertise \
   --meta userId=user-123
 
 # Store a goal
-node active-memory write --domain user \
+node memory-domain write --domain user \
   --text "Learning React for a frontend project" \
   --tags user/goal \
   --meta userId=user-123
@@ -46,5 +46,5 @@ node active-memory write --domain user \
 If a memory already exists, create the edge directly:
 
 ```sh
-active-memory graph relate <memory-id> user:<userId> about_user --domain user
+memory-domain graph relate <memory-id> user:<userId> about_user --domain user
 ```

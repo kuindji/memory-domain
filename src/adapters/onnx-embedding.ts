@@ -16,7 +16,7 @@ interface OnnxEmbeddingConfig {
   maxSequenceLength?: number
 }
 
-const DEFAULT_MODEL_DIR = resolve(process.cwd(), '.active-memory', 'model')
+const DEFAULT_MODEL_DIR = resolve(process.cwd(), '.memory-domain', 'model')
 const DEFAULT_MODEL_FILE = 'model.onnx'
 const DEFAULT_VOCAB_FILE = 'vocab.txt'
 const DEFAULT_MAX_SEQ_LENGTH = 512

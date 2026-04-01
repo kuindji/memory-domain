@@ -4,4 +4,4 @@ dist/
 .DS_Store
 bun.lock
 .claude/
-.active-memory/
+.memory-domain/

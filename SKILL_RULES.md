@@ -40,7 +40,7 @@ const mySkill: DomainSkill = {
 
 ## Scope
 
-- **internal**: Skills consumed by LLM calls inside active-memory (schedules, inbox processing, context building). Not exposed to outer agents.
+- **internal**: Skills consumed by LLM calls inside memory-domain (schedules, inbox processing, context building). Not exposed to outer agents.
 - **external**: Skills that tell outer agents how to interact with a domain via CLI. Loaded by the `skill` command.
 - **both**: Skills relevant to both internal processing and outer agent usage.
 

@@ -6,13 +6,13 @@ Search and retrieve project knowledge by classification, audience, entity refere
 
 ```sh
 # By text
-node active-memory search "<query-text>" --domains project
+node memory-domain search "<query-text>" --domains project
 
 # By classification tag
-node active-memory search "<query-text>" --domains project --tags project/decision
+node memory-domain search "<query-text>" --domains project --tags project/decision
 
 # Build context with audience filter
-node active-memory build-context "<content-to-build-context-for>" \
+node memory-domain build-context "<content-to-build-context-for>" \
   --domains project \
   --meta audience=business
 ```
@@ -33,16 +33,16 @@ The project domain maintains an entity graph. Use graph traversal to explore arc
 
 ```sh
 # What modules connect to a service?
-node active-memory graph traverse <module-id> --edges connects_to --depth 1
+node memory-domain graph traverse <module-id> --edges connects_to --depth 1
 
 # What data entities does a service manage?
-node active-memory graph traverse <module-id> --edges manages --direction out --depth 1
+node memory-domain graph traverse <module-id> --edges manages --direction out --depth 1
 
 # What modules implement a concept?
-node active-memory graph traverse <concept-id> --edges implements --direction in --depth 1
+node memory-domain graph traverse <concept-id> --edges implements --direction in --depth 1
 
 # What memories are about an entity?
-node active-memory graph traverse <entity-id> --edges about_entity --direction in --depth 1
+node memory-domain graph traverse <entity-id> --edges about_entity --direction in --depth 1
 ```
 
 ## Surfacing Questions
@@ -50,7 +50,7 @@ node active-memory graph traverse <entity-id> --edges about_entity --direction i
 The commit scanner and drift detector create `question` memories when they detect changes needing explanation:
 
 ```sh
-node active-memory search "" --domains project --tags project/question
+node memory-domain search "" --domains project --tags project/question
 ```
 
 ## Context Building
