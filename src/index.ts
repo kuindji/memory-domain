@@ -24,6 +24,7 @@ export type {
   DomainSkill,
   DomainSettings,
   DomainSummary,
+  DomainRegistrationOptions,
   WriteMemoryEntry,
   NodeDef,
   EdgeDef,
