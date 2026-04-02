@@ -1058,7 +1058,7 @@ Otherwise, respond with a query plan to find more relevant information.`
   }
 
   startProcessing(intervalMs?: number): void {
-    this.inboxProcessor.start(intervalMs)
+    this.inboxProcessor.start({ intervalMs })
     this.scheduler.start()
   }
 

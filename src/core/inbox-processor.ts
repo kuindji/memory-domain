@@ -166,10 +166,15 @@ class InboxProcessor {
     const existing = await this.store.getNode<Node & { value?: string }>('meta:_inbox_lock')
 
     if (existing?.value) {
-      const payload: InboxLockPayload = JSON.parse(existing.value)
-      const age = Date.now() - payload.lockedAt
-      if (age < this.staleAfterMs) {
-        return false
+      const parsed: unknown = JSON.parse(existing.value)
+      const lockedAt = parsed && typeof parsed === 'object' && 'lockedAt' in parsed
+        ? (parsed as { lockedAt: unknown }).lockedAt
+        : undefined
+      if (typeof lockedAt === 'number') {
+        const age = Date.now() - lockedAt
+        if (age < this.staleAfterMs) {
+          return false
+        }
       }
     }
 
