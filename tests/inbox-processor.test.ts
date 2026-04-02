@@ -270,6 +270,72 @@ describe('InboxProcessor', () => {
       )
       expect(owners?.length).toBe(1)
       expect(errorEvents.length).toBe(1)
+
+      const tags = await store.query<string[]>(
+        'SELECT VALUE out.label FROM tagged WHERE in = $memId',
+        { memId: new (await import('surrealdb')).StringRecordId(memId) }
+      )
+      expect(tags).toContain('inbox:failed-assert-claim:thrower')
+      expect(tags).not.toContain('inbox')
+    })
+
+    test('transient assertInboxClaimBatch errors are retried before quarantine', async () => {
+      const domain: DomainConfig = {
+        id: 'flaky',
+        name: 'Flaky',
+        async processInboxBatch() {},
+        assertInboxClaimBatch() { throw new Error('LLM timeout while classifying') },
+      }
+      domainRegistry.register(domain)
+
+      const memId = await createInboxMemory('retry me')
+      await addAssertClaimTag(memId, 'flaky')
+
+      const firstTick = await processor.tick()
+      const afterFirst = await store.query<string[]>(
+        'SELECT VALUE out.label FROM tagged WHERE in = $memId',
+        { memId: new (await import('surrealdb')).StringRecordId(memId) }
+      )
+
+      const secondTick = await processor.tick()
+      const afterSecond = await store.query<string[]>(
+        'SELECT VALUE out.label FROM tagged WHERE in = $memId',
+        { memId: new (await import('surrealdb')).StringRecordId(memId) }
+      )
+
+      expect(firstTick).toBe(true)
+      expect(secondTick).toBe(true)
+      expect(afterFirst).toContain('inbox')
+      expect(afterFirst).toContain('inbox:assert-claim:flaky')
+      expect(afterFirst).not.toContain('inbox:failed-assert-claim:flaky')
+      expect(afterSecond).not.toContain('inbox')
+      expect(afterSecond).not.toContain('inbox:assert-claim:flaky')
+      expect(afterSecond).toContain('inbox:failed-assert-claim:flaky')
+    })
+
+    test('quarantined assert-claim failures keep unowned memories for review', async () => {
+      const domain: DomainConfig = {
+        id: 'broken',
+        name: 'Broken',
+        async processInboxBatch() {},
+        assertInboxClaimBatch() { throw new Error('bug in claim logic') },
+      }
+      domainRegistry.register(domain)
+
+      const memId = await createInboxMemory('do not delete me')
+      await addAssertClaimTag(memId, 'broken')
+
+      await processor.tick()
+
+      const memory = await store.getNode(memId)
+      expect(memory).not.toBeNull()
+
+      const tags = await store.query<string[]>(
+        'SELECT VALUE out.label FROM tagged WHERE in = $memId',
+        { memId: new (await import('surrealdb')).StringRecordId(memId) }
+      )
+      expect(tags).toContain('inbox:failed-assert-claim:broken')
+      expect(tags).not.toContain('inbox')
     })
   })
 
@@ -362,12 +428,52 @@ describe('InboxProcessor', () => {
       expect(processedItems.length).toBe(1)
       expect(errorEvents.length).toBe(1)
 
-      // Both inbox tags should be removed
       const tags = await store.query<string[]>(
-        `SELECT VALUE out.label FROM tagged WHERE in = $memId AND string::starts_with(out.label, 'inbox:')`,
+        'SELECT VALUE out.label FROM tagged WHERE in = $memId',
         { memId: new (await import('surrealdb')).StringRecordId(memId) }
       )
-      expect(tags?.length ?? 0).toBe(0)
+      expect(tags).toContain('inbox:failed:thrower')
+      expect(tags).not.toContain('inbox:worker')
+      expect(tags).not.toContain('inbox')
+    })
+
+    test('transient processInboxBatch errors are retried before quarantine', async () => {
+      const errorEvents: unknown[] = []
+      events.on('error', (...args: unknown[]) => { errorEvents.push(args[0]) })
+
+      const domain: DomainConfig = {
+        id: 'flaky',
+        name: 'Flaky',
+        processInboxBatch(): Promise<void> { throw new Error('temporary network timeout') },
+      }
+      domainRegistry.register(domain)
+      await createDomainNode('flaky')
+
+      const memId = await createInboxMemory('retry processing')
+      await store.relate(memId, 'owned_by', 'domain:flaky', { attributes: {}, owned_at: Date.now() })
+      await addInboxDomainTag(memId, 'flaky')
+
+      const firstTick = await processor.tick()
+      const afterFirst = await store.query<string[]>(
+        'SELECT VALUE out.label FROM tagged WHERE in = $memId',
+        { memId: new (await import('surrealdb')).StringRecordId(memId) }
+      )
+
+      const secondTick = await processor.tick()
+      const afterSecond = await store.query<string[]>(
+        'SELECT VALUE out.label FROM tagged WHERE in = $memId',
+        { memId: new (await import('surrealdb')).StringRecordId(memId) }
+      )
+
+      expect(firstTick).toBe(false)
+      expect(secondTick).toBe(false)
+      expect(errorEvents).toHaveLength(2)
+      expect(afterFirst).toContain('inbox')
+      expect(afterFirst).toContain('inbox:flaky')
+      expect(afterFirst).not.toContain('inbox:failed:flaky')
+      expect(afterSecond).not.toContain('inbox')
+      expect(afterSecond).not.toContain('inbox:flaky')
+      expect(afterSecond).toContain('inbox:failed:flaky')
     })
 
     test('batches inbox processing by request context', async () => {

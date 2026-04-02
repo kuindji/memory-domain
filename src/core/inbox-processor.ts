@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { StringRecordId } from 'surrealdb'
 import type { GraphStore } from './graph-store.ts'
 import type { DomainRegistry } from './domain-registry.ts'
@@ -35,6 +36,26 @@ interface InboxLockPayload {
   lockedAt: number
 }
 
+type InboxStage = 'assert' | 'process'
+
+type FailureKind = 'transient' | 'permanent' | 'unknown'
+
+type FailureStatus = 'retryable_failed' | 'quarantined'
+
+interface BatchFailureRecord {
+  stage: InboxStage
+  domainId: string
+  memoryIds: string[]
+  requestContext?: Record<string, unknown>
+  attempt: number
+  status: FailureStatus
+  failureKind: FailureKind
+  errorName?: string
+  errorMessage: string
+  firstAttemptAt: number
+  lastAttemptAt: number
+}
+
 interface InboxProcessorOptions {
   intervalMs?: number
   batchLimit?: number
@@ -60,6 +81,7 @@ class InboxProcessor {
   private batchLimit = 50
   private staleAfterMs = 30_000
   private similarityThreshold = 0
+  private maxTransientAttempts = 2
 
   constructor(
     private store: GraphStore,
@@ -283,6 +305,176 @@ class InboxProcessor {
       .join(',')}}`
   }
 
+  private classifyError(error: unknown): FailureKind {
+    const message = this.getErrorMessage(error).toLowerCase()
+    const name = error instanceof Error ? error.name.toLowerCase() : ''
+
+    const transientMarkers = [
+      'timeout',
+      'timed out',
+      'rate limit',
+      'too many requests',
+      'temporarily unavailable',
+      'service unavailable',
+      'gateway timeout',
+      'bad gateway',
+      'connection reset',
+      'connection refused',
+      'socket hang up',
+      'network',
+      'econnreset',
+      'econnrefused',
+      'etimedout',
+      'eai_again',
+      '429',
+      '503',
+      '504',
+      'overloaded',
+    ]
+
+    if (name === 'aborterror' || transientMarkers.some(marker => message.includes(marker))) {
+      return 'transient'
+    }
+
+    return error instanceof Error ? 'permanent' : 'unknown'
+  }
+
+  private getErrorMessage(error: unknown): string {
+    if (error instanceof Error && error.message) return error.message
+    if (typeof error === 'string') return error
+    return 'Unknown inbox processing failure'
+  }
+
+  private getBatchMetaId(
+    stage: InboxStage,
+    domainId: string,
+    memoryIds: string[],
+    requestContext?: Record<string, unknown>,
+  ): string {
+    const payload = this.stableStringify({
+      stage,
+      domainId,
+      memoryIds: [...memoryIds].sort(),
+      requestContextKey: this.getRequestContextKey(requestContext),
+    })
+    const hash = createHash('sha256').update(payload).digest('hex').slice(0, 24)
+    return `meta:inbox_batch_${hash}`
+  }
+
+  private async readBatchFailureRecord(metaId: string): Promise<BatchFailureRecord | null> {
+    const node = await this.store.getNode<Node & { value?: string }>(metaId)
+    if (!node?.value) return null
+
+    try {
+      const parsed: unknown = JSON.parse(node.value)
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
+      return parsed as BatchFailureRecord
+    } catch {
+      return null
+    }
+  }
+
+  private async clearBatchFailureRecord(
+    stage: InboxStage,
+    domainId: string,
+    memoryIds: string[],
+    requestContext?: Record<string, unknown>,
+  ): Promise<void> {
+    const metaId = this.getBatchMetaId(stage, domainId, memoryIds, requestContext)
+    try {
+      await this.store.deleteNode(metaId)
+    } catch {
+      // Best-effort cleanup
+    }
+  }
+
+  private async recordBatchFailure(
+    stage: InboxStage,
+    domainId: string,
+    memoryIds: string[],
+    requestContext: Record<string, unknown> | undefined,
+    error: unknown,
+  ): Promise<BatchFailureRecord> {
+    const metaId = this.getBatchMetaId(stage, domainId, memoryIds, requestContext)
+    const existing = await this.readBatchFailureRecord(metaId)
+    const now = Date.now()
+    const failureKind = this.classifyError(error)
+    const attempt = (existing?.attempt ?? 0) + 1
+    const status: FailureStatus =
+      failureKind === 'transient' && attempt < this.maxTransientAttempts
+        ? 'retryable_failed'
+        : 'quarantined'
+
+    const record: BatchFailureRecord = {
+      stage,
+      domainId,
+      memoryIds: [...memoryIds].sort(),
+      requestContext,
+      attempt,
+      status,
+      failureKind,
+      errorName: error instanceof Error ? error.name : undefined,
+      errorMessage: this.getErrorMessage(error),
+      firstAttemptAt: existing?.firstAttemptAt ?? now,
+      lastAttemptAt: now,
+    }
+
+    const value = JSON.stringify(record)
+    try {
+      await this.store.createNodeWithId(metaId, { value })
+    } catch {
+      await this.store.updateNode(metaId, { value })
+    }
+
+    return record
+  }
+
+  private async ensureTag(label: string): Promise<string> {
+    const tagId = `tag:\`${label}\``
+    try {
+      await this.store.createNodeWithId(tagId, { label, created_at: Date.now() })
+    } catch {
+      // Already exists
+    }
+    return tagId
+  }
+
+  private async countActiveInboxTags(memId: string): Promise<number> {
+    const remainingInbox = await this.store.query<{ count: number }[]>(
+      `SELECT count() AS count FROM tagged
+       WHERE in = $memId
+         AND out.label IS NOT NONE
+         AND string::starts_with(out.label, 'inbox:')
+         AND !string::starts_with(out.label, 'inbox:processing:')
+         AND !string::starts_with(out.label, 'inbox:failed')
+       GROUP ALL`,
+      { memId: new StringRecordId(memId) }
+    )
+
+    return (remainingInbox && remainingInbox.length > 0) ? remainingInbox[0].count : 0
+  }
+
+  private async clearRootInboxIfNoActiveTags(memId: string): Promise<void> {
+    const remaining = await this.countActiveInboxTags(memId)
+    if (remaining === 0) {
+      await this.store.unrelate(memId, 'tagged', 'tag:inbox')
+      this.events.emit('inboxProcessed', { memoryId: memId })
+    }
+  }
+
+  private async countTagsByPrefix(memId: string, prefix: string): Promise<number> {
+    const rows = await this.store.query<{ count: number }[]>(
+      `SELECT count() AS count FROM tagged
+       WHERE in = $memId
+         AND out.label IS NOT NONE
+         AND string::starts_with(out.label, $prefix)
+       GROUP ALL`,
+      { memId: new StringRecordId(memId), prefix }
+    )
+
+    return (rows && rows.length > 0) ? rows[0].count : 0
+  }
+
   private async tagBatchAsProcessing(memoryIds: string[]): Promise<string> {
     const batchId = crypto.randomUUID()
     const tagId = `tag:\`inbox:processing:${batchId}\``
@@ -402,9 +594,13 @@ class InboxProcessor {
         )
         if (domainEntries.length === 0) continue
 
+        const domainMemoryIds = domainEntries.map(entry => entry.memory.id)
+        const assertTagId = `tag:\`inbox:assert-claim:${domainId}\``
+
         const ctx = this.contextFactory(domainId, requestContext)
         try {
           const claimedIds = await domain.assertInboxClaimBatch(domainEntries, ctx)
+          await this.clearBatchFailureRecord('assert', domainId, domainMemoryIds, requestContext)
 
           for (const memId of claimedIds) {
             // Create ownership
@@ -423,21 +619,32 @@ class InboxProcessor {
             } catch { /* already exists */ }
             await this.store.relate(memId, 'tagged', inboxTagId)
           }
+
+          for (const memId of domainMemoryIds) {
+            await this.store.unrelate(memId, 'tagged', assertTagId)
+          }
         } catch (err) {
           this.events.emit('error', {
             source: 'inbox-assertion',
             domainId,
             error: err,
           })
-        }
-      }
 
-      // Remove all assert-claim tags from batch members
-      for (const memId of memoryIds) {
-        const domainIds = memoryDomainMap.get(memId) ?? []
-        for (const domainId of domainIds) {
-          const tagId = `tag:\`inbox:assert-claim:${domainId}\``
-          await this.store.unrelate(memId, 'tagged', tagId)
+          const failure = await this.recordBatchFailure(
+            'assert',
+            domainId,
+            domainMemoryIds,
+            requestContext,
+            err,
+          )
+
+          if (failure.status === 'quarantined') {
+            const failedTagId = await this.ensureTag(`inbox:failed-assert-claim:${domainId}`)
+            for (const memId of domainMemoryIds) {
+              await this.store.unrelate(memId, 'tagged', assertTagId)
+              await this.store.relate(memId, 'tagged', failedTagId)
+            }
+          }
         }
       }
 
@@ -448,9 +655,13 @@ class InboxProcessor {
           { memId: new StringRecordId(memId) }
         )
         const ownerCount = (owners && owners.length > 0) ? owners[0].count : 0
+        const activeAssertCount = await this.countTagsByPrefix(memId, 'inbox:assert-claim:')
+        const failedAssertCount = await this.countTagsByPrefix(memId, 'inbox:failed-assert-claim:')
 
-        if (ownerCount === 0) {
+        if (ownerCount === 0 && activeAssertCount === 0 && failedAssertCount === 0) {
           await this.removeOrphanedMemory(memId)
+        } else {
+          await this.clearRootInboxIfNoActiveTags(memId)
         }
 
         this.events.emit('inboxClaimAsserted', {
@@ -474,6 +685,7 @@ class InboxProcessor {
        WHERE out.label IS NOT NONE
          AND string::starts_with(out.label, 'inbox:')
          AND !string::starts_with(out.label, 'inbox:assert-claim:')
+         AND !string::starts_with(out.label, 'inbox:failed')
          AND !string::starts_with(out.label, 'inbox:processing:')
        LIMIT $limit`,
       { limit: this.batchLimit * 10 }
@@ -500,18 +712,39 @@ class InboxProcessor {
 
       try {
         const ctx = this.contextFactory(domainId, requestContext)
+        const inboxTagId = `tag:\`inbox:${domainId}\``
+
         try {
           await domain.processInboxBatch(entries, ctx)
+          await this.clearBatchFailureRecord('process', domainId, memoryIds, requestContext)
         } catch (err) {
           this.events.emit('error', {
             source: 'inbox',
             domainId,
             error: err,
           })
+
+          const failure = await this.recordBatchFailure(
+            'process',
+            domainId,
+            memoryIds,
+            requestContext,
+            err,
+          )
+
+          if (failure.status === 'quarantined') {
+            const failedTagId = await this.ensureTag(`inbox:failed:${domainId}`)
+            for (const memId of memoryIds) {
+              await this.store.unrelate(memId, 'tagged', inboxTagId)
+              await this.store.relate(memId, 'tagged', failedTagId)
+              await this.clearRootInboxIfNoActiveTags(memId)
+            }
+          }
+
+          continue
         }
 
         // Remove this domain's inbox tag from all batch members
-        const inboxTagId = `tag:\`inbox:${domainId}\``
         for (const memId of memoryIds) {
           await this.store.unrelate(memId, 'tagged', inboxTagId)
           this.events.emit('inboxDomainProcessed', { memoryId: memId, domainId })
@@ -519,21 +752,7 @@ class InboxProcessor {
 
         // Check if any inbox: tags remain for each memory
         for (const memId of memoryIds) {
-          const remainingInbox = await this.store.query<{ count: number }[]>(
-            `SELECT count() AS count FROM tagged
-             WHERE in = $memId
-               AND out.label IS NOT NONE
-               AND string::starts_with(out.label, 'inbox:')
-               AND !string::starts_with(out.label, 'inbox:processing:')
-             GROUP ALL`,
-            { memId: new StringRecordId(memId) }
-          )
-          const remaining = (remainingInbox && remainingInbox.length > 0) ? remainingInbox[0].count : 0
-
-          if (remaining === 0) {
-            await this.store.unrelate(memId, 'tagged', 'tag:inbox')
-            this.events.emit('inboxProcessed', { memoryId: memId })
-          }
+          await this.clearRootInboxIfNoActiveTags(memId)
         }
 
         totalProcessed += memoryIds.length
