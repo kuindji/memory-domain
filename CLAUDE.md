@@ -10,4 +10,4 @@
 
 **Important:** Avoid disabling eslint rules when working on linting issues. Try to find proper solution.
 
-**Important:** Run lint, typecheck and test commands after making changes.
+**Important:** Run lint, typecheck and test commands after making changes. `bun format` before committing.

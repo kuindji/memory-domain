@@ -20,7 +20,7 @@ function isCancel(value: unknown): value is symbol {
     return p.isCancel(value);
 }
 
-async function selectMode(): Promise<"ask" | "build-context" | "quit" | symbol> {
+async function selectMode(): Promise<"ask" | "build-context" | "ingest" | "quit" | symbol> {
     return p.select({
         message: "What would you like to do?",
         options: [
@@ -30,6 +30,7 @@ async function selectMode(): Promise<"ask" | "build-context" | "quit" | symbol> 
                 label: "Build Context",
                 hint: "generate a context block",
             },
+            { value: "ingest" as const, label: "Ingest", hint: "store new memories" },
             { value: "quit" as const, label: "Quit" },
         ],
     });
@@ -111,6 +112,51 @@ async function runBuildContext(engine: MemoryEngine, domains: string[]): Promise
     }
 }
 
+async function runIngest(engine: MemoryEngine, domains: string[]): Promise<void> {
+    let more = true;
+    while (more) {
+        const text = await p.text({
+            message: "Enter text to ingest",
+            validate: (v) => (!v?.trim() ? "Text is required" : undefined),
+        });
+
+        if (isCancel(text)) return;
+
+        const tags = await p.text({
+            message: "Tags (comma-separated, optional)",
+        });
+
+        if (isCancel(tags)) return;
+
+        const spin = p.spinner();
+        spin.start("Ingesting...");
+
+        try {
+            const result = await engine.ingest(text, {
+                domains: domains.length > 0 ? domains : undefined,
+                tags: tags.trim() ? tags.split(",").map((t) => t.trim()) : undefined,
+            });
+            spin.stop("Done");
+
+            if (result.action === "stored") {
+                p.log.success(`Stored as ${result.id}`);
+            } else if (result.action === "reinforced") {
+                p.log.info(`Reinforced existing memory ${result.existingId}`);
+            } else {
+                p.log.warn(`Skipped (duplicate of ${result.existingId})`);
+            }
+        } catch (err) {
+            spin.stop("Failed");
+            p.log.error(err instanceof Error ? err.message : String(err));
+        }
+
+        const again = await p.confirm({ message: "Ingest another?" });
+        if (isCancel(again) || !again) {
+            more = false;
+        }
+    }
+}
+
 async function main(): Promise<void> {
     const { config } = parseArgs(Bun.argv);
 
@@ -138,8 +184,10 @@ async function main(): Promise<void> {
 
             if (mode === "ask") {
                 await runAsk(engine, domains);
-            } else {
+            } else if (mode === "build-context") {
                 await runBuildContext(engine, domains);
+            } else if (mode === "ingest") {
+                await runIngest(engine, domains);
             }
         }
     } finally {
