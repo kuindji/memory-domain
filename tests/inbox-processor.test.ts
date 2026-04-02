@@ -169,4 +169,64 @@ describe('InboxProcessor', () => {
     expect(processedItems[0].memory.content).toBe('multi-domain content')
     expect(secondProcessed[0].memory.content).toBe('multi-domain content')
   })
+
+  test('stale lock is overridden and processing proceeds', async () => {
+    await store.createNodeWithId('meta:_inbox_lock', {
+      value: JSON.stringify({ lockedAt: Date.now() - 3_600_000 }),
+    })
+
+    const memId = await store.createNode('memory', {
+      content: 'stale lock test',
+      created_at: Date.now(),
+      token_count: 3,
+    })
+    await store.createNodeWithId('tag:inbox', { label: 'inbox', created_at: Date.now() })
+    await store.relate(memId, 'tagged', 'tag:inbox')
+    await store.createNodeWithId('domain:test', { name: 'Test Domain' })
+    await store.relate(memId, 'owned_by', 'domain:test', { attributes: {}, owned_at: Date.now() })
+
+    await processor.tick()
+
+    expect(processedItems.length).toBe(1)
+    const lock = await store.getNode('meta:_inbox_lock')
+    expect(lock).toBeNull()
+  })
+
+  test('fresh lock prevents processing', async () => {
+    await store.createNodeWithId('meta:_inbox_lock', {
+      value: JSON.stringify({ lockedAt: Date.now() }),
+    })
+
+    const memId = await store.createNode('memory', {
+      content: 'locked test',
+      created_at: Date.now(),
+      token_count: 3,
+    })
+    await store.createNodeWithId('tag:inbox', { label: 'inbox', created_at: Date.now() })
+    await store.relate(memId, 'tagged', 'tag:inbox')
+    await store.createNodeWithId('domain:test', { name: 'Test Domain' })
+    await store.relate(memId, 'owned_by', 'domain:test', { attributes: {}, owned_at: Date.now() })
+
+    await processor.tick()
+
+    expect(processedItems.length).toBe(0)
+  })
+
+  test('lock is released after processing', async () => {
+    const memId = await store.createNode('memory', {
+      content: 'lock release test',
+      created_at: Date.now(),
+      token_count: 3,
+    })
+    await store.createNodeWithId('tag:inbox', { label: 'inbox', created_at: Date.now() })
+    await store.relate(memId, 'tagged', 'tag:inbox')
+    await store.createNodeWithId('domain:test', { name: 'Test Domain' })
+    await store.relate(memId, 'owned_by', 'domain:test', { attributes: {}, owned_at: Date.now() })
+
+    await processor.tick()
+
+    const lock = await store.getNode('meta:_inbox_lock')
+    expect(lock).toBeNull()
+    expect(processedItems.length).toBe(1)
+  })
 })

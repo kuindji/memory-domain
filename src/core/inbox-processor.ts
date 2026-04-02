@@ -2,7 +2,7 @@ import { StringRecordId } from 'surrealdb'
 import type { GraphStore } from './graph-store.ts'
 import type { DomainRegistry } from './domain-registry.ts'
 import type { EventEmitter } from './events.ts'
-import type { DomainContext, OwnedMemory, MemoryEntry } from './types.ts'
+import type { DomainContext, OwnedMemory, MemoryEntry, Node } from './types.ts'
 
 interface RecordIdLike {
   tb: string
@@ -29,8 +29,22 @@ interface RawTagRow {
   label: string
 }
 
+interface InboxLockPayload {
+  lockedAt: number
+}
+
+interface InboxProcessorOptions {
+  intervalMs?: number
+  batchLimit?: number
+  staleAfterMs?: number
+}
+
 class InboxProcessor {
-  private timer: ReturnType<typeof setInterval> | null = null
+  private timeout: ReturnType<typeof setTimeout> | null = null
+  private running = false
+  private intervalMs = 5000
+  private batchLimit = 50
+  private staleAfterMs = 30_000
 
   constructor(
     private store: GraphStore,
@@ -107,25 +121,78 @@ class InboxProcessor {
     return true
   }
 
-  start(intervalMs = 5000, batchLimit = 50): void {
-    if (this.timer) return
-
-    this.timer = setInterval(() => {
-      void (async () => {
-        let processed = 0
-        while (processed < batchLimit) {
-          const didProcess = await this.processNext()
-          if (!didProcess) break
-          processed++
-        }
-      })();
-    }, intervalMs)
+  start(options?: InboxProcessorOptions): void {
+    if (this.running) return
+    if (options?.intervalMs != null) this.intervalMs = options.intervalMs
+    if (options?.batchLimit != null) this.batchLimit = options.batchLimit
+    if (options?.staleAfterMs != null) this.staleAfterMs = options.staleAfterMs
+    this.running = true
+    this.scheduleNext()
   }
 
   stop(): void {
-    if (this.timer) {
-      clearInterval(this.timer)
-      this.timer = null
+    this.running = false
+    if (this.timeout) {
+      clearTimeout(this.timeout)
+      this.timeout = null
+    }
+  }
+
+  async tick(): Promise<void> {
+    try {
+      const acquired = await this.acquireLock()
+      if (!acquired) return
+
+      let processed = 0
+      while (processed < this.batchLimit) {
+        const didProcess = await this.processNext()
+        if (!didProcess) break
+        processed++
+      }
+    } catch (err) {
+      this.events.emit('error', { source: 'inbox', error: err })
+    } finally {
+      await this.releaseLock()
+      this.scheduleNext()
+    }
+  }
+
+  private scheduleNext(): void {
+    if (!this.running) return
+    this.timeout = setTimeout(() => { void this.tick() }, this.intervalMs)
+  }
+
+  private async acquireLock(): Promise<boolean> {
+    const existing = await this.store.getNode<Node & { value?: string }>('meta:_inbox_lock')
+
+    if (existing?.value) {
+      const payload: InboxLockPayload = JSON.parse(existing.value)
+      const age = Date.now() - payload.lockedAt
+      if (age < this.staleAfterMs) {
+        return false
+      }
+    }
+
+    const payload: InboxLockPayload = { lockedAt: Date.now() }
+
+    try {
+      if (existing) {
+        await this.store.updateNode('meta:_inbox_lock', { value: JSON.stringify(payload) })
+      } else {
+        await this.store.createNodeWithId('meta:_inbox_lock', { value: JSON.stringify(payload) })
+      }
+    } catch {
+      return false
+    }
+
+    return true
+  }
+
+  private async releaseLock(): Promise<void> {
+    try {
+      await this.store.deleteNode('meta:_inbox_lock')
+    } catch {
+      // Best-effort — staleness will handle it
     }
   }
 }
