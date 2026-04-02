@@ -76,7 +76,9 @@ export async function processInboxBatch(entries: OwnedMemory[], context: DomainC
       for (const entry of entries) {
         const topicNames = topicsMap.get(entry.memory.id) ?? []
         for (const topicName of topicNames) {
-          await linkTopic(context, entry.memory.id, topicName)
+          const trimmed = topicName.trim()
+          if (!trimmed) continue
+          await linkTopic(context, entry.memory.id, trimmed)
         }
       }
     }, { entries: entries.length })

@@ -36,6 +36,7 @@ describe('Topic + User domain coexistence (real)', () => {
       database: `integ_coexist_${Date.now()}`,
       llm,
       embedding,
+      debug: { timing: true },
       context: { userId: 'test-user' },
     })
     await engine.registerDomain(userDomain)
@@ -185,6 +186,7 @@ describe('Visibility with built-in domains (real)', () => {
       database: `integ_vis_${Date.now()}`,
       llm,
       embedding,
+      debug: { timing: true },
     })
 
     const restrictedUser: DomainConfig = {
@@ -281,6 +283,7 @@ describe('Request context propagation (real)', () => {
       database: `integ_ctx_${Date.now()}`,
       llm,
       embedding,
+      debug: { timing: true },
       context: { userId: 'ctx-user', lang: 'en' },
     })
     await engine.registerDomain(ctxTestDomain)
@@ -356,6 +359,7 @@ describe('End-to-end lifecycle (real)', () => {
       database: `integ_e2e_${Date.now()}`,
       llm,
       embedding,
+      debug: { timing: true },
       context: { userId: 'e2e-user' },
     })
     await engine.registerDomain(userDomain)

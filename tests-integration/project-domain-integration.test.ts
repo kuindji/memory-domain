@@ -50,6 +50,7 @@ describe('Project inbox processing with entity extraction (real)', () => {
       database: `integ_project_inbox_${Date.now()}`,
       llm,
       embedding,
+      debug: { timing: true },
     })
     await engine.registerDomain(createProjectDomain())
     await engine.registerDomain(topicDomain)
@@ -163,6 +164,7 @@ describe('Contradiction detection and supersedes edges (real)', () => {
       database: `integ_project_contradict_${Date.now()}`,
       llm,
       embedding,
+      debug: { timing: true },
     })
     await engine.registerDomain(createProjectDomain())
     await engine.registerDomain(topicDomain)
@@ -244,6 +246,7 @@ describe('buildContext with audience filtering (real)', () => {
       database: `integ_project_ctx_${Date.now()}`,
       llm,
       embedding,
+      debug: { timing: true },
     })
     await engine.registerDomain(createProjectDomain())
     await engine.registerDomain(topicDomain)
@@ -360,6 +363,7 @@ describe('Commit scanner with real git history (real)', () => {
       database: `integ_project_scanner_${Date.now()}`,
       llm,
       embedding,
+      debug: { timing: true },
     })
     await engine.registerDomain(createProjectDomain({ projectRoot: PROJECT_ROOT }))
     await engine.registerDomain(topicDomain)
@@ -452,6 +456,7 @@ describe('Direct write, entity graph, ask() and buildContext evaluation (real)',
       database: `integ_project_ask_${Date.now()}`,
       llm,
       embedding,
+      debug: { timing: true },
     })
     await engine.registerDomain(createProjectDomain())
     await engine.registerDomain(topicDomain)

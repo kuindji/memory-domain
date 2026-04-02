@@ -126,7 +126,7 @@ export function createProjectDomain(options?: ProjectDomainOptions): DomainConfi
               { type, text: query.text },
             )
             if (Array.isArray(results)) {
-              matchedEntityIds.push(...results.map(r => r.id))
+              matchedEntityIds.push(...results.map(r => String(r.id)))
             }
           } catch {
             // Entity type may not exist yet
@@ -140,7 +140,7 @@ export function createProjectDomain(options?: ProjectDomainOptions): DomainConfi
           ...query,
           traversal: {
             from: matchedEntityIds,
-            pattern: '<-about_entity<-memory',
+            pattern: '<-about_entity<-memory.*',
             depth: 1,
           },
         }

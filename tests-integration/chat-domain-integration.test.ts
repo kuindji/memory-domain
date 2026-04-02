@@ -44,6 +44,7 @@ describe('Chat message ingestion with cross-domain interaction (real)', () => {
       database: `integ_chat_ingest_${Date.now()}`,
       llm,
       embedding,
+      debug: { timing: true },
       context: { userId: 'test-user', chatSessionId: 'session-1' },
     })
     await engine.registerDomain(createChatDomain())
@@ -141,6 +142,7 @@ describe('Working memory promotion (real)', () => {
       database: `integ_chat_promote_${Date.now()}`,
       llm,
       embedding,
+      debug: { timing: true },
       context: { userId: 'promote-user', chatSessionId: 'session-promote' },
     })
     // Use low capacity to trigger promotion
@@ -234,6 +236,7 @@ describe('Full chat lifecycle (real)', () => {
       database: `integ_chat_lifecycle_${Date.now()}`,
       llm,
       embedding,
+      debug: { timing: true },
       context: { userId: 'lifecycle-user', chatSessionId: 'session-lc' },
     })
     await engine.registerDomain(createChatDomain({
@@ -354,6 +357,7 @@ describe('buildContext tiered retrieval + user isolation (real)', () => {
       database: `integ_chat_ctx_${Date.now()}`,
       llm,
       embedding,
+      debug: { timing: true },
     })
     await engine.registerDomain(createChatDomain({
       workingMemoryCapacity: 50,

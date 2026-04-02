@@ -78,7 +78,9 @@ export async function linkToTopics(
   const topicNames = await context.llmAt('low').extract(content)
 
   for (const topicName of topicNames) {
-    await linkSingleTopic(context, memoryId, topicName)
+    const trimmed = topicName.trim()
+    if (!trimmed) continue
+    await linkSingleTopic(context, memoryId, trimmed)
   }
 }
 
@@ -95,7 +97,9 @@ export async function linkToTopicsBatch(
   for (const entry of entries) {
     const topicNames = topicsMap.get(entry.memory.id) ?? []
     for (const topicName of topicNames) {
-      await linkSingleTopic(context, entry.memory.id, topicName)
+      const trimmed = topicName.trim()
+      if (!trimmed) continue
+      await linkSingleTopic(context, entry.memory.id, trimmed)
     }
   }
 }

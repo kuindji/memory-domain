@@ -228,7 +228,6 @@ class SearchEngine {
 
   private async graphSearch(query: SearchQuery): Promise<Map<string, ScoredMemory>> {
     const candidates = new Map<string, ScoredMemory>()
-
     // Traversal-based search
     if (query.traversal) {
       const fromIds = Array.isArray(query.traversal.from)
@@ -237,10 +236,13 @@ class SearchEngine {
 
       for (const fromId of fromIds) {
         const results = await this.store.traverse<MemoryRow>(
-          fromId,
+          String(fromId),
           query.traversal.pattern
         )
         for (const row of results) {
+          // Traversal patterns ending in .* return full rows; bare patterns return RecordIds.
+          // Detect which format we got by checking for the content property.
+          if (row.content === undefined) continue
           const id = String(row.id)
           const tags = await this.getMemoryTags(id)
           candidates.set(id, {
