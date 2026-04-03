@@ -1,9 +1,11 @@
 import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
+import { StringRecordId } from "surrealdb";
 import type {
     DomainConfig,
     DomainSchedule,
     DomainContext,
+    GraphApi,
     SearchQuery,
     ScoredMemory,
     ContextResult,
@@ -24,6 +26,48 @@ import type { KbDomainOptions } from "./types.js";
 import { kbSkills } from "./skills.js";
 import { processInboxBatch } from "./inbox.js";
 import { consolidateKnowledge } from "./schedules.js";
+
+async function findMatchingTopicMemoryIds(text: string, graph: GraphApi): Promise<string[]> {
+    try {
+        const words = text
+            .toLowerCase()
+            .split(/\s+/)
+            .filter((w) => w.length > 3);
+        if (words.length === 0) return [];
+
+        const topicTagId = new StringRecordId(`tag:${TOPIC_TAG}`);
+        // Find topic nodes whose content contains any of the keywords
+        const results = await graph.query<Array<{ id: string; content: string }>>(
+            `SELECT in as id, (SELECT content FROM ONLY $parent.in).content as content FROM tagged WHERE out = $tagId`,
+            { tagId: topicTagId },
+        );
+        if (!Array.isArray(results) || results.length === 0) return [];
+
+        return results
+            .filter((r) => {
+                const content = (r.content ?? "").toLowerCase();
+                return words.some((w) => content.includes(w));
+            })
+            .map((r) => String(r.id));
+    } catch {
+        return [];
+    }
+}
+
+async function getMemoryIdsForTopics(topicIds: string[], graph: GraphApi): Promise<Set<string>> {
+    if (topicIds.length === 0) return new Set();
+    try {
+        const topicRecordIds = topicIds.map((id) => new StringRecordId(id));
+        const results = await graph.query<Array<{ memId: string }>>(
+            `SELECT in as memId FROM about_topic WHERE out IN $topicIds`,
+            { topicIds: topicRecordIds },
+        );
+        if (!Array.isArray(results)) return new Set();
+        return new Set(results.map((r) => String(r.memId)));
+    } catch {
+        return new Set();
+    }
+}
 
 function buildSchedules(options?: KbDomainOptions): DomainSchedule[] {
     const schedules: DomainSchedule[] = [];
@@ -124,6 +168,11 @@ export function createKbDomain(options?: KbDomainOptions): DomainConfig {
 
             const minScore = 0.3;
 
+            // Resolve topics matching the query text for score boosting
+            const topicIds = await findMatchingTopicMemoryIds(text, context.graph);
+            const topicMemoryIds = await getMemoryIdsForTopics(topicIds, context.graph);
+            const hasTopicFilter = topicMemoryIds.size > 0;
+
             // Section 1 — [Definitions & Concepts]
             for (const tag of [KB_DEFINITION_TAG, KB_CONCEPT_TAG]) {
                 const result = await context.search({
@@ -138,6 +187,10 @@ export function createKbDomain(options?: KbDomainOptions): DomainConfig {
                     return !attrs?.superseded;
                 });
                 allMemories.push(...entries);
+            }
+
+            if (hasTopicFilter) {
+                applyTopicBoost(allMemories, topicMemoryIds);
             }
 
             const definitionMemories = deduplicateMemories(allMemories);
@@ -162,6 +215,9 @@ export function createKbDomain(options?: KbDomainOptions): DomainConfig {
                     const attrs = e.domainAttributes[KB_DOMAIN_ID];
                     return !attrs?.superseded;
                 });
+                if (hasTopicFilter) {
+                    applyTopicBoost(entries, topicMemoryIds);
+                }
                 allMemories.push(...entries);
             }
 
@@ -190,6 +246,10 @@ export function createKbDomain(options?: KbDomainOptions): DomainConfig {
                     const attrs = e.domainAttributes[KB_DOMAIN_ID];
                     return !attrs?.superseded;
                 });
+
+                if (hasTopicFilter) {
+                    applyTopicBoost(entries, topicMemoryIds);
+                }
 
                 if (entries.length > 0) {
                     const lines = truncateToTokenBudget(entries, howtoBudget);
@@ -222,6 +282,18 @@ function deduplicateMemories(memories: ScoredMemory[]): ScoredMemory[] {
         }
     }
     return result;
+}
+
+function applyTopicBoost(memories: ScoredMemory[], topicMemoryIds: Set<string>): void {
+    for (let i = 0; i < memories.length; i++) {
+        const mem = memories[i];
+        if (topicMemoryIds.has(mem.id)) {
+            memories[i] = { ...mem, score: mem.score * 1.5 };
+        } else {
+            memories[i] = { ...mem, score: mem.score * 0.5 };
+        }
+    }
+    memories.sort((a, b) => b.score - a.score);
 }
 
 function truncateToTokenBudget(memories: ScoredMemory[], budget: number): string[] {

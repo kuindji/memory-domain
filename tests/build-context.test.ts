@@ -1,6 +1,11 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
+import { StringRecordId } from "surrealdb";
 import { MemoryEngine } from "../src/core/engine.js";
-import { MockLLMAdapter } from "./helpers.js";
+import { MockLLMAdapter, MockEmbeddingAdapter } from "./helpers.js";
+import { createKbDomain } from "../src/domains/kb/kb-domain.js";
+import { createTopicDomain } from "../src/domains/topic/topic-domain.js";
+import { KB_DOMAIN_ID, KB_FACT_TAG } from "../src/domains/kb/types.js";
+import { TOPIC_TAG, TOPIC_DOMAIN_ID } from "../src/domains/topic/types.js";
 
 describe("MemoryEngine.buildContext", () => {
     let engine: MemoryEngine;
@@ -105,5 +110,139 @@ describe("MemoryEngine.buildContext", () => {
         if (result.memories.length > 0) {
             expect(result.context).toContain("[1]");
         }
+    });
+});
+
+describe("KB buildContext topic boosting", () => {
+    let engine: MemoryEngine;
+
+    beforeEach(async () => {
+        engine = new MemoryEngine();
+        await engine.initialize({
+            connection: "mem://",
+            namespace: "test",
+            database: `test_topic_boost_${Date.now()}`,
+            llm: new MockLLMAdapter(),
+            embedding: new MockEmbeddingAdapter(),
+        });
+
+        // Register topic domain first (provides about_topic edge schema)
+        await engine.registerDomain(createTopicDomain({ mergeSchedule: { enabled: false } }));
+        // Register KB domain (provides buildContext)
+        await engine.registerDomain(createKbDomain({ consolidateSchedule: { enabled: false } }));
+    });
+
+    afterEach(async () => {
+        await engine.close();
+    });
+
+    test("topic graph queries find topics and linked memories", async () => {
+        const kbCtx = engine.createDomainContext(KB_DOMAIN_ID);
+        const topicCtx = engine.createDomainContext(TOPIC_DOMAIN_ID);
+
+        // Create a topic node for "silk"
+        const topicId = await topicCtx.writeMemory({
+            content: "Byzantine silk",
+            tags: [TOPIC_TAG],
+            ownership: {
+                domain: TOPIC_DOMAIN_ID,
+                attributes: {
+                    name: "Byzantine silk",
+                    status: "active",
+                    mentionCount: 1,
+                    lastMentionedAt: Date.now(),
+                    createdBy: KB_DOMAIN_ID,
+                },
+            },
+        });
+
+        // Create a fact memory and link it to the topic
+        const silkMemoryId = await kbCtx.writeMemory({
+            content:
+                "Byzantine silk production was a state monopoly that generated enormous revenue",
+            tags: [KB_FACT_TAG],
+            ownership: {
+                domain: KB_DOMAIN_ID,
+                attributes: { classification: "fact", superseded: false },
+            },
+        });
+
+        await kbCtx.graph.relate(silkMemoryId, "about_topic", topicId, {
+            domain: KB_DOMAIN_ID,
+        });
+
+        // Verify topic can be found via tagged edge
+        const topicTagId = new StringRecordId(`tag:${TOPIC_TAG}`);
+        const topicResults = await kbCtx.graph.query<Array<{ id: string; content: string }>>(
+            `SELECT in as id, (SELECT content FROM ONLY $parent.in).content as content FROM tagged WHERE out = $tagId`,
+            { tagId: topicTagId },
+        );
+
+        expect(Array.isArray(topicResults)).toBe(true);
+        expect(topicResults.length).toBeGreaterThanOrEqual(1);
+
+        // Check that keyword filtering works (the word "silk" should match)
+        const matchingTopics = topicResults.filter((r) => {
+            const content = (r.content ?? "").toLowerCase();
+            return content.includes("silk");
+        });
+        expect(matchingTopics.length).toBe(1);
+
+        // Verify about_topic edge can find linked memories
+        const topicRecordIds = matchingTopics.map((t) => new StringRecordId(String(t.id)));
+        const memResults = await kbCtx.graph.query<Array<{ memId: string }>>(
+            `SELECT in as memId FROM about_topic WHERE out IN $topicIds`,
+            { topicIds: topicRecordIds },
+        );
+
+        expect(Array.isArray(memResults)).toBe(true);
+        expect(memResults.length).toBe(1);
+        expect(String(memResults[0].memId)).toBe(silkMemoryId);
+    });
+
+    test("buildContext returns valid structure with topic data present", async () => {
+        const kbCtx = engine.createDomainContext(KB_DOMAIN_ID);
+        const topicCtx = engine.createDomainContext(TOPIC_DOMAIN_ID);
+
+        // Create a topic
+        const topicId = await topicCtx.writeMemory({
+            content: "Byzantine silk",
+            tags: [TOPIC_TAG],
+            ownership: {
+                domain: TOPIC_DOMAIN_ID,
+                attributes: {
+                    name: "Byzantine silk",
+                    status: "active",
+                    mentionCount: 1,
+                    lastMentionedAt: Date.now(),
+                    createdBy: KB_DOMAIN_ID,
+                },
+            },
+        });
+
+        // Create a fact memory and link to topic
+        const silkMemoryId = await kbCtx.writeMemory({
+            content:
+                "Byzantine silk production was a state monopoly that generated enormous revenue",
+            tags: [KB_FACT_TAG],
+            ownership: {
+                domain: KB_DOMAIN_ID,
+                attributes: { classification: "fact", superseded: false },
+            },
+        });
+
+        await kbCtx.graph.relate(silkMemoryId, "about_topic", topicId, {
+            domain: KB_DOMAIN_ID,
+        });
+
+        // buildContext should not error when topic data exists
+        const result = await engine.buildContext("Tell me about Byzantine silk trade", {
+            domains: [KB_DOMAIN_ID],
+            budgetTokens: 2000,
+        });
+
+        expect(typeof result.context).toBe("string");
+        expect(Array.isArray(result.memories)).toBe(true);
+        expect(typeof result.totalTokens).toBe("number");
     });
 });
