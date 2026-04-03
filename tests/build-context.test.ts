@@ -200,6 +200,75 @@ describe("KB buildContext topic boosting", () => {
         expect(String(memResults[0].memId)).toBe(silkMemoryId);
     });
 
+    test("buildContext drops non-topic memories when topics are found", async () => {
+        // Lower minScore to 0 so mock embeddings (which produce arbitrary cosine similarities)
+        // don't interfere with whether memories are returned at all
+        await engine.saveTunableParams(KB_DOMAIN_ID, { minScore: 0 });
+
+        const kbCtx = engine.createDomainContext(KB_DOMAIN_ID);
+        const topicCtx = engine.createDomainContext(TOPIC_DOMAIN_ID);
+
+        // Create a topic node for "silk"
+        // Use engine.tagMemory after writeMemory so tag nodes are properly created
+        const silkTopicId = await topicCtx.writeMemory({
+            content: "Byzantine silk",
+            ownership: {
+                domain: TOPIC_DOMAIN_ID,
+                attributes: {
+                    name: "Byzantine silk",
+                    status: "active",
+                    mentionCount: 1,
+                    lastMentionedAt: Date.now(),
+                    createdBy: KB_DOMAIN_ID,
+                },
+            },
+        });
+        await engine.tagMemory(silkTopicId, TOPIC_TAG);
+
+        // Create a silk fact memory and link it to the silk topic
+        // Use engine.tagMemory so tag nodes are created (context.tagMemory only creates edges)
+        const silkMemoryId = await kbCtx.writeMemory({
+            content:
+                "Silk production was a state monopoly in Byzantium, managed by imperial workshops",
+            ownership: {
+                domain: KB_DOMAIN_ID,
+                attributes: { classification: "fact", superseded: false },
+            },
+        });
+        await engine.tagMemory(silkMemoryId, KB_FACT_TAG);
+        await kbCtx.graph.relate(silkMemoryId, "about_topic", silkTopicId, {
+            domain: KB_DOMAIN_ID,
+        });
+
+        // Create a greek fire memory — NOT linked to the silk topic
+        const greekFireId = await kbCtx.writeMemory({
+            content:
+                "Greek fire was a secret incendiary weapon used by the Byzantine navy in naval warfare",
+            ownership: {
+                domain: KB_DOMAIN_ID,
+                attributes: { classification: "fact", superseded: false },
+            },
+        });
+        await engine.tagMemory(greekFireId, KB_FACT_TAG);
+
+        const result = await engine.buildContext(
+            "Tell me about Byzantine silk production and trade",
+            {
+                domains: ["kb"],
+                budgetTokens: 2000,
+            },
+        );
+
+        const hasSilk = result.memories.some((m) => m.content.toLowerCase().includes("silk"));
+        expect(hasSilk).toBe(true);
+
+        // If topic filtering works, greek fire should be filtered out
+        const hasGreekFire = result.memories.some((m) =>
+            m.content.toLowerCase().includes("greek fire"),
+        );
+        expect(hasGreekFire).toBe(false);
+    });
+
     test("buildContext returns valid structure with topic data present", async () => {
         const kbCtx = engine.createDomainContext(KB_DOMAIN_ID);
         const topicCtx = engine.createDomainContext(TOPIC_DOMAIN_ID);

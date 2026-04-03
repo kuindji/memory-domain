@@ -109,7 +109,6 @@ export function createKbDomain(options?: KbDomainOptions): DomainConfig {
             { name: "definitionBudgetPct", default: 0.3, min: 0.1, max: 0.6, step: 0.05 },
             { name: "factBudgetPct", default: 0.4, min: 0.1, max: 0.6, step: 0.05 },
             { name: "topicBoostFactor", default: 1.5, min: 1.0, max: 3.0, step: 0.25 },
-            { name: "topicPenaltyFactor", default: 0.5, min: 0.1, max: 1.0, step: 0.1 },
         ],
 
         describe() {
@@ -163,7 +162,6 @@ export function createKbDomain(options?: KbDomainOptions): DomainConfig {
             const factPct = context.getTunableParam("factBudgetPct") ?? 0.4;
             const howtoPct = Math.max(0.1, 1.0 - defPct - factPct);
             const topicBoost = context.getTunableParam("topicBoostFactor") ?? 1.5;
-            const topicPenalty = context.getTunableParam("topicPenaltyFactor") ?? 0.5;
 
             const definitionBudget = Math.floor(budgetTokens * defPct);
             const factBudget = Math.floor(budgetTokens * factPct);
@@ -177,7 +175,11 @@ export function createKbDomain(options?: KbDomainOptions): DomainConfig {
             const topicMemoryIds = await getMemoryIdsForTopics(topicIds, context.graph);
             const hasTopicFilter = topicMemoryIds.size > 0;
 
+            // Track best non-topic memory as fallback (used only if all topic-filtering yields nothing)
+            let bestNonTopicFallback: ScoredMemory | null = null;
+
             // Section 1 — [Definitions & Concepts]
+            const rawDefinitions: ScoredMemory[] = [];
             for (const tag of [KB_DEFINITION_TAG, KB_CONCEPT_TAG]) {
                 const result = await context.search({
                     text,
@@ -190,14 +192,20 @@ export function createKbDomain(options?: KbDomainOptions): DomainConfig {
                     const attrs = e.domainAttributes[KB_DOMAIN_ID];
                     return !attrs?.superseded;
                 });
-                allMemories.push(...entries);
+                rawDefinitions.push(...entries);
             }
 
+            let filteredAll = rawDefinitions;
             if (hasTopicFilter) {
-                applyTopicBoost(allMemories, topicMemoryIds, topicBoost, topicPenalty);
+                filteredAll = applyTopicFilter(rawDefinitions, topicMemoryIds, topicBoost);
+                const dropped = rawDefinitions.filter((m) => !topicMemoryIds.has(m.id));
+                if (dropped.length > 0 && !bestNonTopicFallback) {
+                    bestNonTopicFallback = dropped[0];
+                }
             }
+            allMemories.push(...filteredAll);
 
-            const definitionMemories = deduplicateMemories(allMemories);
+            const definitionMemories = deduplicateMemories(filteredAll);
             if (definitionMemories.length > 0) {
                 const lines = truncateToTokenBudget(definitionMemories, definitionBudget);
                 if (lines.length > 0) {
@@ -219,10 +227,15 @@ export function createKbDomain(options?: KbDomainOptions): DomainConfig {
                     const attrs = e.domainAttributes[KB_DOMAIN_ID];
                     return !attrs?.superseded;
                 });
+                let filteredEntries = entries;
                 if (hasTopicFilter) {
-                    applyTopicBoost(entries, topicMemoryIds, topicBoost, topicPenalty);
+                    filteredEntries = applyTopicFilter(entries, topicMemoryIds, topicBoost);
+                    const dropped = entries.filter((m) => !topicMemoryIds.has(m.id));
+                    if (dropped.length > 0 && !bestNonTopicFallback) {
+                        bestNonTopicFallback = dropped[0];
+                    }
                 }
-                allMemories.push(...entries);
+                allMemories.push(...filteredEntries);
             }
 
             const factMemories = allMemories.filter(
@@ -251,17 +264,28 @@ export function createKbDomain(options?: KbDomainOptions): DomainConfig {
                     return !attrs?.superseded;
                 });
 
+                let filteredHowto = entries;
                 if (hasTopicFilter) {
-                    applyTopicBoost(entries, topicMemoryIds, topicBoost, topicPenalty);
-                }
-
-                if (entries.length > 0) {
-                    const lines = truncateToTokenBudget(entries, howtoBudget);
-                    if (lines.length > 0) {
-                        sections.push(`[How-Tos & Insights]\n${lines.join("\n")}`);
-                        allMemories.push(...entries);
+                    filteredHowto = applyTopicFilter(entries, topicMemoryIds, topicBoost);
+                    const dropped = entries.filter((m) => !topicMemoryIds.has(m.id));
+                    if (dropped.length > 0 && !bestNonTopicFallback) {
+                        bestNonTopicFallback = dropped[0];
                     }
                 }
+
+                if (filteredHowto.length > 0) {
+                    const lines = truncateToTokenBudget(filteredHowto, howtoBudget);
+                    if (lines.length > 0) {
+                        sections.push(`[How-Tos & Insights]\n${lines.join("\n")}`);
+                        allMemories.push(...filteredHowto);
+                    }
+                }
+            }
+
+            // Fallback: if topic filtering left nothing, keep the single best non-topic memory
+            if (hasTopicFilter && allMemories.length === 0 && bestNonTopicFallback) {
+                allMemories.push(bestNonTopicFallback);
+                sections.push(bestNonTopicFallback.content);
             }
 
             const finalContext = sections.join("\n\n");
@@ -288,21 +312,16 @@ function deduplicateMemories(memories: ScoredMemory[]): ScoredMemory[] {
     return result;
 }
 
-function applyTopicBoost(
+function applyTopicFilter(
     memories: ScoredMemory[],
     topicMemoryIds: Set<string>,
     boostFactor: number,
-    penaltyFactor: number,
-): void {
-    for (let i = 0; i < memories.length; i++) {
-        const mem = memories[i];
-        if (topicMemoryIds.has(mem.id)) {
-            memories[i] = { ...mem, score: mem.score * boostFactor };
-        } else {
-            memories[i] = { ...mem, score: mem.score * penaltyFactor };
-        }
-    }
-    memories.sort((a, b) => b.score - a.score);
+): ScoredMemory[] {
+    const topicMatches = memories.filter((m) => topicMemoryIds.has(m.id));
+
+    const boosted = topicMatches.map((m) => ({ ...m, score: m.score * boostFactor }));
+    boosted.sort((a, b) => b.score - a.score);
+    return boosted;
 }
 
 function truncateToTokenBudget(memories: ScoredMemory[], budget: number): string[] {
