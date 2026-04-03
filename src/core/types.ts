@@ -211,6 +211,7 @@ export interface DomainContext {
     search(query: Omit<SearchQuery, "domains">): Promise<SearchResult>;
     getMeta(key: string): Promise<string | null>;
     setMeta(key: string, value: string): Promise<void>;
+    getTunableParam(name: string): number | undefined;
     requestContext: RequestContext;
     getMemoryTags(memoryId: string): Promise<string[]>;
     getNodeEdges(nodeId: string, direction?: "in" | "out" | "both"): Promise<Edge[]>;

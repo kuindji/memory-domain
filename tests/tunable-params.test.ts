@@ -1,6 +1,8 @@
 import { describe, test, expect, beforeEach } from "bun:test";
 import { TunableParamRegistry } from "../src/core/tunable-params.js";
 import type { TunableParamDefinition } from "../src/core/tunable-params.js";
+import { MemoryEngine } from "../src/core/engine.js";
+import { MockLLMAdapter } from "./helpers.js";
 
 const sampleParams: TunableParamDefinition[] = [
     { name: "threshold", default: 0.5, min: 0, max: 1, step: 0.1 },
@@ -77,5 +79,81 @@ describe("TunableParamRegistry", () => {
 
     test("getDefinitions returns empty array for unknown domain", () => {
         expect(registry.getDefinitions("unknown")).toEqual([]);
+    });
+});
+
+describe("Engine tunable param integration", () => {
+    test("registers domain tunableParams and exposes via context", async () => {
+        const engine = new MemoryEngine();
+        const llm = new MockLLMAdapter();
+        await engine.initialize({
+            connection: "mem://",
+            namespace: "test",
+            database: `test_tune_${Date.now()}`,
+            llm,
+        });
+
+        let capturedMinScore: number | undefined;
+        await engine.registerDomain({
+            id: "tuned",
+            name: "Tuned",
+            tunableParams: [{ name: "minScore", default: 0.3, min: 0.1, max: 0.9, step: 0.05 }],
+            processInboxBatch(_entries, context) {
+                capturedMinScore = context.getTunableParam("minScore");
+                return Promise.resolve();
+            },
+        });
+
+        await engine.ingest("test", { domains: ["tuned"] });
+        await engine.processInbox();
+
+        expect(capturedMinScore).toBe(0.3);
+        await engine.close();
+    });
+
+    test("saveTunableParams persists and updates values", async () => {
+        const engine = new MemoryEngine();
+        const llm = new MockLLMAdapter();
+        await engine.initialize({
+            connection: "mem://",
+            namespace: "test",
+            database: `test_tune_persist_${Date.now()}`,
+            llm,
+        });
+
+        await engine.registerDomain({
+            id: "tuned",
+            name: "Tuned",
+            tunableParams: [{ name: "minScore", default: 0.3, min: 0.1, max: 0.9, step: 0.05 }],
+            async processInboxBatch() {},
+        });
+
+        await engine.saveTunableParams("tuned", { minScore: 0.55 });
+        const params = engine.getTunableParams("tuned");
+        expect(params.minScore).toBe(0.55);
+        await engine.close();
+    });
+
+    test("getTunableParamDefinitions returns definitions", async () => {
+        const engine = new MemoryEngine();
+        const llm = new MockLLMAdapter();
+        await engine.initialize({
+            connection: "mem://",
+            namespace: "test",
+            database: `test_tune_defs_${Date.now()}`,
+            llm,
+        });
+
+        await engine.registerDomain({
+            id: "tuned",
+            name: "Tuned",
+            tunableParams: [{ name: "weight", default: 0.5, min: 0.0, max: 1.0, step: 0.1 }],
+            async processInboxBatch() {},
+        });
+
+        const defs = engine.getTunableParamDefinitions("tuned");
+        expect(defs).toHaveLength(1);
+        expect(defs[0].name).toBe("weight");
+        await engine.close();
     });
 });

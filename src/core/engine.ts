@@ -1,6 +1,8 @@
 import { Surreal, StringRecordId } from "surrealdb";
 import { createNodeEngines } from "@surrealdb/node";
 import { GraphStore } from "./graph-store.js";
+import { TunableParamRegistry } from "./tunable-params.js";
+import type { TunableParamDefinition } from "./tunable-params.js";
 import { SchemaRegistry } from "./schema-registry.js";
 import { SearchEngine } from "./search-engine.js";
 import { InboxProcessor } from "./inbox-processor.js";
@@ -58,6 +60,7 @@ class MemoryEngine {
     private adapter?: ConnectionAdapter;
     private debugConfig: DebugConfig = {};
     private debug!: DebugTools;
+    private tunableParams: TunableParamRegistry = new TunableParamRegistry();
 
     async initialize(config: EngineConfig): Promise<void> {
         const connection = config.adapter ? await config.adapter.resolve() : config.connection;
@@ -146,6 +149,21 @@ class MemoryEngine {
         if (domain.schedules) {
             for (const schedule of domain.schedules) {
                 this.scheduler.registerSchedule(domain.id, schedule);
+            }
+        }
+
+        // Register tunable params and load persisted overrides
+        if (domain.tunableParams) {
+            this.tunableParams.register(domain.id, domain.tunableParams);
+            const metaId = `meta:${domain.id}_tunable_params`;
+            const node = await this.graph.getNode(metaId);
+            if (node?.value) {
+                try {
+                    const persisted = JSON.parse(node.value as string) as Record<string, number>;
+                    this.tunableParams.applyOverrides(domain.id, persisted);
+                } catch {
+                    // Ignore corrupt persisted values
+                }
             }
         }
     }
@@ -738,6 +756,7 @@ class MemoryEngine {
         const mergedContext = this.mergeContext(requestContext);
         const schema = this.schema;
         const domainRegistry = this.domainRegistry;
+        const tunableParams = this.tunableParams;
         const debug = createDebugTools(`domain:${domainId}`, this.debugConfig);
         const llm = wrapLLMAdapter(baseLlm, debug, "llm");
 
@@ -1004,6 +1023,10 @@ class MemoryEngine {
                 }
             },
 
+            getTunableParam(name: string): number | undefined {
+                return tunableParams.get(domainId, name);
+            },
+
             async getMemoryTags(memoryId: string): Promise<string[]> {
                 if (!(await isMemoryVisible(memoryId))) return [];
                 const rows = await graph.query<string[]>(
@@ -1170,6 +1193,25 @@ class MemoryEngine {
             }
         }
         return bootstrapped;
+    }
+
+    async saveTunableParams(domainId: string, values: Record<string, number>): Promise<void> {
+        this.tunableParams.applyOverrides(domainId, values);
+        const metaId = `meta:${domainId}_tunable_params`;
+        const serialized = JSON.stringify(this.tunableParams.getAllForDomain(domainId));
+        try {
+            await this.graph.createNodeWithId(metaId, { value: serialized });
+        } catch {
+            await this.graph.updateNode(metaId, { value: serialized });
+        }
+    }
+
+    getTunableParams(domainId: string): Record<string, number> {
+        return this.tunableParams.getAllForDomain(domainId);
+    }
+
+    getTunableParamDefinitions(domainId: string): TunableParamDefinition[] {
+        return this.tunableParams.getDefinitions(domainId);
     }
 
     async close(): Promise<void> {
