@@ -105,7 +105,7 @@ export function createKbDomain(options?: KbDomainOptions): DomainConfig {
         processInboxBatch,
         schedules: buildSchedules(options),
         tunableParams: [
-            { name: "minScore", default: 0.5, min: 0.15, max: 0.8, step: 0.05 },
+            { name: "minScore", default: 0.5, min: -1, max: 0.8, step: 0.05 },
             { name: "definitionBudgetPct", default: 0.3, min: 0.1, max: 0.6, step: 0.05 },
             { name: "factBudgetPct", default: 0.4, min: 0.1, max: 0.6, step: 0.05 },
             { name: "topicBoostFactor", default: 1.5, min: 1.0, max: 3.0, step: 0.25 },
@@ -186,6 +186,8 @@ export function createKbDomain(options?: KbDomainOptions): DomainConfig {
                     tags: [tag],
                     tokenBudget: definitionBudget,
                     minScore,
+                    rerank: true,
+                    rerankThreshold: minScore,
                 });
 
                 const entries = result.entries.filter((e) => {
@@ -220,6 +222,8 @@ export function createKbDomain(options?: KbDomainOptions): DomainConfig {
                     tags: [tag],
                     tokenBudget: factBudget,
                     minScore,
+                    rerank: true,
+                    rerankThreshold: minScore,
                 });
 
                 const entries = result.entries.filter((e) => {
@@ -256,6 +260,8 @@ export function createKbDomain(options?: KbDomainOptions): DomainConfig {
                     tags: [tag],
                     tokenBudget: howtoBudget,
                     minScore,
+                    rerank: true,
+                    rerankThreshold: minScore,
                 });
 
                 const entries = result.entries.filter((e) => {

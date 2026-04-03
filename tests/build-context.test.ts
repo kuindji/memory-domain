@@ -201,9 +201,10 @@ describe("KB buildContext topic boosting", () => {
     });
 
     test("buildContext drops non-topic memories when topics are found", async () => {
-        // Lower minScore to 0 so mock embeddings (which produce arbitrary cosine similarities)
-        // don't interfere with whether memories are returned at all
-        await engine.saveTunableParams(KB_DOMAIN_ID, { minScore: 0 });
+        // Lower minScore to -1 so mock embeddings (which produce arbitrary cosine similarities,
+        // potentially negative) don't interfere with whether memories are returned at all.
+        // This applies to both the initial search threshold and the rerank threshold.
+        await engine.saveTunableParams(KB_DOMAIN_ID, { minScore: -1 });
 
         const kbCtx = engine.createDomainContext(KB_DOMAIN_ID);
         const topicCtx = engine.createDomainContext(TOPIC_DOMAIN_ID);
