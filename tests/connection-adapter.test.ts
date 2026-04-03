@@ -1,5 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import type { ConnectionAdapter, S3AdapterConfig } from "../src/core/types.ts";
+import { PassthroughAdapter } from "../src/adapters/connection/passthrough.ts";
 
 describe("ConnectionAdapter types", () => {
     it("ConnectionAdapter has resolve and save methods", () => {
@@ -43,5 +44,24 @@ describe("ConnectionAdapter types", () => {
             llm: {} as import("../src/core/types.ts").LLMAdapter,
         };
         void _config;
+    });
+});
+
+describe("PassthroughAdapter", () => {
+    it("resolve returns the connection string unchanged", async () => {
+        const adapter = new PassthroughAdapter("surrealkv:///path/to/db");
+        const result = await adapter.resolve();
+        expect(result).toBe("surrealkv:///path/to/db");
+    });
+
+    it("save is a no-op", async () => {
+        const adapter = new PassthroughAdapter("mem://");
+        await adapter.save();
+    });
+
+    it("implements ConnectionAdapter", () => {
+        const adapter: ConnectionAdapter = new PassthroughAdapter("mem://");
+        expect(typeof adapter.resolve).toBe("function");
+        expect(typeof adapter.save).toBe("function");
     });
 });
