@@ -1261,12 +1261,12 @@ Otherwise, respond with a query plan to find more relevant information.`;
 
     async close(): Promise<void> {
         this.stopProcessing();
+        if (this.adapter) {
+            await this.adapter.save();
+        }
         if (this.db) {
             await this.db.close();
             this.db = null;
-        }
-        if (this.adapter) {
-            await this.adapter.save();
         }
     }
 }
