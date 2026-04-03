@@ -1,0 +1,12 @@
+{
+  "phase": 3,
+  "config": "noise-reduce-AB",
+  "timestamp": "2026-04-03T21:34:40.117Z",
+  "durationMs": 0,
+  "status": "success",
+  "data": {
+    "clustersFound": 0,
+    "mergesPerformed": 0,
+    "durationMs": 0
+  }
+}

@@ -1,0 +1,533 @@
+{
+  "phase": 2,
+  "config": "noise-reduce-ABC",
+  "timestamp": "2026-04-03T22:09:16.634Z",
+  "durationMs": 93538.258833,
+  "status": "success",
+  "data": {
+    "entries": [
+      {
+        "datasetId": "wiki-justinian_i-0",
+        "memoryId": "memory:atlj2k0zhwmgjmb7qcsv",
+        "assignedClassification": "fact",
+        "expectedClassification": "fact",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "wiki-nika_riots-0",
+        "memoryId": "memory:6iutu5y8v1vsm9rhqwkr",
+        "assignedClassification": "fact",
+        "expectedClassification": "fact",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "wiki-battle_of_manzikert-0",
+        "memoryId": "memory:dvf73nc18oez2qpr6od1",
+        "assignedClassification": "fact",
+        "expectedClassification": "fact",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "wiki-corpus_juris_civilis-0",
+        "memoryId": "memory:q3n5h3dzfswouff8tj83",
+        "assignedClassification": "definition",
+        "expectedClassification": "reference",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "wiki-byzantine_iconoclasm-0",
+        "memoryId": "memory:jsstjfbagxo0k3cx4096",
+        "assignedClassification": "definition",
+        "expectedClassification": "concept",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "wiki-byzantine_iconoclasm-1",
+        "memoryId": "memory:brghldhu02vkq7xmdcj9",
+        "assignedClassification": "fact",
+        "expectedClassification": "fact",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "wiki-basil_ii-0",
+        "memoryId": "memory:9ixm7qds56h7vdnni69o",
+        "assignedClassification": "fact",
+        "expectedClassification": "fact",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "wiki-fall_of_constantinople-0",
+        "memoryId": "memory:e24ppskdnu8xyrlpr5c2",
+        "assignedClassification": "fact",
+        "expectedClassification": "fact",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "wiki-theme_(byzantine_district)-0",
+        "memoryId": "memory:p4asycvvrtepnogqijqa",
+        "assignedClassification": "definition",
+        "expectedClassification": "definition",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "wiki-theme_(byzantine_district)-1",
+        "memoryId": "memory:tluixb87a99il3kh5mm4",
+        "assignedClassification": "fact",
+        "expectedClassification": "concept",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "wiki-byzantine_economy-0",
+        "memoryId": "memory:4o3l589zcikr4nnoynms",
+        "assignedClassification": "concept",
+        "expectedClassification": "fact",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "wiki-byzantine_economy-1",
+        "memoryId": "memory:ow5i7pwez1nulube772d",
+        "assignedClassification": "fact",
+        "expectedClassification": "concept",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "wiki-hagia_sophia-0",
+        "memoryId": "memory:46vg2vjkm5d0xirlak3t",
+        "assignedClassification": "fact",
+        "expectedClassification": "fact",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "wiki-belisarius-0",
+        "memoryId": "memory:ddfwzw4nq08gzooacldy",
+        "assignedClassification": "fact",
+        "expectedClassification": "fact",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "wiki-varangian_guard-0",
+        "memoryId": "memory:ubcnbss87syhoa2nzqdx",
+        "assignedClassification": "fact",
+        "expectedClassification": "fact",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "wiki-fourth_crusade-0",
+        "memoryId": "memory:55k7n7bkvjj28qul7ciw",
+        "assignedClassification": "fact",
+        "expectedClassification": "fact",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "wiki-greek_fire-0",
+        "memoryId": "memory:bizy7dog885bxhp41ker",
+        "assignedClassification": "fact",
+        "expectedClassification": "definition",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "wiki-filioque-0",
+        "memoryId": "memory:nzwb9mrrmj06th19g79a",
+        "assignedClassification": "definition",
+        "expectedClassification": "concept",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "wiki-theodora_(wife_of_justinian_i)-0",
+        "memoryId": "memory:fwtw3nt4cao3rj0l4to8",
+        "assignedClassification": "fact",
+        "expectedClassification": "concept",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "wiki-byzantine_art-0",
+        "memoryId": "memory:sq1qsos73890gfaj8oca",
+        "assignedClassification": "definition",
+        "expectedClassification": "concept",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "wiki-byzantine_music-0",
+        "memoryId": "memory:b8w9osg7vl9mp4qqgqye",
+        "assignedClassification": "fact",
+        "expectedClassification": "reference",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "wiki-byzantine_navy-0",
+        "memoryId": "memory:0j9y7j3rdyavh290ycia",
+        "assignedClassification": "definition",
+        "expectedClassification": "fact",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "wiki-walls_of_constantinople-0",
+        "memoryId": "memory:hgph7bsx6z4wyrst0ta3",
+        "assignedClassification": "fact",
+        "expectedClassification": "reference",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "wiki-siege_of_constantinople_(717–718)-0",
+        "memoryId": "memory:hlyy3x0rwdeex75bwxh8",
+        "assignedClassification": "fact",
+        "expectedClassification": "fact",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "wiki-byzantine_medicine-0",
+        "memoryId": "memory:tliosm16iotwd9ulh1d4",
+        "assignedClassification": "definition",
+        "expectedClassification": "reference",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "wiki-macedonian_dynasty-0",
+        "memoryId": "memory:qcrtu9laelzoy1yihptv",
+        "assignedClassification": "fact",
+        "expectedClassification": "concept",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "wiki-latin_empire-0",
+        "memoryId": "memory:ryzn8zm28fckr5jnu746",
+        "assignedClassification": "definition",
+        "expectedClassification": "fact",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "wiki-constantinople-0",
+        "memoryId": "memory:us029lpqdkkfdsdzv9un",
+        "assignedClassification": "fact",
+        "expectedClassification": "definition",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "wiki-constantinople-1",
+        "memoryId": "memory:40efsvkw3fx9uz06hwph",
+        "assignedClassification": "fact",
+        "expectedClassification": "fact",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "wiki-byzantine–sasanian_wars-0",
+        "memoryId": "memory:gls0nuwcnanvijx8kn2t",
+        "assignedClassification": "fact",
+        "expectedClassification": "fact",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "wiki-ecumenical_patriarch_of_constantinople-0",
+        "memoryId": "memory:dxpeag83z2zq54kse01l",
+        "assignedClassification": "definition",
+        "expectedClassification": "definition",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "wiki-byzantine_dress-0",
+        "memoryId": "memory:6wcq79uejdgbzzrc0kbb",
+        "assignedClassification": "fact",
+        "expectedClassification": "reference",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "wiki-east–west_schism-0",
+        "memoryId": "memory:k90rm34kdtdoiyslci88",
+        "assignedClassification": "definition",
+        "expectedClassification": "concept",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "wiki-procopius-0",
+        "memoryId": "memory:lgbx0p3h6bvyvjuuvrua",
+        "assignedClassification": "fact",
+        "expectedClassification": "fact",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "wiki-hippodrome_of_constantinople-0",
+        "memoryId": "memory:e4jojzlldx52ghiwrrz9",
+        "assignedClassification": "fact",
+        "expectedClassification": "reference",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "wiki-byzantine_senate-0",
+        "memoryId": "memory:jvdduffjjmu2jgzlpm6i",
+        "assignedClassification": "definition",
+        "expectedClassification": "definition",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "wiki-komnenian_restoration-0",
+        "memoryId": "memory:xjlewmhc3lr6q0bn7dip",
+        "assignedClassification": "definition",
+        "expectedClassification": "concept",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "wiki-palaiologos-0",
+        "memoryId": "memory:5fy1pj6v75xtf2htof3e",
+        "assignedClassification": "fact",
+        "expectedClassification": "fact",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "wiki-byzantine_coinage-0",
+        "memoryId": "memory:94ks5u5o17lnsgbg3w19",
+        "assignedClassification": "definition",
+        "expectedClassification": "reference",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "wiki-heraclius-0",
+        "memoryId": "memory:g53ah8cbzxfpb2mdpgv5",
+        "assignedClassification": "fact",
+        "expectedClassification": "fact",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "supersession-manzikert-wrong",
+        "memoryId": "memory:sa52o94kjsw9j3tuj3kr",
+        "assignedClassification": "fact",
+        "expectedClassification": "fact",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "supersession-manzikert-correct",
+        "memoryId": "memory:vb7xrwrycgel1v2kmhji",
+        "assignedClassification": "insight",
+        "expectedClassification": "fact",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "supersession-hagia-wrong",
+        "memoryId": "memory:f692e46mtp4hfmqmvgls",
+        "assignedClassification": "fact",
+        "expectedClassification": "fact",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "supersession-hagia-correct",
+        "memoryId": "memory:m2g3svzv4cidjcglsmyz",
+        "assignedClassification": "fact",
+        "expectedClassification": "fact",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "related-silk-monopoly",
+        "memoryId": "memory:u4eouww4ybu3h9t4lioa",
+        "assignedClassification": "fact",
+        "expectedClassification": "fact",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "related-silk-guilds",
+        "memoryId": "memory:79f131oko76z7fd1wz7q",
+        "assignedClassification": "fact",
+        "expectedClassification": "reference",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "related-silk-diplomacy",
+        "memoryId": "memory:939l5nuqi2g2pao3xu3h",
+        "assignedClassification": "fact",
+        "expectedClassification": "insight",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "hard-bezant",
+        "memoryId": "memory:7e8jn53rvxrwbf9lbn9b",
+        "assignedClassification": "fact",
+        "expectedClassification": "fact",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "hard-varangian-guard",
+        "memoryId": "memory:s00a9tuxckt2vr09yzt8",
+        "assignedClassification": "fact",
+        "expectedClassification": "fact",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "hard-themes",
+        "memoryId": "memory:itm9otgof3522110w2pw",
+        "assignedClassification": "definition",
+        "expectedClassification": "definition",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "hard-iconoclasm-dates",
+        "memoryId": "memory:h5e71ctv0dtmbmetttz0",
+        "assignedClassification": "fact",
+        "expectedClassification": "fact",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "hard-greek-fire",
+        "memoryId": "memory:s4bmiffrcqaczxcn3nbb",
+        "assignedClassification": "fact",
+        "expectedClassification": "reference",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "hard-fourth-crusade",
+        "memoryId": "memory:lx6ple303fwq67llxw9b",
+        "assignedClassification": "fact",
+        "expectedClassification": "fact",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "hard-filioque",
+        "memoryId": "memory:u9h9wbj0wagdekqt2wnb",
+        "assignedClassification": "fact",
+        "expectedClassification": "concept",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "howto-identify-coins",
+        "memoryId": "memory:qufydwtr8xbuh3qupl2e",
+        "assignedClassification": "how-to",
+        "expectedClassification": "how-to",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "insight-bureaucracy",
+        "memoryId": "memory:bnt69oejzv9x87jp3tl3",
+        "assignedClassification": "insight",
+        "expectedClassification": "insight",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "theodora-political-influence",
+        "memoryId": "memory:5ji726f1md1flp2frkve",
+        "assignedClassification": "fact",
+        "expectedClassification": "concept",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "theodosian-walls",
+        "memoryId": "memory:b1hg3v6nrpdxlnqix184",
+        "assignedClassification": "fact",
+        "expectedClassification": "reference",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "byzantine-hospitals",
+        "memoryId": "memory:phdsue89d12tg3cr6ytv",
+        "assignedClassification": "fact",
+        "expectedClassification": "fact",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "byzantine-sasanian-treaty",
+        "memoryId": "memory:nonmyg8ho2wyn9tgmsh9",
+        "assignedClassification": "fact",
+        "expectedClassification": "fact",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "byzantine-717-siege",
+        "memoryId": "memory:8k4tqz609wsplsd7pmt2",
+        "assignedClassification": "fact",
+        "expectedClassification": "fact",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "byzantine-education-system",
+        "memoryId": "memory:smni68a6ofc19ltsub8o",
+        "assignedClassification": "fact",
+        "expectedClassification": "concept",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "byzantine-hippodrome-factions",
+        "memoryId": "memory:94xfgek27s8gssgaop4r",
+        "assignedClassification": "concept",
+        "expectedClassification": "concept",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "byzantine-diplomacy-methods",
+        "memoryId": "memory:dk6q8hp1nzmhtbcw7b24",
+        "assignedClassification": "concept",
+        "expectedClassification": "reference",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      },
+      {
+        "datasetId": "heraclius-reforms",
+        "memoryId": "memory:ee5bl1pdmyca7zs154jv",
+        "assignedClassification": "fact",
+        "expectedClassification": "fact",
+        "supersessionEdges": [],
+        "relatedEdges": []
+      }
+    ],
+    "stageTiming": {},
+    "classificationAccuracy": 0.5384615384615384
+  }
+}
