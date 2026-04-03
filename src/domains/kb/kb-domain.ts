@@ -104,6 +104,13 @@ export function createKbDomain(options?: KbDomainOptions): DomainConfig {
         skills: kbSkills,
         processInboxBatch,
         schedules: buildSchedules(options),
+        tunableParams: [
+            { name: "minScore", default: 0.3, min: 0.05, max: 0.8, step: 0.05 },
+            { name: "definitionBudgetPct", default: 0.3, min: 0.1, max: 0.6, step: 0.05 },
+            { name: "factBudgetPct", default: 0.4, min: 0.1, max: 0.6, step: 0.05 },
+            { name: "topicBoostFactor", default: 1.5, min: 1.0, max: 3.0, step: 0.25 },
+            { name: "topicPenaltyFactor", default: 0.5, min: 0.1, max: 1.0, step: 0.1 },
+        ],
 
         describe() {
             return "General-purpose knowledge base domain for storing domain-agnostic knowledge: facts, definitions, how-tos, technical references, concepts, and insights. A personal wiki not tied to any specific project or conversation.";
@@ -151,14 +158,19 @@ export function createKbDomain(options?: KbDomainOptions): DomainConfig {
             const empty: ContextResult = { context: "", memories: [], totalTokens: 0 };
             if (!text) return empty;
 
-            const definitionBudget = Math.floor(budgetTokens * 0.3);
-            const factBudget = Math.floor(budgetTokens * 0.4);
-            const howtoBudget = Math.floor(budgetTokens * 0.3);
+            const minScore = context.getTunableParam("minScore") ?? 0.3;
+            const defPct = context.getTunableParam("definitionBudgetPct") ?? 0.3;
+            const factPct = context.getTunableParam("factBudgetPct") ?? 0.4;
+            const howtoPct = Math.max(0.1, 1.0 - defPct - factPct);
+            const topicBoost = context.getTunableParam("topicBoostFactor") ?? 1.5;
+            const topicPenalty = context.getTunableParam("topicPenaltyFactor") ?? 0.5;
+
+            const definitionBudget = Math.floor(budgetTokens * defPct);
+            const factBudget = Math.floor(budgetTokens * factPct);
+            const howtoBudget = Math.floor(budgetTokens * howtoPct);
 
             const allMemories: ScoredMemory[] = [];
             const sections: string[] = [];
-
-            const minScore = 0.3;
 
             // Resolve topics matching the query text for score boosting
             const topicIds = await findMatchingTopicMemoryIds(text, context.graph);
@@ -182,7 +194,7 @@ export function createKbDomain(options?: KbDomainOptions): DomainConfig {
             }
 
             if (hasTopicFilter) {
-                applyTopicBoost(allMemories, topicMemoryIds);
+                applyTopicBoost(allMemories, topicMemoryIds, topicBoost, topicPenalty);
             }
 
             const definitionMemories = deduplicateMemories(allMemories);
@@ -208,7 +220,7 @@ export function createKbDomain(options?: KbDomainOptions): DomainConfig {
                     return !attrs?.superseded;
                 });
                 if (hasTopicFilter) {
-                    applyTopicBoost(entries, topicMemoryIds);
+                    applyTopicBoost(entries, topicMemoryIds, topicBoost, topicPenalty);
                 }
                 allMemories.push(...entries);
             }
@@ -240,7 +252,7 @@ export function createKbDomain(options?: KbDomainOptions): DomainConfig {
                 });
 
                 if (hasTopicFilter) {
-                    applyTopicBoost(entries, topicMemoryIds);
+                    applyTopicBoost(entries, topicMemoryIds, topicBoost, topicPenalty);
                 }
 
                 if (entries.length > 0) {
@@ -276,13 +288,18 @@ function deduplicateMemories(memories: ScoredMemory[]): ScoredMemory[] {
     return result;
 }
 
-function applyTopicBoost(memories: ScoredMemory[], topicMemoryIds: Set<string>): void {
+function applyTopicBoost(
+    memories: ScoredMemory[],
+    topicMemoryIds: Set<string>,
+    boostFactor: number,
+    penaltyFactor: number,
+): void {
     for (let i = 0; i < memories.length; i++) {
         const mem = memories[i];
         if (topicMemoryIds.has(mem.id)) {
-            memories[i] = { ...mem, score: mem.score * 1.5 };
+            memories[i] = { ...mem, score: mem.score * boostFactor };
         } else {
-            memories[i] = { ...mem, score: mem.score * 0.5 };
+            memories[i] = { ...mem, score: mem.score * penaltyFactor };
         }
     }
     memories.sort((a, b) => b.score - a.score);
