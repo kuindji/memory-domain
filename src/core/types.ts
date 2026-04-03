@@ -345,10 +345,30 @@ export interface EmbeddingAdapter {
     readonly dimension: number;
 }
 
+// --- Connection adapter types ---
+
+export interface ConnectionAdapter {
+    resolve(): Promise<string>;
+    save(): Promise<void>;
+}
+
+export interface S3AdapterConfig {
+    bucket: string;
+    key: string;
+    region: string;
+    localDir?: string;
+    save?: boolean;
+    credentials?: {
+        accessKeyId: string;
+        secretAccessKey: string;
+    };
+}
+
 // --- Config types ---
 
 export interface EngineConfig {
-    connection: string;
+    connection?: string;
+    adapter?: ConnectionAdapter;
     namespace?: string;
     database?: string;
     credentials?: { user: string; pass: string };

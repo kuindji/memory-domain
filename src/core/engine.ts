@@ -40,6 +40,7 @@ import type {
     DomainRegistrationOptions,
     DebugConfig,
     DebugTools,
+    ConnectionAdapter,
 } from "./types.ts";
 
 class MemoryEngine {
@@ -55,12 +56,21 @@ class MemoryEngine {
     private embedding?: EmbeddingAdapter;
     private repetitionConfig?: RepetitionConfig;
     private defaultContext: RequestContext = {};
+    private adapter?: ConnectionAdapter;
     private debugConfig: DebugConfig = {};
     private debug!: DebugTools;
 
     async initialize(config: EngineConfig): Promise<void> {
+        const connection = config.adapter ? await config.adapter.resolve() : config.connection;
+
+        if (!connection) {
+            throw new Error("EngineConfig requires either a 'connection' string or an 'adapter'");
+        }
+
+        this.adapter = config.adapter;
+
         const db = new Surreal({ engines: createNodeEngines() });
-        await db.connect(config.connection);
+        await db.connect(connection);
         await db.use({
             namespace: config.namespace ?? "default",
             database: config.database ?? "memory",
@@ -1254,6 +1264,9 @@ Otherwise, respond with a query plan to find more relevant information.`;
         if (this.db) {
             await this.db.close();
             this.db = null;
+        }
+        if (this.adapter) {
+            await this.adapter.save();
         }
     }
 }
