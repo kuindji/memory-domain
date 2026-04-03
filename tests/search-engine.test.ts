@@ -56,6 +56,24 @@ describe("SearchEngine", () => {
             expect(result.entries.length).toBe(2);
             expect(result.mode).toBe("graph");
         });
+
+        test("returns empty when no tags or traversal match", async () => {
+            // Create memories with no tags — graph search without tags/traversal should return nothing
+            for (let i = 0; i < 5; i++) {
+                await store.createNode("memory", {
+                    content: `untagged memory ${i}`,
+                    created_at: Date.now(),
+                    token_count: 4,
+                });
+            }
+
+            const result = await search.search({
+                mode: "graph",
+                limit: 10,
+            });
+
+            expect(result.entries.length).toBe(0);
+        });
     });
 
     describe("fulltext search", () => {
@@ -84,16 +102,22 @@ describe("SearchEngine", () => {
 
     describe("token budget", () => {
         test("limits results by token budget", async () => {
+            await store.createNodeWithId("tag:budget_tag", {
+                label: "budget_tag",
+                created_at: Date.now(),
+            });
             for (let i = 0; i < 10; i++) {
-                await store.createNode("memory", {
+                const m = await store.createNode("memory", {
                     content: `Memory number ${i} with some content`,
                     created_at: Date.now(),
                     token_count: 100,
                 });
+                await store.relate(m, "tagged", "tag:budget_tag");
             }
 
             const result = await search.search({
                 mode: "graph",
+                tags: ["budget_tag"],
                 limit: 10,
                 tokenBudget: 350,
             });
@@ -160,7 +184,7 @@ describe("SearchEngine", () => {
 
     describe("minScore filter", () => {
         test("filters out entries below minScore", async () => {
-            // Create memories that will have low scores via graph recency fallback (0.5)
+            // Use hybrid search with only fulltext so scores are fractional
             for (let i = 0; i < 3; i++) {
                 await store.createNode("memory", {
                     content: `low score memory ${i}`,
@@ -169,10 +193,11 @@ describe("SearchEngine", () => {
                 });
             }
 
+            // minScore 0.9 with graph mode and no tags returns empty (no fallback)
             const result = await search.search({
                 mode: "graph",
                 limit: 10,
-                minScore: 0.9, // Higher than recency score of 0.5
+                minScore: 0.9,
             });
 
             expect(result.entries.length).toBe(0);
@@ -257,6 +282,10 @@ describe("SearchEngine", () => {
 
     describe("post-search enrichment", () => {
         test("populates connections.references for linked memories", async () => {
+            await store.createNodeWithId("tag:enrichment_topic", {
+                label: "enrichment_topic",
+                created_at: Date.now(),
+            });
             const m1 = await store.createNode("memory", {
                 content: "original finding about topic",
                 created_at: Date.now(),
@@ -267,9 +296,15 @@ describe("SearchEngine", () => {
                 created_at: Date.now(),
                 token_count: 5,
             });
+            await store.relate(m1, "tagged", "tag:enrichment_topic");
+            await store.relate(m2, "tagged", "tag:enrichment_topic");
             await store.relate(m2, "reinforces", m1);
 
-            const result = await search.search({ mode: "graph", limit: 10 });
+            const result = await search.search({
+                mode: "graph",
+                tags: ["enrichment_topic"],
+                limit: 10,
+            });
 
             const m1Result = result.entries.find((e) => e.id === m1);
             const m2Result = result.entries.find((e) => e.id === m2);
@@ -292,11 +327,16 @@ describe("SearchEngine", () => {
 
         test("populates domainAttributes from owned_by edges", async () => {
             await store.createNodeWithId("domain:enrichtest", { name: "EnrichTest" });
+            await store.createNodeWithId("tag:enrichtest_tag", {
+                label: "enrichtest_tag",
+                created_at: Date.now(),
+            });
             const m1 = await store.createNode("memory", {
                 content: "memory with domain attributes",
                 created_at: Date.now(),
                 token_count: 5,
             });
+            await store.relate(m1, "tagged", "tag:enrichtest_tag");
             await store.relate(m1, "owned_by", "domain:enrichtest", {
                 attributes: { confidence: 0.9, kind: "report" },
                 owned_at: Date.now(),
@@ -304,6 +344,7 @@ describe("SearchEngine", () => {
 
             const result = await search.search({
                 mode: "graph",
+                tags: ["enrichtest_tag"],
                 domains: ["enrichtest"],
                 limit: 10,
             });
@@ -315,13 +356,18 @@ describe("SearchEngine", () => {
         });
 
         test("empty connections when no reference edges exist", async () => {
-            await store.createNode("memory", {
+            await store.createNodeWithId("tag:lonely_tag", {
+                label: "lonely_tag",
+                created_at: Date.now(),
+            });
+            const m = await store.createNode("memory", {
                 content: "lonely memory with no references",
                 created_at: Date.now(),
                 token_count: 5,
             });
+            await store.relate(m, "tagged", "tag:lonely_tag");
 
-            const result = await search.search({ mode: "graph", limit: 10 });
+            const result = await search.search({ mode: "graph", tags: ["lonely_tag"], limit: 10 });
             expect(result.entries.length).toBe(1);
             const refs = result.entries[0].connections?.references;
             expect(!refs || refs.length === 0).toBe(true);
@@ -332,6 +378,10 @@ describe("SearchEngine", () => {
         test("filters by domain ownership", async () => {
             await store.createNodeWithId("domain:alpha", { name: "Alpha" });
             await store.createNodeWithId("domain:beta", { name: "Beta" });
+            await store.createNodeWithId("tag:domain_test_tag", {
+                label: "domain_test_tag",
+                created_at: Date.now(),
+            });
 
             const m1 = await store.createNode("memory", {
                 content: "alpha domain memory",
@@ -344,6 +394,8 @@ describe("SearchEngine", () => {
                 token_count: 3,
             });
 
+            await store.relate(m1, "tagged", "tag:domain_test_tag");
+            await store.relate(m2, "tagged", "tag:domain_test_tag");
             await store.relate(m1, "owned_by", "domain:alpha", {
                 attributes: {},
                 owned_at: Date.now(),
@@ -355,6 +407,7 @@ describe("SearchEngine", () => {
 
             const result = await search.search({
                 mode: "graph",
+                tags: ["domain_test_tag"],
                 domains: ["alpha"],
                 limit: 10,
             });

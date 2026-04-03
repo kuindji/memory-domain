@@ -196,14 +196,16 @@ describe("Multi-domain integration", () => {
         await engine.ingest("beta domain content only", { domains: ["beta"] });
 
         const result = await engine.search({
-            mode: "graph",
+            mode: "fulltext",
+            text: "domain content only",
             domains: ["alpha", "beta"],
             limit: 10,
         });
         expect(result.entries.length).toBe(2);
 
         const alphaOnly = await engine.search({
-            mode: "graph",
+            mode: "fulltext",
+            text: "domain content only",
             domains: ["alpha"],
             limit: 10,
         });

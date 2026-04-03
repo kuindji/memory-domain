@@ -90,10 +90,20 @@ describe("Topic + User domain coexistence", () => {
     });
 
     test("memories owned by different domains are independently searchable", async () => {
-        const userResults = await engine.search({ mode: "graph", domains: [USER_DOMAIN_ID] });
-        const topicResults = await engine.search({ mode: "graph", domains: [TOPIC_DOMAIN_ID] });
+        // user fact is tagged with `user/expertise`, topic memory with `topic`
+        const userResults = await engine.search({
+            mode: "graph",
+            tags: [`${USER_TAG}/expertise`],
+            domains: [USER_DOMAIN_ID],
+        });
+        const topicResults = await engine.search({
+            mode: "graph",
+            tags: [TOPIC_TAG],
+            domains: [TOPIC_DOMAIN_ID],
+        });
         const bothResults = await engine.search({
             mode: "graph",
+            tags: [`${USER_TAG}/expertise`, TOPIC_TAG],
             domains: [USER_DOMAIN_ID, TOPIC_DOMAIN_ID],
         });
 

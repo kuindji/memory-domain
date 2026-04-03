@@ -293,30 +293,6 @@ class SearchEngine {
             return candidates;
         }
 
-        // Recency fallback — return most recent memories
-        const rows = await this.store.query<MemoryRow[]>(
-            `SELECT * FROM memory ORDER BY created_at DESC LIMIT $limit`,
-            { limit: query.limit ?? 20 },
-        );
-
-        if (rows) {
-            for (const row of rows) {
-                const id = String(row.id);
-                const tags = await this.getMemoryTags(id);
-                candidates.set(id, {
-                    id,
-                    content: row.content,
-                    score: 0.5,
-                    scores: { graph: 0.5 },
-                    tags,
-                    domainAttributes: {},
-                    eventTime: row.event_time ?? null,
-                    createdAt: row.created_at,
-                    tokenCount: row.token_count,
-                });
-            }
-        }
-
         return candidates;
     }
 
