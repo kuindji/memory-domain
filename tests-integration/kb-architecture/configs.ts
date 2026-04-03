@@ -13,6 +13,14 @@ const HYBRID_DEFAULT = {
     weights: { vector: 0.5, fulltext: 0.3, graph: 0.2 },
 };
 
+const NO_SUPERSESSION_PIPELINE = {
+    classify: true,
+    tagAssign: true,
+    topicLink: true,
+    supersede: false,
+    relateKnowledge: false,
+};
+
 export const configs: ArchitectureConfig[] = [
     {
         name: "baseline-no-kb",
@@ -123,5 +131,53 @@ export const configs: ArchitectureConfig[] = [
         search: HYBRID_DEFAULT,
         consolidate: true,
         contextBudget: 20000,
+    },
+    {
+        name: "noise-reduce-A",
+        pipeline: NO_SUPERSESSION_PIPELINE,
+        search: HYBRID_DEFAULT,
+        consolidate: false,
+        contextBudget: 2000,
+        noiseReduction: { tightenFilters: true },
+    },
+    {
+        name: "noise-reduce-C",
+        pipeline: NO_SUPERSESSION_PIPELINE,
+        search: HYBRID_DEFAULT,
+        consolidate: false,
+        contextBudget: 2000,
+        noiseReduction: { embeddingRerank: true },
+    },
+    {
+        name: "noise-reduce-AC",
+        pipeline: NO_SUPERSESSION_PIPELINE,
+        search: HYBRID_DEFAULT,
+        consolidate: false,
+        contextBudget: 2000,
+        noiseReduction: { tightenFilters: true, embeddingRerank: true },
+    },
+    {
+        name: "noise-reduce-AB",
+        pipeline: NO_SUPERSESSION_PIPELINE,
+        search: HYBRID_DEFAULT,
+        consolidate: false,
+        contextBudget: 2000,
+        noiseReduction: { tightenFilters: true, llmRerank: true },
+    },
+    {
+        name: "noise-reduce-CB",
+        pipeline: NO_SUPERSESSION_PIPELINE,
+        search: HYBRID_DEFAULT,
+        consolidate: false,
+        contextBudget: 2000,
+        noiseReduction: { embeddingRerank: true, llmRerank: true },
+    },
+    {
+        name: "noise-reduce-ABC",
+        pipeline: NO_SUPERSESSION_PIPELINE,
+        search: HYBRID_DEFAULT,
+        consolidate: false,
+        contextBudget: 2000,
+        noiseReduction: { tightenFilters: true, embeddingRerank: true, llmRerank: true },
     },
 ];

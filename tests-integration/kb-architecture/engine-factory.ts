@@ -50,6 +50,15 @@ export async function createConfiguredEngine(config: ArchitectureConfig): Promis
         processInboxBatch: configurableProcessor,
     };
 
+    // If noise reduction config doesn't include tightenFilters,
+    // override tunable params to use old permissive defaults
+    if (!config.noiseReduction?.tightenFilters && modifiedDomain.tunableParams) {
+        modifiedDomain.tunableParams = modifiedDomain.tunableParams.map((p) => {
+            if (p.name === "minScore") return { ...p, default: 0.3 };
+            return p;
+        });
+    }
+
     await engine.registerDomain(modifiedDomain);
     await engine.registerDomain(topicDomain);
 

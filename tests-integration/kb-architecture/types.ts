@@ -38,6 +38,11 @@ export interface ArchitectureConfig {
     };
     consolidate: boolean;
     contextBudget: number;
+    noiseReduction?: {
+        tightenFilters?: boolean;
+        embeddingRerank?: boolean;
+        llmRerank?: boolean;
+    };
 }
 
 export interface Checkpoint<T = unknown> {
