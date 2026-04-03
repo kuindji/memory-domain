@@ -39,7 +39,7 @@ class SearchEngine {
             fulltext: query.weights?.fulltext ?? this.defaultWeights.fulltext,
             graph: query.weights?.graph ?? this.defaultWeights.graph,
         };
-        const limit = query.limit ?? 20;
+        const limit = query.limit ?? 10;
 
         let candidates: Map<string, ScoredMemory>;
 
@@ -142,7 +142,7 @@ class SearchEngine {
        WHERE embedding IS NOT NONE
        ORDER BY score DESC
        LIMIT $limit`,
-            { queryVec, limit: query.limit ?? 20 },
+            { queryVec, limit: query.limit ?? 10 },
         );
 
         if (!rows) return candidates;
@@ -178,7 +178,7 @@ class SearchEngine {
          WHERE content @1@ $text
          ORDER BY score DESC
          LIMIT $limit`,
-                { text: query.text, limit: query.limit ?? 20 },
+                { text: query.text, limit: query.limit ?? 10 },
             );
         } catch {
             // BM25 index may not be defined; fall back to CONTAINS
@@ -186,7 +186,7 @@ class SearchEngine {
 
         // Fallback to CONTAINS if BM25 returned nothing
         if (!rows || rows.length === 0) {
-            rows = await this.containsFallback(query.text, query.limit ?? 20);
+            rows = await this.containsFallback(query.text, query.limit ?? 10);
         }
 
         for (const row of rows) {
@@ -269,7 +269,7 @@ class SearchEngine {
 
             const rows = await this.store.query<MemoryRow[]>(
                 `SELECT * FROM memory WHERE ->tagged.out CONTAINSANY $tags LIMIT $limit`,
-                { tags: tagRecordIds, limit: query.limit ?? 20 },
+                { tags: tagRecordIds, limit: query.limit ?? 10 },
             );
 
             if (rows) {

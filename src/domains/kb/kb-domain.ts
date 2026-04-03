@@ -105,7 +105,7 @@ export function createKbDomain(options?: KbDomainOptions): DomainConfig {
         processInboxBatch,
         schedules: buildSchedules(options),
         tunableParams: [
-            { name: "minScore", default: 0.3, min: 0.05, max: 0.8, step: 0.05 },
+            { name: "minScore", default: 0.5, min: 0.15, max: 0.8, step: 0.05 },
             { name: "definitionBudgetPct", default: 0.3, min: 0.1, max: 0.6, step: 0.05 },
             { name: "factBudgetPct", default: 0.4, min: 0.1, max: 0.6, step: 0.05 },
             { name: "topicBoostFactor", default: 1.5, min: 1.0, max: 3.0, step: 0.25 },
@@ -158,7 +158,7 @@ export function createKbDomain(options?: KbDomainOptions): DomainConfig {
             const empty: ContextResult = { context: "", memories: [], totalTokens: 0 };
             if (!text) return empty;
 
-            const minScore = context.getTunableParam("minScore") ?? 0.3;
+            const minScore = context.getTunableParam("minScore") ?? 0.5;
             const defPct = context.getTunableParam("definitionBudgetPct") ?? 0.3;
             const factPct = context.getTunableParam("factBudgetPct") ?? 0.4;
             const howtoPct = Math.max(0.1, 1.0 - defPct - factPct);
