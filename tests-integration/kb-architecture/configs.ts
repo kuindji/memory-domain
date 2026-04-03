@@ -110,4 +110,18 @@ export const configs: ArchitectureConfig[] = [
         consolidate: true,
         contextBudget: 4000,
     },
+    {
+        name: "full-hybrid-consolidate-10000",
+        pipeline: FULL_PIPELINE,
+        search: HYBRID_DEFAULT,
+        consolidate: true,
+        contextBudget: 10000,
+    },
+    {
+        name: "full-hybrid-consolidate-20000",
+        pipeline: FULL_PIPELINE,
+        search: HYBRID_DEFAULT,
+        consolidate: true,
+        contextBudget: 20000,
+    },
 ];
