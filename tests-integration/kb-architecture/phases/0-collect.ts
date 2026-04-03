@@ -69,6 +69,51 @@ const WIKIPEDIA_SOURCES: { title: string; expectedClassifications: string[] }[] 
     { title: "Fourth_Crusade", expectedClassifications: ["fact"] },
     { title: "Greek_fire", expectedClassifications: ["definition", "concept"] },
     { title: "Filioque", expectedClassifications: ["concept", "definition"] },
+
+    // People & Politics
+    { title: "Theodora_(wife_of_Justinian_I)", expectedClassifications: ["concept", "fact"] },
+
+    // Culture & Art
+    { title: "Byzantine_art", expectedClassifications: ["concept", "reference"] },
+    { title: "Byzantine_music", expectedClassifications: ["reference"] },
+
+    // Military & Defense
+    { title: "Byzantine_navy", expectedClassifications: ["fact", "reference"] },
+    { title: "Walls_of_Constantinople", expectedClassifications: ["reference", "fact"] },
+    {
+        title: "Siege_of_Constantinople_(717\u2013718)",
+        expectedClassifications: ["fact"],
+    },
+
+    // Science & Education
+    { title: "Byzantine_medicine", expectedClassifications: ["reference", "fact"] },
+
+    // Periods & Events
+    { title: "Macedonian_dynasty", expectedClassifications: ["concept", "fact"] },
+    { title: "Latin_Empire", expectedClassifications: ["fact"] },
+
+    // Geography & Infrastructure
+    { title: "Constantinople", expectedClassifications: ["definition", "fact"] },
+
+    // Foreign Relations
+    { title: "Byzantine\u2013Sasanian_wars", expectedClassifications: ["fact"] },
+
+    // Religion & Society
+    {
+        title: "Ecumenical_Patriarch_of_Constantinople",
+        expectedClassifications: ["definition", "reference"],
+    },
+    { title: "Byzantine_dress", expectedClassifications: ["reference"] },
+    { title: "East\u2013West_Schism", expectedClassifications: ["concept", "fact"] },
+    { title: "Procopius", expectedClassifications: ["fact", "reference"] },
+    { title: "Hippodrome_of_Constantinople", expectedClassifications: ["reference", "fact"] },
+
+    // Additional diverse topics
+    { title: "Byzantine_Senate", expectedClassifications: ["definition", "reference"] },
+    { title: "Komnenian_restoration", expectedClassifications: ["concept", "fact"] },
+    { title: "Palaiologos", expectedClassifications: ["fact"] },
+    { title: "Byzantine_coinage", expectedClassifications: ["reference", "fact"] },
+    { title: "Heraclius", expectedClassifications: ["fact"] },
 ];
 
 /**
@@ -187,6 +232,62 @@ function getManualEntries(): DatasetEntry[] {
             content:
                 "The Byzantine Empire's longevity (over 1,100 years) owed much to its sophisticated bureaucratic system rather than military might alone. The civil service was merit-based with examinations, officials rotated to prevent local power bases, and the tax system (based on the Roman capitatio-iugatio) adapted remarkably to territorial losses. When the empire lost Anatolia after 1071, it was the collapse of the tax base — not the military defeat itself — that proved fatal.",
             expectedClassification: "insight",
+        },
+
+        // New diverse sub-topic entries
+        {
+            id: "theodora-political-influence",
+            content:
+                "Empress Theodora (c. 500–548 CE) wielded extraordinary political influence as co-ruler with Justinian I. A former actress from humble origins, she became one of the most powerful women in Byzantine history. During the Nika riots of 532, when Justinian considered fleeing Constantinople, Theodora's famous speech convinced him to stay and fight. She championed women's rights, closing forced prostitution houses and expanding divorce and property rights for women.",
+            expectedClassification: "concept",
+        },
+        {
+            id: "theodosian-walls",
+            content:
+                "The Theodosian Walls were built between 408-413 CE under Emperor Theodosius II. The triple-wall system stretched 6.5 kilometers across the peninsula, featuring an inner wall 5 meters thick and 12 meters high, an outer wall, and a 20-meter-wide moat. These walls successfully defended Constantinople for over a thousand years until the Ottoman siege of 1453 when Sultan Mehmed II breached them using massive cannons, particularly the great bombard built by the Hungarian engineer Orban.",
+            expectedClassification: "reference",
+        },
+        {
+            id: "byzantine-hospitals",
+            content:
+                "The Pantokrator monastery hospital complex in Constantinople, founded in 1136 by Emperor John II Komnenos, was one of the most advanced medical facilities in the medieval world. It had 50 beds divided into five specialized wards: surgical, ophthalmological, gynecological, and two for general ailments. The hospital employed a staff hierarchy including chief physicians, surgeons, female doctors for women's wards, pharmacists, and orderlies, establishing a model for institutional healthcare.",
+            expectedClassification: "fact",
+        },
+        {
+            id: "byzantine-sasanian-treaty",
+            content:
+                "The Eternal Peace of 532 CE between Emperor Justinian I and Khosrau I of Sassanid Persia ended decades of Roman-Persian conflict. Justinian agreed to pay 11,000 pounds of gold to secure his eastern frontier, freeing him to pursue reconquest of the western Mediterranean. The peace lasted only eight years before Khosrau broke it in 540 CE by sacking Antioch, one of the empire's wealthiest cities.",
+            expectedClassification: "fact",
+        },
+        {
+            id: "byzantine-717-siege",
+            content:
+                "The Arab siege of Constantinople in 717-718 CE was one of the most decisive battles in world history. The massive Arab fleet of over 1,800 ships and 120,000 troops besieged the city by land and sea. The Byzantines under Emperor Leo III used Greek fire to devastating effect against the Arab fleet, while a harsh winter and Bulgarian attacks on the Arab land forces led to catastrophic losses. The failed siege halted Arab expansion into Europe for centuries.",
+            expectedClassification: "fact",
+        },
+        {
+            id: "byzantine-education-system",
+            content:
+                "The University of Constantinople, refounded by Emperor Constantine IX Monomachos in 1045 CE, was organized into faculties of philosophy and law. The philosophy faculty was headed by Michael Psellos, one of the greatest Byzantine intellectuals. Unlike Western universities which were church-controlled, Byzantine higher education remained under imperial patronage and emphasized classical Greek literature, rhetoric, and Aristotelian philosophy alongside Christian theology.",
+            expectedClassification: "concept",
+        },
+        {
+            id: "byzantine-hippodrome-factions",
+            content:
+                "The Hippodrome of Constantinople was far more than a chariot racing venue — it was the center of Byzantine political life. The four racing factions (Blues, Greens, Reds, and Whites) evolved into powerful political parties. The Blues generally represented the aristocratic and orthodox faction, while the Greens drew support from merchants and monophysites. The emperor's appearance in the imperial box (kathisma) was a key ritual of imperial legitimacy, and crowd reactions served as a form of public opinion polling.",
+            expectedClassification: "concept",
+        },
+        {
+            id: "byzantine-diplomacy-methods",
+            content:
+                "Byzantine diplomacy was arguably the most sophisticated in the medieval world. The empire maintained a dedicated bureau of barbarians (the Office of Barbarians) to manage foreign relations, employing translators, intelligence agents, and protocol experts. Key tactics included strategic marriages of imperial princesses to foreign rulers, subsidies and tribute payments to buy peace, playing rival neighbors against each other, and converting foreign peoples to Orthodox Christianity to create cultural allies.",
+            expectedClassification: "reference",
+        },
+        {
+            id: "heraclius-reforms",
+            content:
+                "Emperor Heraclius (r. 610-641 CE) transformed the Byzantine Empire after defeating the Sasanian Persians in 628 CE. He replaced Latin with Greek as the official language of administration, adopted the Greek title Basileus instead of the Latin Augustus, and began reorganizing provinces into military themes. His reign marked the transition from a late Roman to a distinctly medieval Greek state, though his final years were overshadowed by the catastrophic Arab conquests that stripped away Syria, Egypt, and North Africa.",
+            expectedClassification: "fact",
         },
     ];
 }
@@ -332,6 +433,83 @@ function getVerificationQuestions(): VerificationQuestion[] {
             question: "What triggered the Nika riots and how many people were killed?",
             expectedAnswer:
                 "The Nika riots of 532 CE were triggered by public anger over taxes and the arrest of chariot racing faction members. Justinian nearly fled but Theodora convinced him to stay. General Belisarius trapped the rioters in the Hippodrome and killed an estimated 30,000 people.",
+            requiredEntryIds: [],
+            excludedEntryIds: [],
+            difficulty: "medium",
+        },
+
+        // New questions targeting expanded content
+        {
+            id: "q-theodora-role",
+            question:
+                "What role did Empress Theodora play during the Nika riots, and what were her social reforms?",
+            expectedAnswer:
+                "During the Nika riots of 532 CE, Empress Theodora delivered a famous speech convincing Justinian I not to flee Constantinople, which proved decisive in saving his reign. As co-ruler, she championed women's rights by closing forced prostitution houses and expanding divorce and property rights for women. She rose from humble origins as a former actress to become one of the most powerful women in Byzantine history.",
+            requiredEntryIds: ["theodora-political-influence"],
+            excludedEntryIds: [],
+            difficulty: "medium",
+        },
+        {
+            id: "q-theodosian-walls",
+            question: "When were the Theodosian Walls built and how were they eventually breached?",
+            expectedAnswer:
+                "The Theodosian Walls were built between 408-413 CE under Emperor Theodosius II. The triple-wall system stretched 6.5 km with an inner wall 5 meters thick and 12 meters high, an outer wall, and a 20-meter-wide moat. They defended Constantinople for over a thousand years until 1453, when Ottoman Sultan Mehmed II breached them using massive cannons, particularly the great bombard built by Hungarian engineer Orban.",
+            requiredEntryIds: ["theodosian-walls"],
+            excludedEntryIds: [],
+            difficulty: "medium",
+        },
+        {
+            id: "q-pantokrator-hospital",
+            question:
+                "Describe the Pantokrator monastery hospital and its significance in medical history.",
+            expectedAnswer:
+                "The Pantokrator monastery hospital in Constantinople was founded in 1136 by Emperor John II Komnenos. It had 50 beds in five specialized wards (surgical, ophthalmological, gynecological, and two general). It employed chief physicians, surgeons, female doctors for women's wards, pharmacists, and orderlies. It was one of the most advanced medieval medical facilities and established a model for institutional healthcare.",
+            requiredEntryIds: ["byzantine-hospitals"],
+            excludedEntryIds: [],
+            difficulty: "hard",
+        },
+        {
+            id: "q-eternal-peace",
+            question: "What was the Eternal Peace of 532, and how long did it last?",
+            expectedAnswer:
+                "The Eternal Peace of 532 CE was a treaty between Emperor Justinian I and Sassanid Persian King Khosrau I. Justinian paid 11,000 pounds of gold to secure the eastern frontier, freeing resources for his western reconquest campaigns. Despite its name, it lasted only eight years — Khosrau broke it in 540 CE by sacking Antioch, one of the empire's wealthiest cities.",
+            requiredEntryIds: ["byzantine-sasanian-treaty"],
+            excludedEntryIds: [],
+            difficulty: "hard",
+        },
+        {
+            id: "q-717-siege",
+            question: "How was the Arab siege of Constantinople in 717-718 defeated?",
+            expectedAnswer:
+                "The Arab siege of 717-718 CE involved over 1,800 ships and 120,000 troops. Emperor Leo III used Greek fire to destroy much of the Arab fleet. A harsh winter decimated the besieging forces, and Bulgarian attacks on the Arab land army compounded their losses. The failed siege was one of the most decisive battles in world history, halting Arab expansion into Europe for centuries.",
+            requiredEntryIds: ["byzantine-717-siege"],
+            excludedEntryIds: [],
+            difficulty: "hard",
+        },
+        {
+            id: "q-basil-ii",
+            question: "What military achievements made Basil II known as 'the Bulgar Slayer'?",
+            expectedAnswer:
+                "Basil II earned the epithet 'Bulgar Slayer' (Boulgaroktonos) for his decisive campaigns against the Bulgarian Empire. After the Battle of Kleidion in 1014, he allegedly blinded 99 out of every 100 captured Bulgarian soldiers, sending them back led by the hundredth who was left with one eye. This led to the complete conquest of Bulgaria by 1018, expanding the Byzantine Empire to its greatest territorial extent since Justinian I.",
+            requiredEntryIds: [],
+            excludedEntryIds: [],
+            difficulty: "hard",
+        },
+        {
+            id: "q-byzantine-navy",
+            question:
+                "What was the role of the Byzantine navy and what technology gave it an advantage?",
+            expectedAnswer:
+                "The Byzantine navy was crucial for defending Constantinople and controlling Mediterranean trade routes. Its primary technological advantage was Greek fire, a napalm-like incendiary weapon deployed through pressurized siphons mounted on warships called dromons. The navy played decisive roles in the Arab sieges of Constantinople (674-678 and 717-718) and maintained Byzantine control of the Aegean Sea for centuries.",
+            requiredEntryIds: [],
+            excludedEntryIds: [],
+            difficulty: "medium",
+        },
+        {
+            id: "q-latin-empire",
+            question: "What was the Latin Empire and how did it affect Byzantine civilization?",
+            expectedAnswer:
+                "The Latin Empire (1204-1261) was a Crusader state established after the Fourth Crusade's sack of Constantinople. It replaced Byzantine governance with Western feudal structures and Catholic ecclesiastical authority. The Latin occupation weakened Constantinople's defenses, depleted its wealth and art treasures, and permanently damaged the empire's ability to recover. Michael VIII Palaiologos recaptured the city in 1261, but the restored Byzantine Empire never regained its former strength.",
             requiredEntryIds: [],
             excludedEntryIds: [],
             difficulty: "medium",
