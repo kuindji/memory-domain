@@ -13,22 +13,19 @@ import type {
 } from "../../core/types.js";
 import { countTokens } from "../../core/scoring.js";
 import { TOPIC_TAG } from "../topic/types.js";
-import {
-    KB_DOMAIN_ID,
-    KB_TAG,
-    KB_DEFINITION_TAG,
-    KB_CONCEPT_TAG,
-    KB_FACT_TAG,
-    KB_REFERENCE_TAG,
-    KB_HOWTO_TAG,
-    KB_INSIGHT_TAG,
-    DEFAULT_CONSOLIDATE_INTERVAL_MS,
-} from "./types.js";
-import type { KbDomainOptions } from "./types.js";
+import { KB_DOMAIN_ID, KB_TAG, DEFAULT_CONSOLIDATE_INTERVAL_MS } from "./types.js";
+import type { KbDomainOptions, QueryIntent } from "./types.js";
 import { kbSkills } from "./skills.js";
 import { processInboxBatch } from "./inbox.js";
 import { consolidateKnowledge } from "./schedules.js";
-import { isEntryValid, getKbAttrs, recordAccess, computeImportance } from "./utils.js";
+import {
+    isEntryValid,
+    getKbAttrs,
+    recordAccess,
+    computeImportance,
+    classifyQueryIntent,
+    ALL_CLASSIFICATIONS,
+} from "./utils.js";
 
 async function findMatchingTopicMemoryIds(text: string, graph: GraphApi): Promise<string[]> {
     try {
@@ -54,21 +51,6 @@ async function findMatchingTopicMemoryIds(text: string, graph: GraphApi): Promis
             .map((r) => String(r.id));
     } catch {
         return [];
-    }
-}
-
-async function getMemoryIdsForTopics(topicIds: string[], graph: GraphApi): Promise<Set<string>> {
-    if (topicIds.length === 0) return new Set();
-    try {
-        const topicRecordIds = topicIds.map((id) => new StringRecordId(id));
-        const results = await graph.query<Array<{ memId: string }>>(
-            `SELECT in as memId FROM about_topic WHERE out IN $topicIds`,
-            { topicIds: topicRecordIds },
-        );
-        if (!Array.isArray(results)) return new Set();
-        return new Set(results.map((r) => String(r.memId)));
-    } catch {
-        return new Set();
     }
 }
 
@@ -269,6 +251,8 @@ export function createKbDomain(options?: KbDomainOptions): DomainConfig {
             { name: "decayFactor", default: 0.95, min: 0.5, max: 1.0, step: 0.05 },
             { name: "importanceBoost", default: 1.5, min: 1.0, max: 3.0, step: 0.25 },
             { name: "adaptiveContext", default: 1, min: 0, max: 1, step: 1 },
+            { name: "useQueryIntent", default: 1, min: 0, max: 1, step: 1 },
+            { name: "intentFallbackWidth", default: 2, min: 0, max: 6, step: 1 },
         ],
 
         async bootstrap(context: DomainContext) {
@@ -365,241 +349,142 @@ export function createKbDomain(options?: KbDomainOptions): DomainConfig {
             const defPct = context.getTunableParam("definitionBudgetPct") ?? 0.3;
             const factPct = context.getTunableParam("factBudgetPct") ?? 0.4;
             const howtoPct = Math.max(0.1, 1.0 - defPct - factPct);
-            const topicBoost = context.getTunableParam("topicBoostFactor") ?? 1.5;
             const useEmbeddingRerank = (context.getTunableParam("embeddingRerank") ?? 1) > 0;
             const useLlmRerank = (context.getTunableParam("llmRerank") ?? 0) > 0;
+            const useIntent = (context.getTunableParam("useQueryIntent") ?? 1) > 0;
 
-            const definitionBudget = Math.floor(budgetTokens * defPct);
-            const factBudget = Math.floor(budgetTokens * factPct);
-            const howtoBudget = Math.floor(budgetTokens * howtoPct);
-
-            const allMemories: ScoredMemory[] = [];
-            const sections: string[] = [];
-            const now = Date.now();
-
-            // Resolve topics matching the query text for score boosting
-            const topicIds = await findMatchingTopicMemoryIds(text, context.graph);
-            const topicMemoryIds = await getMemoryIdsForTopics(topicIds, context.graph);
-            const hasTopicFilter = topicMemoryIds.size > 0;
-
-            // Adaptive context: if KB is small enough and no topic filtering needed,
-            // return everything grouped by classification
+            // Adaptive context: if KB is small enough, return everything
             const useAdaptiveContext = (context.getTunableParam("adaptiveContext") ?? 1) > 0;
-            if (useAdaptiveContext && !hasTopicFilter) {
+            if (useAdaptiveContext) {
                 const fullResult = await tryFullContextReturn(budgetTokens, context);
                 if (fullResult) return fullResult;
             }
 
-            // Track best non-topic memory as fallback (used only if all topic-filtering yields nothing)
-            let bestNonTopicFallback: ScoredMemory | null = null;
+            // Step 1: Classify query intent
+            let intent: QueryIntent | null = null;
+            if (useIntent) {
+                intent = await classifyQueryIntent(text, context.llmAt("low"));
+            }
 
-            // Section 1 — [Definitions & Concepts]
-            const rawDefinitions: ScoredMemory[] = [];
-            for (const tag of [KB_DEFINITION_TAG, KB_CONCEPT_TAG]) {
-                const result = await context.search({
+            const now = Date.now();
+
+            // Step 2: Build filters from intent
+            const filters: Record<string, unknown> = {};
+            if (intent && intent.classifications.length < ALL_CLASSIFICATIONS.length) {
+                filters.classification = intent.classifications;
+            }
+
+            // Step 3: Search with filters
+            const searchText = intent?.keywords?.length ? intent.keywords.join(" ") : text;
+            const results = await context.search({
+                text: searchText,
+                tags: [KB_TAG],
+                minScore,
+                rerank: useEmbeddingRerank,
+                rerankThreshold: minScore,
+                filters: Object.keys(filters).length > 0 ? filters : undefined,
+                tokenBudget: budgetTokens,
+            });
+
+            let entries = results.entries.filter((e) =>
+                isEntryValid(getKbAttrs(e.domainAttributes), now),
+            );
+
+            // Step 4: Progressive fallback if too few results
+            const MIN_RESULTS = 3;
+            if (entries.length < MIN_RESULTS && Object.keys(filters).length > 0) {
+                // Widen: drop classification filter
+                const widerResults = await context.search({
                     text,
-                    tags: [tag],
-                    tokenBudget: definitionBudget,
+                    tags: [KB_TAG],
                     minScore,
                     rerank: useEmbeddingRerank,
                     rerankThreshold: minScore,
+                    tokenBudget: budgetTokens,
                 });
-
-                const entries = result.entries.filter((e) => {
-                    return isEntryValid(getKbAttrs(e.domainAttributes), now);
-                });
-                rawDefinitions.push(...entries);
+                entries = widerResults.entries.filter((e) =>
+                    isEntryValid(getKbAttrs(e.domainAttributes), now),
+                );
             }
 
-            let filteredAll = rawDefinitions;
-            if (hasTopicFilter) {
-                filteredAll = applyTopicFilter(rawDefinitions, topicMemoryIds, topicBoost);
-                const dropped = rawDefinitions.filter((m) => !topicMemoryIds.has(m.id));
-                if (dropped.length > 0 && !bestNonTopicFallback) {
-                    bestNonTopicFallback = dropped[0];
+            if (entries.length === 0) return empty;
+
+            // Step 5: Optional LLM rerank
+            if (useLlmRerank && context.llm) {
+                entries = await llmRerankMemories(text, entries, context.llm);
+            }
+
+            // Step 6: Group by classification for output
+            const groups = new Map<string, ScoredMemory[]>();
+            for (const entry of entries) {
+                const attrs = getKbAttrs(entry.domainAttributes);
+                const cls = (attrs?.classification as string) ?? "fact";
+                let group = groups.get(cls);
+                if (!group) {
+                    group = [];
+                    groups.set(cls, group);
                 }
+                group.push(entry);
             }
-            allMemories.push(...filteredAll);
 
-            const definitionMemories = deduplicateMemories(filteredAll);
-            if (definitionMemories.length > 0) {
-                const lines = truncateToTokenBudget(definitionMemories, definitionBudget);
+            const sections: string[] = [];
+            const allMemories: ScoredMemory[] = [];
+
+            // Definitions & Concepts
+            const defConcept = [
+                ...(groups.get("definition") ?? []),
+                ...(groups.get("concept") ?? []),
+            ];
+            if (defConcept.length > 0) {
+                const definitionBudget = Math.floor(budgetTokens * defPct);
+                const lines = truncateToTokenBudget(defConcept, definitionBudget);
                 if (lines.length > 0) {
                     sections.push(`[Definitions & Concepts]\n${lines.join("\n")}`);
+                    allMemories.push(...defConcept.slice(0, lines.length));
                 }
             }
 
-            // Section 2 — [Facts & References]
-            for (const tag of [KB_FACT_TAG, KB_REFERENCE_TAG]) {
-                const result = await context.search({
-                    text,
-                    tags: [tag],
-                    tokenBudget: factBudget,
-                    minScore,
-                    rerank: useEmbeddingRerank,
-                    rerankThreshold: minScore,
-                });
-
-                const entries = result.entries.filter((e) => {
-                    if (allMemories.some((m) => m.id === e.id)) return false;
-                    return isEntryValid(getKbAttrs(e.domainAttributes), now);
-                });
-                let filteredEntries = entries;
-                if (hasTopicFilter) {
-                    filteredEntries = applyTopicFilter(entries, topicMemoryIds, topicBoost);
-                    const dropped = entries.filter((m) => !topicMemoryIds.has(m.id));
-                    if (dropped.length > 0 && !bestNonTopicFallback) {
-                        bestNonTopicFallback = dropped[0];
-                    }
-                }
-                allMemories.push(...filteredEntries);
-            }
-
-            const factMemories = allMemories.filter(
-                (m) => !definitionMemories.some((d) => d.id === m.id),
-            );
-            const dedupedFacts = deduplicateMemories(factMemories);
-            if (dedupedFacts.length > 0) {
-                const lines = truncateToTokenBudget(dedupedFacts, factBudget);
+            // Facts & References
+            const factRef = [...(groups.get("fact") ?? []), ...(groups.get("reference") ?? [])];
+            if (factRef.length > 0) {
+                const factBudget = Math.floor(budgetTokens * factPct);
+                const lines = truncateToTokenBudget(factRef, factBudget);
                 if (lines.length > 0) {
                     sections.push(`[Facts & References]\n${lines.join("\n")}`);
+                    allMemories.push(...factRef.slice(0, lines.length));
                 }
             }
 
-            // Section 3 — [How-Tos & Insights]
-            for (const tag of [KB_HOWTO_TAG, KB_INSIGHT_TAG]) {
-                const result = await context.search({
-                    text,
-                    tags: [tag],
-                    tokenBudget: howtoBudget,
-                    minScore,
-                    rerank: useEmbeddingRerank,
-                    rerankThreshold: minScore,
-                });
-
-                const entries = result.entries.filter((e) => {
-                    if (allMemories.some((m) => m.id === e.id)) return false;
-                    return isEntryValid(getKbAttrs(e.domainAttributes), now);
-                });
-
-                let filteredHowto = entries;
-                if (hasTopicFilter) {
-                    filteredHowto = applyTopicFilter(entries, topicMemoryIds, topicBoost);
-                    const dropped = entries.filter((m) => !topicMemoryIds.has(m.id));
-                    if (dropped.length > 0 && !bestNonTopicFallback) {
-                        bestNonTopicFallback = dropped[0];
-                    }
-                }
-
-                if (filteredHowto.length > 0) {
-                    const lines = truncateToTokenBudget(filteredHowto, howtoBudget);
-                    if (lines.length > 0) {
-                        sections.push(`[How-Tos & Insights]\n${lines.join("\n")}`);
-                        allMemories.push(...filteredHowto);
-                    }
-                }
-            }
-
-            // Fallback: if topic filtering left nothing, keep the single best non-topic memory
-            if (hasTopicFilter && allMemories.length === 0 && bestNonTopicFallback) {
-                allMemories.push(bestNonTopicFallback);
-                sections.push(bestNonTopicFallback.content);
-            }
-
-            // LLM re-rank: filter memories by semantic relevance
-            if (useLlmRerank) {
-                const allCollected = deduplicateMemories(allMemories);
-                const reranked = await llmRerankMemories(text, allCollected, context.llm);
-
-                if (reranked.length < allCollected.length) {
-                    // Rebuild context from reranked memories only
-                    sections.length = 0;
-                    const rerankedDefs = reranked.filter((m) =>
-                        definitionMemories.some((d) => d.id === m.id),
-                    );
-                    if (rerankedDefs.length > 0) {
-                        const lines = truncateToTokenBudget(rerankedDefs, definitionBudget);
-                        if (lines.length > 0) {
-                            sections.push(`[Definitions & Concepts]\n${lines.join("\n")}`);
-                        }
-                    }
-
-                    const rerankedFacts = reranked.filter(
-                        (m) =>
-                            !rerankedDefs.some((d) => d.id === m.id) &&
-                            dedupedFacts.some((f) => f.id === m.id),
-                    );
-                    if (rerankedFacts.length > 0) {
-                        const lines = truncateToTokenBudget(rerankedFacts, factBudget);
-                        if (lines.length > 0) {
-                            sections.push(`[Facts & References]\n${lines.join("\n")}`);
-                        }
-                    }
-
-                    const rerankedOther = reranked.filter(
-                        (m) =>
-                            !rerankedDefs.some((d) => d.id === m.id) &&
-                            !rerankedFacts.some((f) => f.id === m.id),
-                    );
-                    if (rerankedOther.length > 0) {
-                        const lines = truncateToTokenBudget(rerankedOther, howtoBudget);
-                        if (lines.length > 0) {
-                            sections.push(`[How-Tos & Insights]\n${lines.join("\n")}`);
-                        }
-                    }
-
-                    const finalContext = sections.join("\n\n");
-                    const totalTokens = countTokens(finalContext);
-                    return {
-                        context: finalContext,
-                        memories: reranked,
-                        totalTokens,
-                    };
+            // How-Tos & Insights
+            const howtoInsight = [
+                ...(groups.get("how-to") ?? []),
+                ...(groups.get("insight") ?? []),
+            ];
+            if (howtoInsight.length > 0) {
+                const howtoBudget = Math.floor(budgetTokens * howtoPct);
+                const lines = truncateToTokenBudget(howtoInsight, howtoBudget);
+                if (lines.length > 0) {
+                    sections.push(`[How-Tos & Insights]\n${lines.join("\n")}`);
+                    allMemories.push(...howtoInsight.slice(0, lines.length));
                 }
             }
 
             const finalContext = sections.join("\n\n");
-            const totalTokens = countTokens(finalContext);
-            const finalMemories = deduplicateMemories(allMemories);
 
-            // Fire-and-forget access recording for importance tracking
+            // Record access for importance tracking (fire-and-forget)
             Promise.all(
-                finalMemories.map((m) =>
+                allMemories.map((m) =>
                     recordAccess(context, m.id, getKbAttrs(m.domainAttributes)).catch(() => {}),
                 ),
             ).catch(() => {});
 
             return {
                 context: finalContext,
-                memories: finalMemories,
-                totalTokens,
+                memories: allMemories,
+                totalTokens: countTokens(finalContext),
             };
         },
     };
-}
-
-function deduplicateMemories(memories: ScoredMemory[]): ScoredMemory[] {
-    const seen = new Set<string>();
-    const result: ScoredMemory[] = [];
-    for (const mem of memories) {
-        if (!seen.has(mem.id)) {
-            seen.add(mem.id);
-            result.push(mem);
-        }
-    }
-    return result;
-}
-
-function applyTopicFilter(
-    memories: ScoredMemory[],
-    topicMemoryIds: Set<string>,
-    boostFactor: number,
-): ScoredMemory[] {
-    const topicMatches = memories.filter((m) => topicMemoryIds.has(m.id));
-
-    const boosted = topicMatches.map((m) => ({ ...m, score: m.score * boostFactor }));
-    boosted.sort((a, b) => b.score - a.score);
-    return boosted;
 }
 
 function truncateToTokenBudget(memories: ScoredMemory[], budget: number): string[] {
