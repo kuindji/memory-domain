@@ -1,7 +1,13 @@
 import type { OwnedMemory, DomainContext, ScoredMemory } from "../../core/types.js";
-import { KB_TAG, KB_DOMAIN_ID } from "./types.js";
+import { KB_TAG, KB_DOMAIN_ID, DECOMPOSITION_TOKEN_THRESHOLD } from "./types.js";
 import type { KbClassification } from "./types.js";
-import { ensureTag, linkToTopicsBatch, classificationToTag } from "./utils.js";
+import {
+    ensureTag,
+    linkToTopicsBatch,
+    classificationToTag,
+    decomposeToAtomicFacts,
+} from "./utils.js";
+import { countTokens } from "../../core/scoring.js";
 
 function logKbInboxWarning(scope: string, error: unknown): void {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -64,11 +70,18 @@ export async function processInboxBatch(
     await context.debug.time(
         "kb.inbox.total",
         async () => {
+            // Stage 0: Atomic Fact Decomposition
+            const processableEntries = await context.debug.time(
+                "kb.inbox.decompose",
+                () => decomposeEntries(entries, context),
+                { entries: entries.length },
+            );
+
             // Stage 1: Classification
             const classificationMap = await context.debug.time(
                 "kb.inbox.classify",
-                () => batchClassify(entries, context),
-                { entries: entries.length },
+                () => batchClassify(processableEntries, context),
+                { entries: processableEntries.length },
             );
 
             // Stage 2: Tag & Attribute assignment
@@ -77,13 +90,15 @@ export async function processInboxBatch(
             await context.debug.time(
                 "kb.inbox.tagAndAttribute",
                 async () => {
-                    for (const entry of entries) {
+                    for (const entry of processableEntries) {
                         const classification = classificationMap.get(entry.memory.id) ?? "fact";
                         const existingSource = entry.domainAttributes.source as string | undefined;
 
                         await context.updateAttributes(entry.memory.id, {
                             classification,
                             superseded: false,
+                            validFrom: Date.now(),
+                            confidence: 1.0,
                             ...(existingSource ? { source: existingSource } : {}),
                         });
 
@@ -99,32 +114,94 @@ export async function processInboxBatch(
                         await context.tagMemory(entry.memory.id, classTagId);
                     }
                 },
-                { entries: entries.length },
+                { entries: processableEntries.length },
             );
 
             // Stage 3: Topic linking
             await context.debug.time(
                 "kb.inbox.topicLinking",
-                () => linkToTopicsBatch(context, entries),
-                { entries: entries.length },
+                () => linkToTopicsBatch(context, processableEntries),
+                { entries: processableEntries.length },
             );
 
             // Stage 4: Supersession detection
             await context.debug.time(
                 "kb.inbox.supersessionDetection",
-                () => batchDetectSupersession(entries, classificationMap, context),
-                { entries: entries.length },
+                () => batchDetectSupersession(processableEntries, classificationMap, context),
+                { entries: processableEntries.length },
             );
 
             // Stage 5: Related knowledge linking
             await context.debug.time(
                 "kb.inbox.relatedLinking",
-                () => batchLinkRelated(entries, classificationMap, context),
-                { entries: entries.length },
+                () => batchLinkRelated(processableEntries, classificationMap, context),
+                { entries: processableEntries.length },
             );
         },
         { entries: entries.length },
     );
+}
+
+async function decomposeEntries(
+    entries: OwnedMemory[],
+    context: DomainContext,
+): Promise<OwnedMemory[]> {
+    const result: OwnedMemory[] = [];
+
+    for (const entry of entries) {
+        const tokens = countTokens(entry.memory.content);
+        if (tokens <= DECOMPOSITION_TOKEN_THRESHOLD) {
+            result.push(entry);
+            continue;
+        }
+
+        const atomicFacts = await decomposeToAtomicFacts(entry.memory.content, context);
+        if (!atomicFacts || atomicFacts.length <= 1) {
+            result.push(entry);
+            continue;
+        }
+
+        // Mark parent as decomposed
+        await context.updateAttributes(entry.memory.id, {
+            ...entry.domainAttributes,
+            decomposed: true,
+        });
+
+        // Create child memories
+        for (const fact of atomicFacts) {
+            const childId = await context.writeMemory({
+                content: fact.claim,
+                tags: [KB_TAG],
+                ownership: {
+                    domain: KB_DOMAIN_ID,
+                    attributes: {
+                        source: "decomposed",
+                        parentMemoryId: entry.memory.id,
+                        ...(fact.classification ? { classification: fact.classification } : {}),
+                    },
+                },
+            });
+
+            // Link child to parent
+            await context.graph.relate(childId, "refines", entry.memory.id);
+
+            // Fetch child memory for subsequent stages
+            const childMemory = await context.getMemory(childId);
+            if (childMemory) {
+                result.push({
+                    memory: childMemory,
+                    domainAttributes: {
+                        source: "decomposed",
+                        parentMemoryId: entry.memory.id,
+                        ...(fact.classification ? { classification: fact.classification } : {}),
+                    },
+                    tags: [KB_TAG],
+                });
+            }
+        }
+    }
+
+    return result;
 }
 
 async function batchClassify(
@@ -302,6 +379,7 @@ async function processSupersessionBatch(
             await context.updateAttributes(existing.id, {
                 ...existing.domainAttributes[KB_DOMAIN_ID],
                 superseded: true,
+                validUntil: Date.now(),
             });
         }
     } catch (error) {

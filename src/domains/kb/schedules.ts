@@ -15,7 +15,7 @@ export async function consolidateKnowledge(context: DomainContext): Promise<void
 
         // Get all non-superseded KB memories
         const rows = await context.graph.query<OwnershipRow[]>(
-            "SELECT in, attributes FROM owned_by WHERE out = $domainId AND attributes.superseded = false",
+            "SELECT in, attributes FROM owned_by WHERE out = $domainId AND attributes.superseded = false AND attributes.decomposed != true",
             { domainId: new StringRecordId(`domain:${KB_DOMAIN_ID}`) },
         );
         if (!rows || rows.length === 0) return;

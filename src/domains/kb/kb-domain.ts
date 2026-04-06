@@ -15,6 +15,7 @@ import { countTokens } from "../../core/scoring.js";
 import { TOPIC_TAG } from "../topic/types.js";
 import {
     KB_DOMAIN_ID,
+    KB_TAG,
     KB_DEFINITION_TAG,
     KB_CONCEPT_TAG,
     KB_FACT_TAG,
@@ -27,6 +28,7 @@ import type { KbDomainOptions } from "./types.js";
 import { kbSkills } from "./skills.js";
 import { processInboxBatch } from "./inbox.js";
 import { consolidateKnowledge } from "./schedules.js";
+import { isEntryValid, getKbAttrs, recordAccess, computeImportance } from "./utils.js";
 
 async function findMatchingTopicMemoryIds(text: string, graph: GraphApi): Promise<string[]> {
     try {
@@ -128,6 +130,103 @@ Include only memories with score >= 3.`;
     }
 }
 
+async function tryFullContextReturn(
+    budgetTokens: number,
+    context: DomainContext,
+): Promise<ContextResult | null> {
+    const allEntries = await context.getMemories({
+        tags: [KB_TAG],
+        attributes: { superseded: false },
+    });
+
+    // Quick token count — bail early if over budget
+    let totalTokens = 0;
+    for (const entry of allEntries) {
+        totalTokens += entry.tokenCount;
+        if (totalTokens > budgetTokens) return null;
+    }
+
+    if (allEntries.length === 0) return null;
+
+    // Fetch domain attributes for all entries in a single batch query
+    const now = Date.now();
+    const domainRef = new StringRecordId(`domain:${KB_DOMAIN_ID}`);
+    const memRefs = allEntries.map((e) => new StringRecordId(e.id));
+    const attrRows = await context.graph.query<
+        Array<{ in: string; attributes: Record<string, unknown> }>
+    >("SELECT in, attributes FROM owned_by WHERE in IN $memIds AND out = $domainId", {
+        memIds: memRefs,
+        domainId: domainRef,
+    });
+
+    const attrMap = new Map<string, Record<string, unknown>>();
+    if (attrRows) {
+        for (const row of attrRows) {
+            attrMap.set(String(row.in), row.attributes);
+        }
+    }
+
+    const groups = new Map<string, Array<{ content: string; mem: ScoredMemory }>>();
+    const allMemories: ScoredMemory[] = [];
+
+    for (const entry of allEntries) {
+        const attrs = attrMap.get(entry.id);
+        if (!isEntryValid(attrs, now)) continue;
+
+        const cls = (attrs?.classification as string) ?? "fact";
+        const scored: ScoredMemory = {
+            id: entry.id,
+            content: entry.content,
+            score: 1.0,
+            scores: {},
+            tags: [],
+            domainAttributes: { [KB_DOMAIN_ID]: attrs ?? {} },
+            eventTime: entry.eventTime,
+            createdAt: entry.createdAt,
+            tokenCount: entry.tokenCount,
+        };
+
+        let group = groups.get(cls);
+        if (!group) {
+            group = [];
+            groups.set(cls, group);
+        }
+        group.push({ content: entry.content, mem: scored });
+        allMemories.push(scored);
+    }
+
+    const sections: string[] = [];
+    const defConcept = [...(groups.get("definition") ?? []), ...(groups.get("concept") ?? [])];
+    if (defConcept.length > 0) {
+        sections.push(`[Definitions & Concepts]\n${defConcept.map((e) => e.content).join("\n")}`);
+    }
+
+    const factRef = [...(groups.get("fact") ?? []), ...(groups.get("reference") ?? [])];
+    if (factRef.length > 0) {
+        sections.push(`[Facts & References]\n${factRef.map((e) => e.content).join("\n")}`);
+    }
+
+    const howtoInsight = [...(groups.get("how-to") ?? []), ...(groups.get("insight") ?? [])];
+    if (howtoInsight.length > 0) {
+        sections.push(`[How-Tos & Insights]\n${howtoInsight.map((e) => e.content).join("\n")}`);
+    }
+
+    const finalContext = sections.join("\n\n");
+
+    // Record access for importance tracking
+    Promise.all(
+        allMemories.map((m) =>
+            recordAccess(context, m.id, getKbAttrs(m.domainAttributes)).catch(() => {}),
+        ),
+    ).catch(() => {});
+
+    return {
+        context: finalContext,
+        memories: allMemories,
+        totalTokens: countTokens(finalContext),
+    };
+}
+
 export function createKbDomain(options?: KbDomainOptions): DomainConfig {
     return {
         id: KB_DOMAIN_ID,
@@ -155,6 +254,9 @@ export function createKbDomain(options?: KbDomainOptions): DomainConfig {
             { name: "topicBoostFactor", default: 1.5, min: 1.0, max: 3.0, step: 0.25 },
             { name: "embeddingRerank", default: 1, min: 0, max: 1, step: 1 },
             { name: "llmRerank", default: 0, min: 0, max: 1, step: 1 },
+            { name: "decayFactor", default: 0.95, min: 0.5, max: 1.0, step: 0.05 },
+            { name: "importanceBoost", default: 1.5, min: 1.0, max: 3.0, step: 0.25 },
+            { name: "adaptiveContext", default: 1, min: 0, max: 1, step: 1 },
         ],
 
         describe() {
@@ -182,13 +284,17 @@ export function createKbDomain(options?: KbDomainOptions): DomainConfig {
             },
 
             rank(_query: SearchQuery, candidates: ScoredMemory[]): ScoredMemory[] {
+                const now = Date.now();
                 return candidates
                     .map((c) => {
-                        const attrs = c.domainAttributes[KB_DOMAIN_ID] as
-                            | Record<string, unknown>
-                            | undefined;
+                        const attrs = getKbAttrs(c.domainAttributes);
                         let score = c.score;
-                        if (attrs?.superseded) score *= 0.1;
+                        if (!isEntryValid(attrs, now)) {
+                            score *= 0.05;
+                        } else {
+                            const imp = computeImportance(attrs, 0.95);
+                            score *= 1 + (imp - 0.5) * 0.5;
+                        }
                         return { ...c, score };
                     })
                     .sort((a, b) => b.score - a.score);
@@ -217,11 +323,20 @@ export function createKbDomain(options?: KbDomainOptions): DomainConfig {
 
             const allMemories: ScoredMemory[] = [];
             const sections: string[] = [];
+            const now = Date.now();
 
             // Resolve topics matching the query text for score boosting
             const topicIds = await findMatchingTopicMemoryIds(text, context.graph);
             const topicMemoryIds = await getMemoryIdsForTopics(topicIds, context.graph);
             const hasTopicFilter = topicMemoryIds.size > 0;
+
+            // Adaptive context: if KB is small enough and no topic filtering needed,
+            // return everything grouped by classification
+            const useAdaptiveContext = (context.getTunableParam("adaptiveContext") ?? 1) > 0;
+            if (useAdaptiveContext && !hasTopicFilter) {
+                const fullResult = await tryFullContextReturn(budgetTokens, context);
+                if (fullResult) return fullResult;
+            }
 
             // Track best non-topic memory as fallback (used only if all topic-filtering yields nothing)
             let bestNonTopicFallback: ScoredMemory | null = null;
@@ -239,8 +354,7 @@ export function createKbDomain(options?: KbDomainOptions): DomainConfig {
                 });
 
                 const entries = result.entries.filter((e) => {
-                    const attrs = e.domainAttributes[KB_DOMAIN_ID];
-                    return !attrs?.superseded;
+                    return isEntryValid(getKbAttrs(e.domainAttributes), now);
                 });
                 rawDefinitions.push(...entries);
             }
@@ -276,8 +390,7 @@ export function createKbDomain(options?: KbDomainOptions): DomainConfig {
 
                 const entries = result.entries.filter((e) => {
                     if (allMemories.some((m) => m.id === e.id)) return false;
-                    const attrs = e.domainAttributes[KB_DOMAIN_ID];
-                    return !attrs?.superseded;
+                    return isEntryValid(getKbAttrs(e.domainAttributes), now);
                 });
                 let filteredEntries = entries;
                 if (hasTopicFilter) {
@@ -314,8 +427,7 @@ export function createKbDomain(options?: KbDomainOptions): DomainConfig {
 
                 const entries = result.entries.filter((e) => {
                     if (allMemories.some((m) => m.id === e.id)) return false;
-                    const attrs = e.domainAttributes[KB_DOMAIN_ID];
-                    return !attrs?.superseded;
+                    return isEntryValid(getKbAttrs(e.domainAttributes), now);
                 });
 
                 let filteredHowto = entries;
@@ -396,10 +508,18 @@ export function createKbDomain(options?: KbDomainOptions): DomainConfig {
 
             const finalContext = sections.join("\n\n");
             const totalTokens = countTokens(finalContext);
+            const finalMemories = deduplicateMemories(allMemories);
+
+            // Fire-and-forget access recording for importance tracking
+            Promise.all(
+                finalMemories.map((m) =>
+                    recordAccess(context, m.id, getKbAttrs(m.domainAttributes)).catch(() => {}),
+                ),
+            ).catch(() => {});
 
             return {
                 context: finalContext,
-                memories: deduplicateMemories(allMemories),
+                memories: finalMemories,
                 totalTokens,
             };
         },

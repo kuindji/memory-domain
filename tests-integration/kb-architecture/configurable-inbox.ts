@@ -1,8 +1,14 @@
 // tests-integration/kb-architecture/configurable-inbox.ts
 import type { OwnedMemory, DomainContext, ScoredMemory } from "../../src/core/types.js";
 import type { KbClassification } from "../../src/domains/kb/types.js";
-import { KB_TAG, KB_DOMAIN_ID } from "../../src/domains/kb/types.js";
-import { ensureTag, classificationToTag, linkToTopicsBatch } from "../../src/domains/kb/utils.js";
+import { KB_TAG, KB_DOMAIN_ID, DECOMPOSITION_TOKEN_THRESHOLD } from "../../src/domains/kb/types.js";
+import {
+    ensureTag,
+    classificationToTag,
+    linkToTopicsBatch,
+    decomposeToAtomicFacts,
+} from "../../src/domains/kb/utils.js";
+import { countTokens } from "../../src/core/scoring.js";
 import type { PipelineStages } from "./types.js";
 
 const VALID_CLASSIFICATIONS = new Set<string>([
@@ -70,17 +76,24 @@ export function createConfigurableInboxProcessor(stages: PipelineStages) {
         await context.debug.time(
             "kb.inbox.total",
             async () => {
+                // Stage 0: Atomic Fact Decomposition
+                const processableEntries = await context.debug.time(
+                    "kb.inbox.decompose",
+                    () => decomposeEntries(entries, context),
+                    { entries: entries.length },
+                );
+
                 // Stage 1: Classification
                 let classificationMap: Map<string, string>;
                 if (stages.classify) {
                     classificationMap = await context.debug.time(
                         "kb.inbox.classify",
-                        () => batchClassify(entries, context),
-                        { entries: entries.length },
+                        () => batchClassify(processableEntries, context),
+                        { entries: processableEntries.length },
                     );
                 } else {
                     classificationMap = new Map();
-                    for (const entry of entries) {
+                    for (const entry of processableEntries) {
                         classificationMap.set(entry.memory.id, "fact");
                     }
                 }
@@ -91,7 +104,7 @@ export function createConfigurableInboxProcessor(stages: PipelineStages) {
                     await context.debug.time(
                         "kb.inbox.tagAndAttribute",
                         async () => {
-                            for (const entry of entries) {
+                            for (const entry of processableEntries) {
                                 const classification =
                                     classificationMap.get(entry.memory.id) ?? "fact";
                                 const existingSource = entry.domainAttributes.source as
@@ -101,6 +114,8 @@ export function createConfigurableInboxProcessor(stages: PipelineStages) {
                                 await context.updateAttributes(entry.memory.id, {
                                     classification,
                                     superseded: false,
+                                    validFrom: Date.now(),
+                                    confidence: 1.0,
                                     ...(existingSource ? { source: existingSource } : {}),
                                 });
 
@@ -118,7 +133,7 @@ export function createConfigurableInboxProcessor(stages: PipelineStages) {
                                 await context.tagMemory(entry.memory.id, classTagId);
                             }
                         },
-                        { entries: entries.length },
+                        { entries: processableEntries.length },
                     );
                 }
 
@@ -126,8 +141,8 @@ export function createConfigurableInboxProcessor(stages: PipelineStages) {
                 if (stages.topicLink) {
                     await context.debug.time(
                         "kb.inbox.topicLinking",
-                        () => linkToTopicsBatch(context, entries),
-                        { entries: entries.length },
+                        () => linkToTopicsBatch(context, processableEntries),
+                        { entries: processableEntries.length },
                     );
                 }
 
@@ -135,8 +150,8 @@ export function createConfigurableInboxProcessor(stages: PipelineStages) {
                 if (stages.supersede) {
                     await context.debug.time(
                         "kb.inbox.supersessionDetection",
-                        () => batchDetectSupersession(entries, classificationMap, context),
-                        { entries: entries.length },
+                        () => batchDetectSupersession(processableEntries, classificationMap, context),
+                        { entries: processableEntries.length },
                     );
                 }
 
@@ -144,14 +159,78 @@ export function createConfigurableInboxProcessor(stages: PipelineStages) {
                 if (stages.relateKnowledge) {
                     await context.debug.time(
                         "kb.inbox.relatedLinking",
-                        () => batchLinkRelated(entries, classificationMap, context),
-                        { entries: entries.length },
+                        () => batchLinkRelated(processableEntries, classificationMap, context),
+                        { entries: processableEntries.length },
                     );
                 }
             },
             { entries: entries.length },
         );
     };
+}
+
+// --- Stage 0: Atomic decomposition ---
+
+async function decomposeEntries(
+    entries: OwnedMemory[],
+    context: DomainContext,
+): Promise<OwnedMemory[]> {
+    const result: OwnedMemory[] = [];
+
+    for (const entry of entries) {
+        const tokens = countTokens(entry.memory.content);
+        if (tokens <= DECOMPOSITION_TOKEN_THRESHOLD) {
+            result.push(entry);
+            continue;
+        }
+
+        const atomicFacts = await decomposeToAtomicFacts(entry.memory.content, context);
+        if (!atomicFacts || atomicFacts.length <= 1) {
+            result.push(entry);
+            continue;
+        }
+
+        // Mark parent as decomposed
+        await context.updateAttributes(entry.memory.id, {
+            ...entry.domainAttributes,
+            decomposed: true,
+        });
+
+        // Create child memories
+        for (const fact of atomicFacts) {
+            const childId = await context.writeMemory({
+                content: fact.claim,
+                tags: [KB_TAG],
+                ownership: {
+                    domain: KB_DOMAIN_ID,
+                    attributes: {
+                        source: "decomposed",
+                        parentMemoryId: entry.memory.id,
+                        ...(fact.classification ? { classification: fact.classification } : {}),
+                    },
+                },
+            });
+
+            // Link child to parent
+            await context.graph.relate(childId, "refines", entry.memory.id);
+
+            // Fetch child memory for subsequent stages
+            const childMemory = await context.getMemory(childId);
+            if (childMemory) {
+                result.push({
+                    memory: childMemory,
+                    domainAttributes: {
+                        source: "decomposed",
+                        parentMemoryId: entry.memory.id,
+                        ...(fact.classification ? { classification: fact.classification } : {}),
+                    },
+                    tags: [KB_TAG],
+                });
+            }
+        }
+    }
+
+    return result;
 }
 
 // --- Stage implementations ---
@@ -326,6 +405,7 @@ async function processSupersessionBatch(
             await context.updateAttributes(existing.id, {
                 ...existing.domainAttributes[KB_DOMAIN_ID],
                 superseded: true,
+                validUntil: Date.now(),
             });
         }
     } catch (error) {
