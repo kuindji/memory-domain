@@ -446,6 +446,71 @@ describe("SearchEngine", () => {
         });
     });
 
+    describe("filtered search", () => {
+        test("fulltextSearch respects filters on memory fields", async () => {
+            // Add a custom field to memory table
+            await db.query(
+                "DEFINE FIELD IF NOT EXISTS classification ON memory TYPE option<string>",
+            );
+
+            await store.createNode("memory", {
+                content: "Byzantine military tactics in siege warfare",
+                created_at: Date.now(),
+                token_count: 7,
+                classification: "fact",
+            });
+            await store.createNode("memory", {
+                content: "Byzantine architecture and building techniques",
+                created_at: Date.now(),
+                token_count: 6,
+                classification: "reference",
+            });
+            await store.createNode("memory", {
+                content: "Byzantine trade routes and commerce",
+                created_at: Date.now(),
+                token_count: 6,
+                classification: "fact",
+            });
+
+            const result = await search.search({
+                text: "Byzantine",
+                mode: "fulltext",
+                filters: { classification: ["fact"] },
+            });
+
+            expect(result.entries.length).toBe(2);
+            for (const entry of result.entries) {
+                expect(entry.content).not.toContain("architecture");
+            }
+        });
+
+        test("search without filters returns all matches", async () => {
+            await db.query(
+                "DEFINE FIELD IF NOT EXISTS classification ON memory TYPE option<string>",
+            );
+
+            await store.createNode("memory", {
+                content: "Byzantine military tactics",
+                created_at: Date.now(),
+                token_count: 4,
+                classification: "fact",
+            });
+            await store.createNode("memory", {
+                content: "Byzantine architecture overview",
+                created_at: Date.now(),
+                token_count: 4,
+                classification: "reference",
+            });
+
+            const result = await search.search({
+                text: "Byzantine",
+                mode: "fulltext",
+            });
+
+            expect(result.entries.length).toBe(2);
+        });
+    });
+
     describe("domain ownership filter", () => {
         test("filters by domain ownership", async () => {
             await store.createNodeWithId("domain:alpha", { name: "Alpha" });

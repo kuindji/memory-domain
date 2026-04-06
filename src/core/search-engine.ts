@@ -139,19 +139,53 @@ class SearchEngine {
         return countTokens(mem.content);
     }
 
+    private buildFilterClauses(filters: Record<string, unknown>): {
+        clauses: string[];
+        vars: Record<string, unknown>;
+    } {
+        const clauses: string[] = [];
+        const vars: Record<string, unknown> = {};
+        let i = 0;
+        for (const [field, value] of Object.entries(filters)) {
+            if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+                const obj = value as Record<string, unknown>;
+                if ("containsAny" in obj && Array.isArray(obj.containsAny)) {
+                    clauses.push(`${field} CONTAINSANY $flt${i}`);
+                    vars[`flt${i}`] = obj.containsAny;
+                }
+            } else if (Array.isArray(value)) {
+                clauses.push(`${field} IN $flt${i}`);
+                vars[`flt${i}`] = value;
+            } else {
+                clauses.push(`${field} = $flt${i}`);
+                vars[`flt${i}`] = value;
+            }
+            i++;
+        }
+        return { clauses, vars };
+    }
+
     private async vectorSearch(query: SearchQuery): Promise<Map<string, ScoredMemory>> {
         const candidates = new Map<string, ScoredMemory>();
         if (!this.embeddingAdapter || !query.text) return candidates;
 
         const queryVec = await this.embeddingAdapter.embed(query.text);
 
+        let filterSql = "";
+        let filterVars: Record<string, unknown> = {};
+        if (query.filters && Object.keys(query.filters).length > 0) {
+            const { clauses, vars } = this.buildFilterClauses(query.filters);
+            filterSql = clauses.length > 0 ? ` AND ${clauses.join(" AND ")}` : "";
+            filterVars = vars;
+        }
+
         const rows = await this.store.query<(MemoryRow & { score: number })[]>(
             `SELECT *, vector::similarity::cosine(embedding, $queryVec) AS score
        FROM memory
-       WHERE embedding IS NOT NONE
+       WHERE embedding IS NOT NONE${filterSql}
        ORDER BY score DESC
        LIMIT $limit`,
-            { queryVec, limit: query.limit ?? 10 },
+            { queryVec, limit: query.limit ?? 10, ...filterVars },
         );
 
         if (!rows) return candidates;
@@ -179,15 +213,23 @@ class SearchEngine {
         const candidates = new Map<string, ScoredMemory>();
         if (!query.text) return candidates;
 
+        let filterSql = "";
+        let filterVars: Record<string, unknown> = {};
+        if (query.filters && Object.keys(query.filters).length > 0) {
+            const { clauses, vars } = this.buildFilterClauses(query.filters);
+            filterSql = clauses.length > 0 ? ` AND ${clauses.join(" AND ")}` : "";
+            filterVars = vars;
+        }
+
         // Try BM25 full-text search first
         let rows: MemoryRow[] = [];
         try {
             rows = await this.store.query<MemoryRow[]>(
                 `SELECT *, search::score(1) AS score FROM memory
-         WHERE content @1@ $text
+         WHERE content @1@ $text${filterSql}
          ORDER BY score DESC
          LIMIT $limit`,
-                { text: query.text, limit: query.limit ?? 10 },
+                { text: query.text, limit: query.limit ?? 10, ...filterVars },
             );
         } catch {
             // BM25 index may not be defined; fall back to CONTAINS
@@ -195,7 +237,12 @@ class SearchEngine {
 
         // Fallback to CONTAINS if BM25 returned nothing
         if (!rows || rows.length === 0) {
-            rows = await this.containsFallback(query.text, query.limit ?? 10);
+            rows = await this.containsFallback(
+                query.text,
+                query.limit ?? 10,
+                filterSql,
+                filterVars,
+            );
         }
 
         for (const row of rows) {
@@ -217,7 +264,12 @@ class SearchEngine {
         return candidates;
     }
 
-    private async containsFallback(text: string, limit: number): Promise<MemoryRow[]> {
+    private async containsFallback(
+        text: string,
+        limit: number,
+        filterSql = "",
+        filterVars: Record<string, unknown> = {},
+    ): Promise<MemoryRow[]> {
         // Split into keywords and search for each
         const keywords = text.split(/\s+/).filter((k) => k.length > 2);
         if (keywords.length === 0) return [];
@@ -226,12 +278,12 @@ class SearchEngine {
         const conditions = keywords.map(
             (_, i) => `string::lowercase(content) CONTAINS string::lowercase($kw${i})`,
         );
-        const vars: Record<string, unknown> = { limit };
+        const vars: Record<string, unknown> = { limit, ...filterVars };
         keywords.forEach((kw, i) => {
             vars[`kw${i}`] = kw;
         });
 
-        const surql = `SELECT * FROM memory WHERE ${conditions.join(" OR ")} LIMIT $limit`;
+        const surql = `SELECT * FROM memory WHERE (${conditions.join(" OR ")})${filterSql} LIMIT $limit`;
         const rows = await this.store.query<MemoryRow[]>(surql, vars);
         return rows ?? [];
     }

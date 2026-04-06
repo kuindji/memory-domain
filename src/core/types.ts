@@ -124,6 +124,7 @@ export interface SearchQuery extends MemoryFilter {
     context?: RequestContext;
     rerank?: boolean;
     rerankThreshold?: number;
+    filters?: Record<string, unknown>;
 }
 
 export interface SearchResult {
