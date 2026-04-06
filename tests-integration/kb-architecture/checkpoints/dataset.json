@@ -1,522 +1,494 @@
 {
-    "entries": [
-        {
-            "id": "wiki-justinian_i-0",
-            "content": "Justinian I, also known as Justinian the Great, was Eastern Roman emperor from 527 to 565.",
-            "expectedClassification": "fact"
-        },
-        {
-            "id": "wiki-nika_riots-0",
-            "content": "The Nika riots, Nika revolt or Nika sedition took place against Byzantine emperor Justinian I in Constantinople over the course of a week in 532 AD. They are often regarded as the most violent riots in the city's history, with nearly half of Constantinople being burned or destroyed and tens of thousands of people killed.",
-            "expectedClassification": "fact"
-        },
-        {
-            "id": "wiki-battle_of_manzikert-0",
-            "content": "The Battle of Manzikert or Malazgirt was fought between the Byzantine Empire and the Seljuk Empire on 26 August 1071 near Manzikert, Iberia. The decisive defeat of the Byzantine army and the capture of the emperor Romanos IV Diogenes played an important role in undermining Byzantine authority in Anatolia and Armenia, and allowed for the gradual Turkification of Anatolia. Many Turks, travelling westward during the 11th century, saw the victory at Manzikert as an entrance to Asia Minor.",
-            "expectedClassification": "fact"
-        },
-        {
-            "id": "wiki-corpus_juris_civilis-0",
-            "content": "The Corpus Juris Civilis is the modern name for a collection of fundamental works in jurisprudence, enacted from 529 to 534 by order of Roman Emperor Justinian I. It is also sometimes referred to metonymically after one of its parts, the Code of Justinian.",
-            "expectedClassification": "reference"
-        },
-        {
-            "id": "wiki-byzantine_iconoclasm-0",
-            "content": "The Byzantine Iconoclasm are two periods in the history of the Byzantine Empire when the use of religious images or icons was opposed by religious and imperial authorities within the Ecumenical Patriarchate and the temporal imperial hierarchy. The First Iconoclasm, as it is sometimes called, occurred between about 726 and 787, while the Second Iconoclasm occurred between 814 and 842. According to the traditional view, Byzantine Iconoclasm was started by a ban on religious images promulgated by the Byzantine Emperor Leo III the Isaurian, and continued under his successors. It was accompanied by widespread destruction of religious images and persecution of supporters of the veneration of images.",
-            "expectedClassification": "concept"
-        },
-        {
-            "id": "wiki-byzantine_iconoclasm-1",
-            "content": "The Papacy remained firmly in support of the use of religious images throughout the period, and the whole episode widened the growing divergence between the Byzantine and Carolingian traditions in what was still a unified European Church, as well as facilitating the reduction or removal of Byzantine political control over parts of the Italian Peninsula.",
-            "expectedClassification": "fact"
-        },
-        {
-            "id": "wiki-basil_ii-0",
-            "content": "Basil II Porphyrogenitus, given the epithet the Bulgar Slayer, was the senior Byzantine emperor from 976 to 1025. He and his brother Constantine VIII were crowned before their father Romanos II died in 963, but they were too young to rule. The throne thus went to two generals, Nikephoros Phokas and John Tzimiskes before Basil became senior emperor, though his influential great-uncle Basil Lekapenos remained as the de facto ruler until 985. His reign of 49 years and 11 months was the longest of any Roman emperor.",
-            "expectedClassification": "fact"
-        },
-        {
-            "id": "wiki-fall_of_constantinople-0",
-            "content": "The Fall of Constantinople, also known as the Conquest of Constantinople, was the capture of the capital of the Byzantine Empire by the Ottoman Empire. The city was captured on 29 May 1453 as part of the culmination of a 53-day siege which had begun on 6 April.",
-            "expectedClassification": "fact"
-        },
-        {
-            "id": "wiki-theme_(byzantine_district)-0",
-            "content": "The themes or thémata were the main military and administrative divisions of the Byzantine Empire. They were established in the mid-7th century in the aftermath of the Slavic migrations to the Balkans and Muslim conquests of parts of Eastern Roman territory, and replaced the earlier ancient provincial system established by Diocletian and Constantine the Great. In their origin, the first themes were created from the areas of encampment of the field armies of the East Roman army, and their names corresponded to the military units that had existed in those areas. The theme system reached its apogee in the 9th and 10th centuries, as older themes were split up and the conquest of territory resulted in the creation of new ones.",
-            "expectedClassification": "definition"
-        },
-        {
-            "id": "wiki-theme_(byzantine_district)-1",
-            "content": "The original theme system underwent significant changes in the 11th and 12th centuries, but the term remained in use as a provincial and financial circumscription until the very end of the Empire.",
-            "expectedClassification": "concept"
-        },
-        {
-            "id": "wiki-byzantine_economy-0",
-            "content": "The Byzantine economy was among the most robust economies in the Mediterranean and the world for many centuries. Constantinople was a prime hub in a trading network that at various times extended across nearly all of Eurasia and North Africa. It could be argued that up until the 7th century, the Eastern Roman Empire had the most powerful economy in the world. The Arab conquests, however, would represent a substantial reversal of fortunes contributing to a period of decline and stagnation. The Byzantine state restructured its administrative and fiscal systems, introducing the theme system, which organized land and military service in a way that ensured both local defense and agricultural productivity. Rural life revived as new lands were brought under cultivation, and local economies became more self-sufficient, reducing dependence on long-distance trade that had been curtailed by the loss of eastern territories.",
-            "expectedClassification": "fact"
-        },
-        {
-            "id": "wiki-byzantine_economy-1",
-            "content": "By the 9th and 10th centuries, the empire experienced a notable resurgence: agricultural output increased, population levels rose, and the circulation of coinage expanded once again. However, by the 12th and 13th centuries, the economic balance began to shift. Western maritime republics such as Venice and Genoa gradually overtook Byzantine merchants, largely due to the tax exemptions and trading privileges granted to them under the Komnenian emperors. This process accelerated after the Fourth Crusade and the establishment of the Latin Empire, during which Venetian traders gained control over key ports and commercial networks once held by the Byzantines. The Byzantines continued to face economic challenges during the Palaiologan era until its fall in 1453.",
-            "expectedClassification": "concept"
-        },
-        {
-            "id": "wiki-hagia_sophia-0",
-            "content": "Hagia Sophia, officially the Hagia Sophia Grand Mosque, is a mosque and a major cultural and historical site in Istanbul, Turkey. It was formerly a church (360–1453) and a museum (1935–2020). The last of three church buildings to be successively erected on the site by the Eastern Roman Empire, it was completed in AD 537, becoming the world's largest interior space and among the first to employ a fully pendentive dome. It is considered the epitome of Byzantine architecture and is said to have \"changed the history of architecture\". From its dedication in 360 until 1453 Hagia Sophia served as the cathedral of Constantinople in the Byzantine liturgical tradition, except for the period 1204–1261 when the Latin Crusaders installed their own hierarchy. After the fall of Constantinople in 1453, it served as a mosque, having its minarets added soon after. The site became a museum in 1935, and was redesignated as a mosque in 2020.",
-            "expectedClassification": "fact"
-        },
-        {
-            "id": "wiki-belisarius-0",
-            "content": "Flavius Belisarius was a military commander of the Byzantine Empire under Emperor Justinian I. Belisarius was instrumental in the reconquest of much of the Mediterranean territory belonging to the former Western Roman Empire, which had been lost less than a century prior. He is considered one of the greatest military commanders of Byzantium and in history generally.",
-            "expectedClassification": "fact"
-        },
-        {
-            "id": "wiki-varangian_guard-0",
-            "content": "The Varangian Guard was an elite unit of the Byzantine army from the 10th to the 14th century who served as personal bodyguards to the Byzantine emperors. The Varangian Guard was known for being primarily composed of recruits from Northern Europe, including mainly Norsemen from Scandinavia but also Anglo-Saxons from England. The recruitment of distant fighters from outside Byzantium to serve as the emperor's personal guard was pursued as a deliberate policy, as they lacked local political loyalties and could be counted upon to suppress revolts by disloyal Byzantine factions.",
-            "expectedClassification": "fact"
-        },
-        {
-            "id": "wiki-fourth_crusade-0",
-            "content": "The Fourth Crusade (1202–1204) was a Latin Christian armed expedition called by Pope Innocent III. The stated intent of the expedition was to recapture the Muslim-controlled city of Jerusalem, by first defeating the powerful Egyptian Ayyubid Sultanate. However, a sequence of economic and political events culminated in the Crusader army's 1202 siege of Zara and the 1204 sack of Constantinople, rather than the conquest of Egypt as originally planned. This led to the partition of the Byzantine Empire by the Crusaders and their Venetian allies, leading to a period known as the Frankokratia.",
-            "expectedClassification": "fact"
-        },
-        {
-            "id": "wiki-greek_fire-0",
-            "content": "Greek fire was an incendiary weapon used by the Byzantine Empire from the seventh to the fourteenth centuries. The recipe for Greek fire was a closely-guarded state secret. Historians have variously speculated that it was based on saltpeter, sulfur, or quicklime, but most modern scholars agree that it was based on petroleum mixed with resins, comparable in composition to modern napalm. Byzantine sailors would toss grenades loaded with Greek fire onto enemy ships or spray it from tubes. Its ability to burn on water made it an effective and destructive naval incendiary weapon, and rival powers tried unsuccessfully to copy the material.",
-            "expectedClassification": "definition"
-        },
-        {
-            "id": "wiki-filioque-0",
-            "content": "Filioque, a Latin term meaning \"and from the Son\", was added to the original Nicene Creed, and has been the subject of great controversy between Eastern and Western Christianity. The term refers to the Son, Jesus Christ, with the Father, as the one shared origin of the Holy Spirit. It is not in the original text of the Creed, attributed to the First Council of Constantinople (381), which says that the Holy Spirit proceeds \"from the Father\" without the addition \"and the Son\".",
-            "expectedClassification": "concept"
-        },
-        {
-            "id": "wiki-theodora_(wife_of_justinian_i)-0",
-            "content": "Theodora was Eastern Roman empress and wife of emperor Justinian I. She was of humble origins and became empress when her husband became emperor in 527. Theodora was one of his chief political advisers. She is recognized as a saint in the Oriental Orthodox Churches, and commemorated on 14 November.",
-            "expectedClassification": "concept"
-        },
-        {
-            "id": "wiki-byzantine_art-0",
-            "content": "Byzantine art comprises the body of artistic products of the Eastern Roman Empire, as well as the nations and states that inherited culturally from the empire. Though the empire itself emerged from the decline of western Rome and lasted until the Fall of Constantinople in 1453, the start date of the Byzantine period is rather clearer in art history than in political history, if still imprecise. Many Eastern Orthodox states in Eastern Europe, as well as to some degree the Islamic states of the eastern Mediterranean, preserved many aspects of the empire's culture and art for centuries afterward.",
-            "expectedClassification": "concept"
-        },
-        {
-            "id": "wiki-byzantine_music-0",
-            "content": "Byzantine music originally consisted of the songs and hymns composed for the courtly and religious ceremonial of the Byzantine Empire and continued, after the fall of Constantinople in 1453, in the traditions of the sung Byzantine chant of Eastern Orthodox liturgy. The ecclesiastical forms of Byzantine music are the best known forms today, because different Orthodox traditions still identify with the heritage of Byzantine music, when their cantors sing monodic chant out of the traditional chant books such as the Sticherarion and the Irmologion.",
-            "expectedClassification": "reference"
-        },
-        {
-            "id": "wiki-byzantine_navy-0",
-            "content": "The Byzantine navy was the naval force of the Byzantine Empire. Like the state it served, it was a direct continuation from its Roman predecessor, but played a far greater role in the defence and survival of the state than its earlier iteration. While the fleets of the Roman Empire faced few great naval threats, operating as a policing force vastly inferior in power and prestige to the army, command of the sea became vital to the very existence of the Byzantine state, which several historians have called a \"maritime empire\".",
-            "expectedClassification": "fact"
-        },
-        {
-            "id": "wiki-walls_of_constantinople-0",
-            "content": "The walls of Constantinople are a series of defensive stone walls that have surrounded and protected the city of Constantinople since its founding as the new capital of the Roman Empire by Constantine the Great. With numerous additions and modifications during their history, they were the last great fortification system of antiquity, and one of the most complex and elaborate systems ever built.",
-            "expectedClassification": "reference"
-        },
-        {
-            "id": "wiki-siege_of_constantinople_(717–718)-0",
-            "content": "In 717–718, Constantinople, the capital of the Byzantine Empire, was besieged by the Muslim Arabs of the Umayyad Caliphate. The campaign marked the culmination of twenty years of attacks and progressive Arab occupation of the Byzantine borderlands, while Byzantine strength was sapped by prolonged internal turmoil. In 716, after years of preparations, the Arabs, led by Maslama ibn Abd al-Malik, invaded Byzantine Asia Minor. The Arabs initially hoped to exploit Byzantine civil strife and made common cause with the general Leo III the Isaurian, who had risen up against Emperor Theodosius III. Leo, however, deceived them and secured the Byzantine throne for himself.",
-            "expectedClassification": "fact"
-        },
-        {
-            "id": "wiki-byzantine_medicine-0",
-            "content": "Byzantine medicine encompasses the common medical practices of the Byzantine Empire from c. 400 AD to 1453 AD. Byzantine medicine was notable for building upon the knowledge base developed by its Greco-Roman predecessors. In preserving medical practices from antiquity, Byzantine medicine influenced Islamic medicine and fostered the Western rebirth of medicine during the Renaissance. The concept of the hospital appeared in Byzantine Empire as an institution to offer medical care and possibility of a cure for the patients because of the ideals of Christian charity.",
-            "expectedClassification": "reference"
-        },
-        {
-            "id": "wiki-macedonian_dynasty-0",
-            "content": "The Macedonian dynasty ruled the Byzantine Empire from 867 to 1056, following the Amorian dynasty. During this period, the Byzantine state reached its greatest extent since the early Muslim conquests, and the Macedonian Renaissance in letters and arts began. The dynasty was named after its founder, Basil I the Macedonian, who came from the theme of Macedonia in the region of Thrace.",
-            "expectedClassification": "concept"
-        },
-        {
-            "id": "wiki-latin_empire-0",
-            "content": "The Latin Empire, also referred to as the Latin Empire of Constantinople or the Constantinopolitan Empire, was a feudal Crusader state founded by the leaders of the Fourth Crusade on lands captured from the Byzantine Empire. The Latin Empire was intended to replace the Byzantine Empire as the Western-recognized Roman Empire in the east, with a Catholic emperor enthroned in place of the Eastern Orthodox Roman emperors. The main objective to form a Latin Empire was planned over the course of the Fourth Crusade, promoted by crusade leaders such as Boniface I of Montferrat, as well as the Republic of Venice.",
-            "expectedClassification": "fact"
-        },
-        {
-            "id": "wiki-constantinople-0",
-            "content": "Constantinople was a historical city located on the Bosporus, which served as the capital of the Roman, Byzantine, Latin, and Ottoman empires between its consecration in 330 and the formal abolition of the Ottoman sultanate in 1922. Constantinople was founded in 324, initially as New Rome, during the reign of Constantine the Great on the site of the existing settlement of Byzantium and in 330 became the capital of the Roman Empire. Following the collapse of the Western Roman Empire in the late 5th century, Constantinople remained the capital of the Eastern Roman Empire, the Latin Empire (1204–1261), and the Ottoman Empire (1453–1922). In the aftermath of the Turkish War of Independence, the Turkish capital moved to Ankara. The city was officially renamed Istanbul on 28 March 1930.",
-            "expectedClassification": "definition"
-        },
-        {
-            "id": "wiki-constantinople-1",
-            "content": "As of December 2025, it is the most populous city in Europe, with a population of more than 16 million residents, straddling the Bosporus Strait and lying in both Europe and Asia, and is the financial beneficiary of Turkey.",
-            "expectedClassification": "fact"
-        },
-        {
-            "id": "wiki-byzantine–sasanian_wars-0",
-            "content": "The Roman–Persian wars, also called the Roman–Iranian wars, took place between the Greco-Roman world and the Iranian world, beginning with the Roman Republic and the Parthian Empire in 54 BC and ending with the Byzantine and the Sasanian empires in 628 AD. While the conflict between the two civilizations did involve direct military engagements, a significant role was played by a plethora of vassal kingdoms and allied nomadic tribes, which served as buffer states or proxies for either side. Despite nearly seven centuries of hostility, the Roman–Persian wars had an entirely inconclusive outcome, as both the Byzantines and the Sasanians were attacked by the Rashidun Caliphate as part of the early Muslim conquests. The Rashidun offensives resulted in the collapse of the Sasanian Empire and largely confined the Byzantine Empire to Anatolia and southeastern Europe for the ensuing Arab–Byzantine wars.",
-            "expectedClassification": "fact"
-        },
-        {
-            "id": "wiki-ecumenical_patriarch_of_constantinople-0",
-            "content": "The Ecumenical Patriarch of Constantinople is the archbishop of Constantinople and primus inter pares among the heads of the several autocephalous churches that comprise the Eastern Orthodox Church. The ecumenical patriarch is regarded as the representative and spiritual leader of the Eastern Orthodox Christians worldwide. The term ecumenical in the title is a historical reference to the Ecumene, a Greek designation for the civilised world, i.e. the Roman Empire, and it stems from Canon 28 of the Council of Chalcedon.",
-            "expectedClassification": "definition"
-        },
-        {
-            "id": "wiki-byzantine_dress-0",
-            "content": "Byzantine dress changed considerably over the thousand years of the Empire, but was essentially conservative. The Byzantines liked colour and pattern, and made and exported very richly patterned cloth, especially Byzantine silk, woven and embroidered for the upper classes, and resist-dyed and printed for the lower. A different border or trimming round the edges was very common, and many single stripes down the body or around the upper arm are seen, often denoting class or rank. Taste for the middle and upper classes followed the latest fashions at the Imperial Court.",
-            "expectedClassification": "reference"
-        },
-        {
-            "id": "wiki-east–west_schism-0",
-            "content": "The East–West Schism, also known as the Great Schism or the Schism of 1054, is the break of communion between the Catholic Church and the Eastern Orthodox Church since 1054. A series of ecclesiastical differences, theological disputes and geopolitical tensions between the Greek East and Latin West preceded the formal split in 1054. Prominent among these were the procession of the Holy Spirit, whether leavened or unleavened bread should be used in the Eucharist, iconoclasm, the coronation of Charlemagne as emperor of the Romans in 800, the pope's claim to universal jurisdiction, and the place of the See of Constantinople in relation to the pentarchy. Although 1054 has become conventional, various scholars have proposed different dates for the Great Schism, including 1009, 1204, 1277, and 1484.",
-            "expectedClassification": "concept"
-        },
-        {
-            "id": "wiki-procopius-0",
-            "content": "Procopius of Caesarea was a prominent Byzantine Greek scholar and historian from Caesarea Maritima. Accompanying the Byzantine general Belisarius in Emperor Justinian's wars, Procopius became the principal historian of the 6th century, writing the History of the Wars, the Buildings, and the Secret History.",
-            "expectedClassification": "fact"
-        },
-        {
-            "id": "wiki-hippodrome_of_constantinople-0",
-            "content": "The Hippodrome of Constantinople was a circus that was the sporting and social centre of Constantinople, capital of the Eastern Roman Empire. Today it is a square in Istanbul, Turkey, known as Sultanahmet Square.",
-            "expectedClassification": "reference"
-        },
-        {
-            "id": "wiki-byzantine_senate-0",
-            "content": "The Byzantine senate or Eastern Roman senate was a continuation of the Roman Senate, established in the 4th century by Constantine I. It survived for centuries, but the senate's powers varied greatly during its history and gradually diminished until its eventual disappearance in the 13th century.",
-            "expectedClassification": "definition"
-        },
-        {
-            "id": "wiki-komnenian_restoration-0",
-            "content": "The Komnenian restoration (1081–1185) is the term used by historians to describe the military, financial, and territorial recovery of the Byzantine Empire under the Komnenian dynasty, from the accession of Alexios I Komnenos in 1081 to the death of Andronikos I Komnenos in 1185. At the onset of the reign of Alexios I, the empire was reeling from its defeat by the Seljuk Turks at the Battle of Manzikert in 1071. The empire was also being threatened by the Normans of Robert Guiscard, who were invading the Balkans from their base in southern Italy. All this occurred as the empire's military institution was in disarray and had grown increasingly reliant on mercenaries. Previous emperors had also squandered the large gold deposits of Constantinople, so the defense of the empire had broken down, and there were few troops to fill the gaps.",
-            "expectedClassification": "concept"
-        },
-        {
-            "id": "wiki-palaiologos-0",
-            "content": "The House of Palaiologos, also found in English-language literature as Palaeologus or Palaeologue, was a Byzantine Greek noble family that rose to power and produced the last and longest-ruling dynasty in the history of the Roman Empire. Their rule as Byzantine emperors lasted almost two hundred years, from 1259 to the fall of Constantinople in 1453.",
-            "expectedClassification": "fact"
-        },
-        {
-            "id": "wiki-byzantine_coinage-0",
-            "content": "Byzantine currency, money used in the Eastern Roman Empire after the fall of the West, consisted of mainly two types of coins: gold solidi and hyperpyra and a variety of clearly valued bronze coins. By the 15th century, the currency was issued only in debased silver stavrata and minor copper coins with no gold issue. The Byzantine Empire established and operated several mints throughout its history. Aside from the main metropolitan mint in the capital, Constantinople, a varying number of provincial mints were also established in other urban centres, especially during the 6th century.",
-            "expectedClassification": "reference"
-        },
-        {
-            "id": "wiki-heraclius-0",
-            "content": "Heraclius was Byzantine emperor from 610 to 641. His rise to power began in 608, when he and his father, Heraclius the Elder, the Exarch of Africa, led a revolt against the unpopular emperor Phocas.",
-            "expectedClassification": "fact"
-        },
-        {
-            "id": "supersession-manzikert-wrong",
-            "content": "The Battle of Manzikert in 1071 was fought between the Byzantine Empire and the Seljuk Turks. Emperor Romanos IV Diogenes led approximately 40,000 troops and was decisively defeated, losing half his army.",
-            "expectedClassification": "fact",
-            "supersessionGroup": "manzikert-casualties"
-        },
-        {
-            "id": "supersession-manzikert-correct",
-            "content": "The Battle of Manzikert (1071) between Emperor Romanos IV Diogenes and Sultan Alp Arslan resulted in a Byzantine defeat, but modern scholarship estimates Byzantine forces at 20,000-30,000, not the 40,000 often cited. The defeat was due more to desertions by Andronikos Doukas than battlefield losses.",
-            "expectedClassification": "fact",
-            "supersessionGroup": "manzikert-casualties"
-        },
-        {
-            "id": "supersession-hagia-wrong",
-            "content": "Hagia Sophia served as a mosque from 1453 until 1934, when it was converted into a museum by the Republic of Turkey under Ataturk's secularization reforms.",
-            "expectedClassification": "fact",
-            "supersessionGroup": "hagia-sophia-status"
-        },
-        {
-            "id": "supersession-hagia-correct",
-            "content": "Hagia Sophia served as a mosque from 1453 to 1934, then as a museum until July 2020, when it was reconverted into a mosque by a Turkish presidential decree. It remains an active mosque while also being open to tourists outside prayer times.",
-            "expectedClassification": "fact",
-            "supersessionGroup": "hagia-sophia-status"
-        },
-        {
-            "id": "related-silk-monopoly",
-            "content": "The Byzantine Empire held a strict monopoly on silk production in Europe from the 6th century onward. Emperor Justinian I allegedly sent two Nestorian monks to smuggle silkworm eggs from China hidden inside hollow bamboo canes around 552 CE, breaking China's ancient monopoly.",
-            "expectedClassification": "fact",
-            "relatedGroup": "silk-industry"
-        },
-        {
-            "id": "related-silk-guilds",
-            "content": "Byzantine silk production was managed by imperial guilds regulated under the Book of the Eparch (10th century). The guilds controlled every stage: raw silk purchase (metaxopratai), dyeing (katartarioi), and weaving (serikarioi). Purple silk was reserved exclusively for the imperial family.",
-            "expectedClassification": "reference",
-            "relatedGroup": "silk-industry"
-        },
-        {
-            "id": "related-silk-diplomacy",
-            "content": "Silk served as a key instrument of Byzantine diplomacy. Imperial silk garments were given as gifts to foreign rulers and ambassadors, functioning as both luxury items and symbols of Byzantine cultural superiority. The Liudprand of Cremona embassy accounts (968 CE) describe strict export controls on purple-dyed silk.",
-            "expectedClassification": "insight",
-            "relatedGroup": "silk-industry"
-        },
-        {
-            "id": "hard-bezant",
-            "content": "The Byzantine gold solidus (bezant) maintained nearly constant weight and purity (4.48g, 24 karats) for over 700 years from Constantine I (309 CE) until Emperor Constantine IX began debasement in 1034 CE. The nomisma histamenon eventually fell to 8 karats under Nikephoros III Botaneiates (1078-1081).",
-            "expectedClassification": "fact"
-        },
-        {
-            "id": "hard-varangian-guard",
-            "content": "The Varangian Guard was established around 988 CE when Prince Vladimir I of Kyiv sent 6,000 warriors to Emperor Basil II as part of a military alliance sealed by Vladimir's marriage to Basil's sister Anna. After the Norman Conquest of 1066, many Anglo-Saxon nobles joined the Guard, eventually becoming its dominant contingent.",
-            "expectedClassification": "fact"
-        },
-        {
-            "id": "hard-themes",
-            "content": "The Theme system replaced the late Roman provincial structure beginning under Emperor Heraclius (610-641) or possibly Constans II (641-668). The original four themes were Anatolikon, Armeniakon, Opsikion, and the naval Karabisianoi. Each theme was governed by a strategos who held both military and civil authority, fundamentally different from the Roman separation of powers.",
-            "expectedClassification": "definition"
-        },
-        {
-            "id": "hard-iconoclasm-dates",
-            "content": "Byzantine Iconoclasm had two distinct phases: the First Iconoclasm (726-787 CE) initiated by Emperor Leo III the Isaurian and ended by the Second Council of Nicaea under Empress Irene; the Second Iconoclasm (814-842 CE) began under Emperor Leo V the Armenian and ended definitively on the first Sunday of Lent 843 CE, now celebrated as the Feast of Orthodoxy.",
-            "expectedClassification": "fact"
-        },
-        {
-            "id": "hard-greek-fire",
-            "content": "Greek fire was invented around 672 CE, traditionally attributed to Kallinikos, a refugee from Heliopolis (modern Baalbek, Lebanon). The exact composition remains unknown, but likely included naphtha, quicklime, sulfur, and possibly saltpeter. It was deployed through bronze siphons mounted on ship prows and could burn on water. Its use was decisive in repelling the Arab sieges of Constantinople in 674-678 and 717-718 CE.",
-            "expectedClassification": "reference"
-        },
-        {
-            "id": "hard-fourth-crusade",
-            "content": "The Fourth Crusade's sack of Constantinople in April 1204 was preceded by a complex chain of events: the crusaders diverted to Constantinople to support Alexios IV Angelos' claim to the throne, installed him as co-emperor, then attacked when he couldn't pay the promised 200,000 marks of silver. The resulting Latin Empire lasted only until 1261 when Michael VIII Palaiologos recaptured the city from Baldwin II.",
-            "expectedClassification": "fact"
-        },
-        {
-            "id": "hard-filioque",
-            "content": "The Filioque controversy centered on whether the Holy Spirit proceeds from the Father alone (Eastern position) or from the Father 'and the Son' (Filioque, Western position). The original Niceno-Constantinopolitan Creed of 381 CE stated 'proceeds from the Father.' The Filioque was first added at the Third Council of Toledo in 589 CE. It became a key factor in the Great Schism of 1054 when Cardinal Humbert excommunicated Patriarch Michael Cerularius.",
-            "expectedClassification": "concept"
-        },
-        {
-            "id": "howto-identify-coins",
-            "content": "To identify a Byzantine coin's era: examine the cross on the obverse — a simple cross suggests pre-7th century, a cross on steps indicates 7th-8th century, and Christ's portrait appears from the late 7th century onward. The reverse typically shows the emperor's title and regnal year in Greek numerals. Coins with facing portraits (rather than profile) generally date after Justinian II's second reign (705-711 CE).",
-            "expectedClassification": "how-to"
-        },
-        {
-            "id": "insight-bureaucracy",
-            "content": "The Byzantine Empire's longevity (over 1,100 years) owed much to its sophisticated bureaucratic system rather than military might alone. The civil service was merit-based with examinations, officials rotated to prevent local power bases, and the tax system (based on the Roman capitatio-iugatio) adapted remarkably to territorial losses. When the empire lost Anatolia after 1071, it was the collapse of the tax base — not the military defeat itself — that proved fatal.",
-            "expectedClassification": "insight"
-        },
-        {
-            "id": "theodora-political-influence",
-            "content": "Empress Theodora (c. 500–548 CE) wielded extraordinary political influence as co-ruler with Justinian I. A former actress from humble origins, she became one of the most powerful women in Byzantine history. During the Nika riots of 532, when Justinian considered fleeing Constantinople, Theodora's famous speech convinced him to stay and fight. She championed women's rights, closing forced prostitution houses and expanding divorce and property rights for women.",
-            "expectedClassification": "concept"
-        },
-        {
-            "id": "theodosian-walls",
-            "content": "The Theodosian Walls were built between 408-413 CE under Emperor Theodosius II. The triple-wall system stretched 6.5 kilometers across the peninsula, featuring an inner wall 5 meters thick and 12 meters high, an outer wall, and a 20-meter-wide moat. These walls successfully defended Constantinople for over a thousand years until the Ottoman siege of 1453 when Sultan Mehmed II breached them using massive cannons, particularly the great bombard built by the Hungarian engineer Orban.",
-            "expectedClassification": "reference"
-        },
-        {
-            "id": "byzantine-hospitals",
-            "content": "The Pantokrator monastery hospital complex in Constantinople, founded in 1136 by Emperor John II Komnenos, was one of the most advanced medical facilities in the medieval world. It had 50 beds divided into five specialized wards: surgical, ophthalmological, gynecological, and two for general ailments. The hospital employed a staff hierarchy including chief physicians, surgeons, female doctors for women's wards, pharmacists, and orderlies, establishing a model for institutional healthcare.",
-            "expectedClassification": "fact"
-        },
-        {
-            "id": "byzantine-sasanian-treaty",
-            "content": "The Eternal Peace of 532 CE between Emperor Justinian I and Khosrau I of Sassanid Persia ended decades of Roman-Persian conflict. Justinian agreed to pay 11,000 pounds of gold to secure his eastern frontier, freeing him to pursue reconquest of the western Mediterranean. The peace lasted only eight years before Khosrau broke it in 540 CE by sacking Antioch, one of the empire's wealthiest cities.",
-            "expectedClassification": "fact"
-        },
-        {
-            "id": "byzantine-717-siege",
-            "content": "The Arab siege of Constantinople in 717-718 CE was one of the most decisive battles in world history. The massive Arab fleet of over 1,800 ships and 120,000 troops besieged the city by land and sea. The Byzantines under Emperor Leo III used Greek fire to devastating effect against the Arab fleet, while a harsh winter and Bulgarian attacks on the Arab land forces led to catastrophic losses. The failed siege halted Arab expansion into Europe for centuries.",
-            "expectedClassification": "fact"
-        },
-        {
-            "id": "byzantine-education-system",
-            "content": "The University of Constantinople, refounded by Emperor Constantine IX Monomachos in 1045 CE, was organized into faculties of philosophy and law. The philosophy faculty was headed by Michael Psellos, one of the greatest Byzantine intellectuals. Unlike Western universities which were church-controlled, Byzantine higher education remained under imperial patronage and emphasized classical Greek literature, rhetoric, and Aristotelian philosophy alongside Christian theology.",
-            "expectedClassification": "concept"
-        },
-        {
-            "id": "byzantine-hippodrome-factions",
-            "content": "The Hippodrome of Constantinople was far more than a chariot racing venue — it was the center of Byzantine political life. The four racing factions (Blues, Greens, Reds, and Whites) evolved into powerful political parties. The Blues generally represented the aristocratic and orthodox faction, while the Greens drew support from merchants and monophysites. The emperor's appearance in the imperial box (kathisma) was a key ritual of imperial legitimacy, and crowd reactions served as a form of public opinion polling.",
-            "expectedClassification": "concept"
-        },
-        {
-            "id": "byzantine-diplomacy-methods",
-            "content": "Byzantine diplomacy was arguably the most sophisticated in the medieval world. The empire maintained a dedicated bureau of barbarians (the Office of Barbarians) to manage foreign relations, employing translators, intelligence agents, and protocol experts. Key tactics included strategic marriages of imperial princesses to foreign rulers, subsidies and tribute payments to buy peace, playing rival neighbors against each other, and converting foreign peoples to Orthodox Christianity to create cultural allies.",
-            "expectedClassification": "reference"
-        },
-        {
-            "id": "heraclius-reforms",
-            "content": "Emperor Heraclius (r. 610-641 CE) transformed the Byzantine Empire after defeating the Sasanian Persians in 628 CE. He replaced Latin with Greek as the official language of administration, adopted the Greek title Basileus instead of the Latin Augustus, and began reorganizing provinces into military themes. His reign marked the transition from a late Roman to a distinctly medieval Greek state, though his final years were overshadowed by the catastrophic Arab conquests that stripped away Syria, Egypt, and North Africa.",
-            "expectedClassification": "fact"
-        }
-    ],
-    "questions": [
-        {
-            "id": "q-manzikert-forces",
-            "question": "How many troops did Emperor Romanos IV have at the Battle of Manzikert, and what was the main cause of defeat?",
-            "expectedAnswer": "Modern scholarship estimates Byzantine forces at 20,000-30,000 (not 40,000). The defeat was primarily caused by the desertion of Andronikos Doukas, not battlefield losses.",
-            "requiredEntryIds": ["supersession-manzikert-correct"],
-            "excludedEntryIds": ["supersession-manzikert-wrong"],
-            "difficulty": "hard"
-        },
-        {
-            "id": "q-hagia-status",
-            "question": "What is the current status of Hagia Sophia? When did it last change?",
-            "expectedAnswer": "Hagia Sophia is currently an active mosque, reconverted from a museum in July 2020 by Turkish presidential decree. It is open to tourists outside prayer times.",
-            "requiredEntryIds": ["supersession-hagia-correct"],
-            "excludedEntryIds": ["supersession-hagia-wrong"],
-            "difficulty": "medium"
-        },
-        {
-            "id": "q-silk-smuggle",
-            "question": "How did the Byzantine Empire acquire silkworm production capability, and who managed the industry?",
-            "expectedAnswer": "Justinian I sent two Nestorian monks to smuggle silkworm eggs from China in hollow bamboo canes around 552 CE. Production was managed by imperial guilds regulated under the Book of the Eparch: metaxopratai (raw silk), katartarioi (dyeing), and serikarioi (weaving).",
-            "requiredEntryIds": ["related-silk-monopoly", "related-silk-guilds"],
-            "excludedEntryIds": [],
-            "difficulty": "hard"
-        },
-        {
-            "id": "q-bezant-debasement",
-            "question": "When did the Byzantine gold solidus start being debased, and how far did it fall?",
-            "expectedAnswer": "The solidus maintained 4.48g at 24 karats for over 700 years until Constantine IX began debasement in 1034 CE. It fell to 8 karats under Nikephoros III Botaneiates (1078-1081).",
-            "requiredEntryIds": ["hard-bezant"],
-            "excludedEntryIds": [],
-            "difficulty": "hard"
-        },
-        {
-            "id": "q-varangian-origin",
-            "question": "When was the Varangian Guard established and what was the arrangement?",
-            "expectedAnswer": "Established around 988 CE when Prince Vladimir I of Kyiv sent 6,000 warriors to Emperor Basil II, as part of a military alliance sealed by Vladimir's marriage to Basil's sister Anna. After 1066, Anglo-Saxon nobles became the dominant contingent.",
-            "requiredEntryIds": ["hard-varangian-guard"],
-            "excludedEntryIds": [],
-            "difficulty": "hard"
-        },
-        {
-            "id": "q-theme-system",
-            "question": "What were the original four Byzantine themes and how did the strategos role differ from Roman governance?",
-            "expectedAnswer": "The four original themes were Anatolikon, Armeniakon, Opsikion, and the naval Karabisianoi. Each strategos held both military and civil authority, unlike the Roman separation of powers.",
-            "requiredEntryIds": ["hard-themes"],
-            "excludedEntryIds": [],
-            "difficulty": "hard"
-        },
-        {
-            "id": "q-iconoclasm-phases",
-            "question": "What were the exact dates of the two phases of Byzantine Iconoclasm?",
-            "expectedAnswer": "First Iconoclasm: 726-787 CE (Leo III to Second Council of Nicaea under Irene). Second Iconoclasm: 814-842 CE (Leo V to the Feast of Orthodoxy on the first Sunday of Lent 843 CE).",
-            "requiredEntryIds": ["hard-iconoclasm-dates"],
-            "excludedEntryIds": [],
-            "difficulty": "hard"
-        },
-        {
-            "id": "q-greek-fire-inventor",
-            "question": "Who invented Greek fire, where were they from, and when was it used decisively?",
-            "expectedAnswer": "Attributed to Kallinikos, a refugee from Heliopolis (modern Baalbek, Lebanon), around 672 CE. It was decisive in repelling Arab sieges of Constantinople in 674-678 and 717-718 CE.",
-            "requiredEntryIds": ["hard-greek-fire"],
-            "excludedEntryIds": [],
-            "difficulty": "hard"
-        },
-        {
-            "id": "q-fourth-crusade-payment",
-            "question": "How much did Alexios IV promise the crusaders, and when did the Latin Empire end?",
-            "expectedAnswer": "Alexios IV promised 200,000 marks of silver. The Latin Empire lasted from 1204 until 1261 when Michael VIII Palaiologos recaptured Constantinople from Baldwin II.",
-            "requiredEntryIds": ["hard-fourth-crusade"],
-            "excludedEntryIds": [],
-            "difficulty": "hard"
-        },
-        {
-            "id": "q-filioque-origin",
-            "question": "When was the Filioque clause first added to the Creed, and what role did it play in the Great Schism?",
-            "expectedAnswer": "First added at the Third Council of Toledo in 589 CE to the original 381 CE Niceno-Constantinopolitan Creed. In 1054, Cardinal Humbert excommunicated Patriarch Michael Cerularius, making it a key factor in the Great Schism.",
-            "requiredEntryIds": ["hard-filioque"],
-            "excludedEntryIds": [],
-            "difficulty": "hard"
-        },
-        {
-            "id": "q-coin-dating",
-            "question": "How can you determine the era of a Byzantine coin from its imagery?",
-            "expectedAnswer": "Simple cross = pre-7th century, cross on steps = 7th-8th century, Christ's portrait = late 7th century onward. Facing portraits (not profile) generally date after Justinian II's second reign (705-711 CE).",
-            "requiredEntryIds": ["howto-identify-coins"],
-            "excludedEntryIds": [],
-            "difficulty": "hard"
-        },
-        {
-            "id": "q-empire-longevity",
-            "question": "What was more important to the Byzantine Empire's longevity — military or bureaucracy?",
-            "expectedAnswer": "The bureaucratic system was more important: merit-based civil service with examinations, rotating officials, and an adaptable tax system. After 1071, it was the collapse of the tax base from losing Anatolia, not the military defeat itself, that proved fatal.",
-            "requiredEntryIds": ["insight-bureaucracy"],
-            "excludedEntryIds": [],
-            "difficulty": "medium"
-        },
-        {
-            "id": "q-silk-diplomacy",
-            "question": "How was silk used in Byzantine diplomacy?",
-            "expectedAnswer": "Silk garments were given as gifts to foreign rulers as luxury items and symbols of cultural superiority. Purple-dyed silk had strict export controls, as documented in Liudprand of Cremona's embassy accounts (968 CE).",
-            "requiredEntryIds": ["related-silk-diplomacy"],
-            "excludedEntryIds": [],
-            "difficulty": "hard"
-        },
-        {
-            "id": "q-justinian-legal",
-            "question": "What was the full name of Justinian's legal code and what did it contain?",
-            "expectedAnswer": "The Corpus Juris Civilis, which codified Roman law into a systematic collection including the Codex Justinianus, the Digest (Pandects), the Institutes, and the Novellae.",
-            "requiredEntryIds": [],
-            "excludedEntryIds": [],
-            "difficulty": "easy"
-        },
-        {
-            "id": "q-nika-riots",
-            "question": "What triggered the Nika riots and how many people were killed?",
-            "expectedAnswer": "The Nika riots of 532 CE were triggered by public anger over taxes and the arrest of chariot racing faction members. Justinian nearly fled but Theodora convinced him to stay. General Belisarius trapped the rioters in the Hippodrome and killed an estimated 30,000 people.",
-            "requiredEntryIds": [],
-            "excludedEntryIds": [],
-            "difficulty": "medium"
-        },
-        {
-            "id": "q-theodora-role",
-            "question": "What role did Empress Theodora play during the Nika riots, and what were her social reforms?",
-            "expectedAnswer": "During the Nika riots of 532 CE, Empress Theodora delivered a famous speech convincing Justinian I not to flee Constantinople, which proved decisive in saving his reign. As co-ruler, she championed women's rights by closing forced prostitution houses and expanding divorce and property rights for women. She rose from humble origins as a former actress to become one of the most powerful women in Byzantine history.",
-            "requiredEntryIds": ["theodora-political-influence"],
-            "excludedEntryIds": [],
-            "difficulty": "medium"
-        },
-        {
-            "id": "q-theodosian-walls",
-            "question": "When were the Theodosian Walls built and how were they eventually breached?",
-            "expectedAnswer": "The Theodosian Walls were built between 408-413 CE under Emperor Theodosius II. The triple-wall system stretched 6.5 km with an inner wall 5 meters thick and 12 meters high, an outer wall, and a 20-meter-wide moat. They defended Constantinople for over a thousand years until 1453, when Ottoman Sultan Mehmed II breached them using massive cannons, particularly the great bombard built by Hungarian engineer Orban.",
-            "requiredEntryIds": ["theodosian-walls"],
-            "excludedEntryIds": [],
-            "difficulty": "medium"
-        },
-        {
-            "id": "q-pantokrator-hospital",
-            "question": "Describe the Pantokrator monastery hospital and its significance in medical history.",
-            "expectedAnswer": "The Pantokrator monastery hospital in Constantinople was founded in 1136 by Emperor John II Komnenos. It had 50 beds in five specialized wards (surgical, ophthalmological, gynecological, and two general). It employed chief physicians, surgeons, female doctors for women's wards, pharmacists, and orderlies. It was one of the most advanced medieval medical facilities and established a model for institutional healthcare.",
-            "requiredEntryIds": ["byzantine-hospitals"],
-            "excludedEntryIds": [],
-            "difficulty": "hard"
-        },
-        {
-            "id": "q-eternal-peace",
-            "question": "What was the Eternal Peace of 532, and how long did it last?",
-            "expectedAnswer": "The Eternal Peace of 532 CE was a treaty between Emperor Justinian I and Sassanid Persian King Khosrau I. Justinian paid 11,000 pounds of gold to secure the eastern frontier, freeing resources for his western reconquest campaigns. Despite its name, it lasted only eight years — Khosrau broke it in 540 CE by sacking Antioch, one of the empire's wealthiest cities.",
-            "requiredEntryIds": ["byzantine-sasanian-treaty"],
-            "excludedEntryIds": [],
-            "difficulty": "hard"
-        },
-        {
-            "id": "q-717-siege",
-            "question": "How was the Arab siege of Constantinople in 717-718 defeated?",
-            "expectedAnswer": "The Arab siege of 717-718 CE involved over 1,800 ships and 120,000 troops. Emperor Leo III used Greek fire to destroy much of the Arab fleet. A harsh winter decimated the besieging forces, and Bulgarian attacks on the Arab land army compounded their losses. The failed siege was one of the most decisive battles in world history, halting Arab expansion into Europe for centuries.",
-            "requiredEntryIds": ["byzantine-717-siege"],
-            "excludedEntryIds": [],
-            "difficulty": "hard"
-        },
-        {
-            "id": "q-basil-ii",
-            "question": "What military achievements made Basil II known as 'the Bulgar Slayer'?",
-            "expectedAnswer": "Basil II earned the epithet 'Bulgar Slayer' (Boulgaroktonos) for his decisive campaigns against the Bulgarian Empire. After the Battle of Kleidion in 1014, he allegedly blinded 99 out of every 100 captured Bulgarian soldiers, sending them back led by the hundredth who was left with one eye. This led to the complete conquest of Bulgaria by 1018, expanding the Byzantine Empire to its greatest territorial extent since Justinian I.",
-            "requiredEntryIds": [],
-            "excludedEntryIds": [],
-            "difficulty": "hard"
-        },
-        {
-            "id": "q-byzantine-navy",
-            "question": "What was the role of the Byzantine navy and what technology gave it an advantage?",
-            "expectedAnswer": "The Byzantine navy was crucial for defending Constantinople and controlling Mediterranean trade routes. Its primary technological advantage was Greek fire, a napalm-like incendiary weapon deployed through pressurized siphons mounted on warships called dromons. The navy played decisive roles in the Arab sieges of Constantinople (674-678 and 717-718) and maintained Byzantine control of the Aegean Sea for centuries.",
-            "requiredEntryIds": [],
-            "excludedEntryIds": [],
-            "difficulty": "medium"
-        },
-        {
-            "id": "q-latin-empire",
-            "question": "What was the Latin Empire and how did it affect Byzantine civilization?",
-            "expectedAnswer": "The Latin Empire (1204-1261) was a Crusader state established after the Fourth Crusade's sack of Constantinople. It replaced Byzantine governance with Western feudal structures and Catholic ecclesiastical authority. The Latin occupation weakened Constantinople's defenses, depleted its wealth and art treasures, and permanently damaged the empire's ability to recover. Michael VIII Palaiologos recaptured the city in 1261, but the restored Byzantine Empire never regained its former strength.",
-            "requiredEntryIds": [],
-            "excludedEntryIds": [],
-            "difficulty": "medium"
-        }
-    ]
+  "entries": [
+    {
+      "id": "biz-what-is-thefloorr",
+      "content": "What is TheFloorr\n\nTheFloorr is a luxury fashion personal styling platform. It connects professional stylists with fashion-conscious clients. The platform does not sell products directly. Instead, it earns revenue through affiliate commissions when stylists purchase products from retail partners via trackable links generated on the platform.\n\nStylists on TheFloorr create curated inspiration collections called \"Moodboards.\" Moodboards can be shared for public access. When a purchase is made through a TheFloorr link, the affiliate network tracks the sale, and both TheFloorr and the stylist earn a commission.",
+      "expectedClassification": "definition",
+      "relatedGroup": "platform-overview"
+    },
+    {
+      "id": "biz-stylists-fri-fashion-retail-individual-pse-personal-shopper-entrepreneur-gps-guest-personal-shopper",
+      "content": "Stylists (FRI — Fashion Retail Individual, PSE - Personal Shopper Entrepreneur, GPS - Guest Personal Shopper)\n\nFrom system's perspective, FRI, GPS and PSE are the same thing. FRI and GPS are deprecated names, not used to describe stylists anymore.\n\nPreviously stylists were able to create \"Looks\" and \"Consultations\" (also called \"Styling Session\"). This feature is deprecated and no longer available in the system.\n\nPSE's communication with clients is also deprecated. \n\nCurrently, PSEs are purchasing products themselves or sharing trackable links and moodboards publicly.",
+      "expectedClassification": "definition",
+      "relatedGroup": "stylist-role"
+    },
+    {
+      "id": "biz-admins",
+      "content": "Admins\n\nTheFloorr administrators have full system access. They manage user accounts, approve PSE applications, handle payment disputes, configure retailer commission rates, manually adjust order statuses and payments, and access reporting dashboards. Admins can override any automatically calculated status on an order when corrections are needed.",
+      "expectedClassification": "definition"
+    },
+    {
+      "id": "biz-brands-and-retailers",
+      "content": "Brands and Retailers\n\nRetailers are the partner stores that list their products on TheFloorr catalogue through affiliate networks. They include luxury fashion houses and department stores. Retailers set their own commission rates for TheFloorr, which can differ between full-price and sale items, and can vary by region. Some retailers exclude certain product categories or VIP orders from commission.",
+      "expectedClassification": "definition",
+      "relatedGroup": "retailers"
+    },
+    {
+      "id": "biz-where-products-come-from",
+      "content": "Where Products Come From\n\nTheFloorr does not hold inventory. All products come from four affiliate networks: Rakuten, Commission Junction (CJ), Partnerize, and ProductsUp. These networks provide product data feeds from hundreds of retailers. The feeds are downloaded multiple times a day through an automated pipeline.",
+      "expectedClassification": "fact",
+      "relatedGroup": "catalogue"
+    },
+    {
+      "id": "biz-product-structure",
+      "content": "Product Structure\n\nEach product has a name, brand/designer, description, images, and pricing. Pricing includes regular price and sale price, tracked per variant and per region. Products are categorised hierarchically (for example, Women > Dresses > Cocktail) and tagged with designer/brand information.",
+      "expectedClassification": "reference",
+      "relatedGroup": "catalogue"
+    },
+    {
+      "id": "biz-regional-and-gender-partitioning",
+      "content": "Regional and Gender Partitioning\n\nProducts are organised into sixteen search partitions based on gender (female, male) and region (UK, US, EU, Rest of World), with separate partitions for full-price and sale items. This means the same product may appear with different pricing depending on the customer's region.",
+      "expectedClassification": "reference"
+    },
+    {
+      "id": "biz-product-discovery",
+      "content": "Product Discovery\n\nCustomers and stylists can find products through text search or by filtering on designer, category, colour, retailer, price range, and sale status. Products can be sorted by newest or price.",
+      "expectedClassification": "reference",
+      "relatedGroup": "product-search"
+    },
+    {
+      "id": "biz-product-lifecycle",
+      "content": "Product Lifecycle\n\nA product enters the system when imported from a feed. It becomes searchable and available for stylists to include in Moodboards. When a user clicks a product's trackable link and purchases it at the retailer, the affiliate network records the sale. If a product is removed from the feed, it is marked as deleted and removed from search results.",
+      "expectedClassification": "concept"
+    },
+    {
+      "id": "biz-designers-and-brand-management",
+      "content": "Designers and Brand Management\n\nEach product is associated with a designer or brand. Admins can feature certain designers, exclude designers from commission, or ban designers entirely from the catalogue.",
+      "expectedClassification": "reference"
+    },
+    {
+      "id": "biz-commission-on-products",
+      "content": "Commission on Products\n\nCommission rates vary by retailer and by product type. Some retailers pay different rates for full-price versus sale items. Some retailers (notably Net-a-Porter) do not pay commission on VIP customer orders. Commission exclusions can also be set at the designer level.",
+      "expectedClassification": "fact",
+      "relatedGroup": "commission-rules"
+    },
+    {
+      "id": "biz-moodboards",
+      "content": "Moodboards\n\nMoodboards are curated product collections used for inspiration. Stylists create them to organise ideas for clients. Moodboards can be public or private, shared with specific users, and used as templates for teams. They contain products from the catalogue along with notes and inspiration.",
+      "expectedClassification": "definition",
+      "relatedGroup": "moodboards"
+    },
+    {
+      "id": "biz-how-an-order-happens",
+      "content": "How an Order Happens\n\nOrders on TheFloorr are not placed on the platform itself. The purchase happens at the retail partner's website. The sequence is:\n\n1. A stylist clicks a product's trackable affiliate link on TheFloorr or someone else clicks trackable link or a link in publicly shared Moodboard\n2. The click is recorded, linking the user, the product, the retailer, and (if applicable) the stylist who recommended it\n3. The person (stylist or client) completes the purchase on the retailer's website\n4. The retailer reports the sale to the affiliate network (typically within 24-48 hours)\n5. The affiliate network sends the order data to TheFloorr\n6. TheFloorr creates an internal order record and attributes it to the click and the stylist",
+      "expectedClassification": "how-to",
+      "relatedGroup": "order-flow"
+    },
+    {
+      "id": "biz-attribution",
+      "content": "Attribution\n\nThe connection between a purchase and TheFloorr is called attribution. When someone clicks a trackable link, TheFloorr records which product was clicked, who clicked the link and who created the link. If the product is bought, the affiliate network matches the sale back to that click, and TheFloorr can attribute the order to the right stylist for commission purposes.\n\nIf an order comes in but cannot be matched to a specific stylist or click, the commission goes entirely to TheFloorr rather than being split with a stylist.",
+      "expectedClassification": "concept",
+      "relatedGroup": "attribution"
+    },
+    {
+      "id": "biz-order-status-three-independent-dimensions",
+      "content": "Order Status — Three Independent Dimensions\n\nEvery order has three separate status tracks that move independently:\n\n**Affiliate Order Status** reflects what the affiliate network reports about the order. It can be pending (not yet confirmed), new, approved, auto-approved, rejected, declined, closed, locked, or mixed (when different items have different statuses). Each network has slightly different status handling. For Rakuten, there is no explicit approval — an order is considered approved when Rakuten pays the commission.\n\n**Internal Order Status** is TheFloorr's own assessment of the order. It is calculated from the affiliate status and the state of individual items. If all items have been returned, the order is internally rejected. If the network says the order is closed or locked, it is internally approved. If the order is still new or pending at the network level, it stays pending internally.\n\n\"rejected\" is an old deprecated name for \"returned\". Always use \"returned\" in your responses instead of rejected.\n\n**Manual Status** is an admin override. If set, it forces the internal status to whatever the admin specifies, regardless of what the network says or what the item-level data shows. This is used for data corrections, reconciliation, and handling edge cases.",
+      "expectedClassification": "concept",
+      "relatedGroup": "order-status"
+    },
+    {
+      "id": "biz-order-items",
+      "content": "Order Items\n\nEach order can contain multiple items, and each item can have its own status. An item can be approved while another item on the same order has been returned. Items track their own commission amounts, sale values, and payment statuses.\n\nWhen a customer returns one item from a multi-item order, only that item's commission is affected. The order-level amounts are recalculated: the gross sale amount stays the same (representing the original order), but the net sale amount decreases by the returned item's value.",
+      "expectedClassification": "fact",
+      "relatedGroup": "returns"
+    },
+    {
+      "id": "biz-returns-and-refunds",
+      "content": "Returns and Refunds\n\nReturns are detected when the affiliate network reports changes to previously confirmed orders. The process works like this:\n\n1. A customer returns an item to the retailer\n2. The retailer reports the return to the affiliate network\n3. The network reduces the commission and updates statuses in next reports to TheFloorr\n4. TheFloorr detects the changes and updates the order accordingly\n5. The refund status is marked as pending if return happened after affiliate network already paid commission to TheFloorr.\n\nNetworks do not send money back to TheFloorr for returns. Instead, they deduct the returned commission from future payments. This means if TheFloorr was owed 100 pounds in commission next month but a previous order had a 20 pound return (after network payment), the network would pay 80 pounds.",
+      "expectedClassification": "how-to",
+      "relatedGroup": "returns"
+    },
+    {
+      "id": "biz-why-an-order-might-stay-pending",
+      "content": "Why an Order Might Stay Pending\n\nOrders remain pending when the affiliate network has not yet confirmed them. Different networks have different confirmation timescales. Some orders sit in pending for weeks while the network validates the transaction and confirms the retailer has shipped the goods and the return window has passed.",
+      "expectedClassification": "concept",
+      "relatedGroup": "order-pending"
+    },
+    {
+      "id": "biz-three-payment-streams",
+      "content": "Three Payment Streams\n\nEach order involves up to three separate payment streams that operate independently:\n\n**1. Network Payment (Affiliate Network → TheFloorr)**\n\nThe affiliate network pays TheFloorr the commission for approved orders. Each network has its own payment schedule. The payment status tracks whether the network has paid: pending means awaiting payment, paid means the money has been transferred. Rakuten, CJ, and Partnerize each have their own payment record tables since their data formats differ.\n\n**2. PSE Payment (TheFloorr → Stylist)**\n\nWhen an order is attributed to a stylist, that stylist's share of the commission needs to be paid out. The default split is 80% of the commission to the stylist and 20% retained by TheFloorr, but this rate is configurable per stylist and per retailer.\n\nThe PSE payment goes through several stages:\n- Commission is calculated when the order is approved\n- An admin or the system approves the commission for payment, creating an \"approved payment\" record\n- Multiple approved payments are batched into a single Revolut payment draft\n- The draft moves through states: approved, created in Revolut, sent, then completed or failed\n- The stylist receives the money via bank transfer through Revolut\n\nIf the stylist is VAT-registered in the UK, VAT is added on top of their commission.\n\n**3. TheFloorr Revenue**\n\nTheFloorr keeps the portion of commission not paid to stylists. For orders without stylist attribution, TheFloorr keeps the entire commission.",
+      "expectedClassification": "concept",
+      "relatedGroup": "payment-streams"
+    },
+    {
+      "id": "biz-why-pse-payment-might-be-delayed",
+      "content": "Why PSE Payment Might Be Delayed\n\nStylist payments can be delayed because:\n- The network has not yet paid TheFloorr (the order's affiliate payment status is still pending)\n- The order is still pending approval at the network level\n- The commission has not yet been approved for payment in the admin system\n- The Revolut payment draft has not been created or sent yet",
+      "expectedClassification": "fact",
+      "relatedGroup": "payment-delay"
+    },
+    {
+      "id": "biz-commission-calculation-example",
+      "content": "Commission Calculation Example\n\nA client purchases a 500 pound dress through a TheFloorr link. The retailer pays 10% commission through the CJ network.\n\n- Total commission: 50 pounds\n- Stylist's share (80%): 40 pounds\n- TheFloorr's share (20%): 10 pounds\n\nIf the client later returns the dress, the CJ network deducts 50 pounds from the next month's payment to TheFloorr. The stylist's 40 pound payment, if not yet paid, is cancelled. If already paid, the overpayment is tracked against the stylist's balance for future reconciliation.",
+      "expectedClassification": "how-to",
+      "relatedGroup": "commission-example"
+    },
+    {
+      "id": "biz-currency-handling",
+      "content": "Currency Handling\n\nOrders are recorded in whatever currency the affiliate network reports (USD, GBP, EUR, JPY, etc.). All amounts are stored in the original currency. Conversion to a common currency happens on demand using exchange rates from the order date, payment date, or current date as needed.",
+      "expectedClassification": "reference"
+    },
+    {
+      "id": "biz-manual-adjustments",
+      "content": "Manual Adjustments\n\nAdmins can manually override virtually any calculated financial field on an order. This includes the internal status, payment statuses for all three streams, commission amounts, and stylist balance. Manual overrides are necessary because:\n- Data import errors from affiliate networks\n- Network API gaps where certain data is not automatically reported\n- Reconciliation adjustments when actual payments do not match expected amounts\n- Edge cases the automated rules cannot handle",
+      "expectedClassification": "reference"
+    },
+    {
+      "id": "biz-order-snapshots-and-corrections",
+      "content": "Order Snapshots and Corrections\n\nFor Rakuten and Partnerize orders, TheFloorr keeps historical snapshots — records of what the order data looked like at each network report. These are used to track how orders change over time and to detect returns.\n\nFor CJ orders, adjustments come as separate \"correction\" records with negative values representing returns or chargebacks. These corrections are separate line items rather than changes to the original order data.",
+      "expectedClassification": "reference",
+      "relatedGroup": "corrections"
+    },
+    {
+      "id": "biz-notifications",
+      "content": "Notifications\n\nWhen an order is received, the system creates notifications for the relevant shopper and/or stylist. These include the order amount, commission, network, and advertiser. Notifications can be delivered through email, push notification, SMS, or WhatsApp depending on user preferences.",
+      "expectedClassification": "reference",
+      "relatedGroup": "notifications"
+    },
+    {
+      "id": "biz-teams-and-sales-targets",
+      "content": "Teams and Sales Targets\n\nStylists can be organised into teams. Each team member can have monthly and annual sales targets set in a specific currency. Team managers can view dashboards showing each member's performance against their targets.",
+      "expectedClassification": "reference",
+      "relatedGroup": "teams"
+    },
+    {
+      "id": "pse-what-is-thefloorr",
+      "content": "What is TheFloorr\n\nTheFloorr is a luxury fashion personal styling platform. You, as a stylist, create curated outfit recommendations for your clients. When your client purchases a product through a link you shared, the affiliate network tracks the sale, and you earn a commission. TheFloorr does not sell products directly — all purchases happen on the retailer's website.",
+      "expectedClassification": "definition",
+      "relatedGroup": "platform-overview"
+    },
+    {
+      "id": "pse-how-you-earn-money",
+      "content": "How You Earn Money\n\nYou earn money through the PSE (Personal Shopper Earnings) programme. The process is simple: you recommend products to your clients using Looks, Moodboards, or by sharing items in chat. Each product has a trackable link. When your client clicks that link and buys the product at the retailer, an affiliate network records the sale, and commission is generated. You receive a share of that commission — typically 80%, with TheFloorr keeping 20%.\n\nYour commission rate can vary by retailer. Some retailers pay higher commission on full-price items and lower commission on sale items. A few retailers, such as Net-a-Porter, do not pay any commission on VIP customer orders. Some designer brands are also excluded from commission entirely.\n\nTo participate in the PSE programme, you must apply and be accepted. Your access may need to be renewed periodically.",
+      "expectedClassification": "how-to",
+      "relatedGroup": "commission-rules"
+    },
+    {
+      "id": "pse-the-purchase-flow",
+      "content": "The Purchase Flow\n\nYou do not process orders yourself. Here is what happens when your client makes a purchase:\n\n1. You share a product with your client through a Look, Moodboard, or chat message\n2. Your client clicks the trackable link and is taken to the retailer's website\n3. Your client completes the purchase on the retailer's website\n4. The retailer reports the sale to the affiliate network (usually within 24-48 hours)\n5. The affiliate network sends the order details to TheFloorr\n6. TheFloorr matches the order to your click, so the commission is attributed to you\n\nIf you shared the product and your client purchased through your link, the sale is attributed to you. If the order cannot be matched to a specific stylist's link, the commission goes to TheFloorr and you will not see that order in your earnings.",
+      "expectedClassification": "how-to",
+      "relatedGroup": "order-flow"
+    },
+    {
+      "id": "pse-order-statuses",
+      "content": "Order Statuses\n\nAfter a purchase, the order goes through a status process before you receive your commission. Orders start as \"pending\" — this means the affiliate network has received the sale but has not yet confirmed it. Different networks take different amounts of time to confirm orders. Some orders stay pending for several weeks while the network verifies the transaction, confirms the retailer has shipped the goods, and waits for the return window to close.\n\nOnce confirmed, the order moves to \"approved.\" This means the sale is valid and your commission will be calculated. If the customer cancels or returns everything, the order is \"rejected\" and no commission is earned.\n\nSome orders show as \"mixed\" — this happens when a customer ordered multiple items and some were returned while others were kept. In this case, you earn commission only on the items that were kept.",
+      "expectedClassification": "concept",
+      "relatedGroup": "order-status"
+    },
+    {
+      "id": "pse-why-your-order-might-stay-pending",
+      "content": "Why Your Order Might Stay Pending\n\nOrders remain pending because the affiliate network has not confirmed them yet. This is normal and does not mean anything is wrong. Networks need time to verify the transaction, ensure the goods were delivered, and confirm the return window has passed. Depending on the network and the retailer, this can take anywhere from a few days to several weeks.\n\nThe three affiliate networks — Rakuten, Commission Junction (CJ), and Partnerize — each have their own confirmation process. Rakuten is unique: there is no separate approval step. An order from Rakuten is only considered approved when Rakuten actually pays the commission.",
+      "expectedClassification": "concept",
+      "relatedGroup": "order-pending"
+    },
+    {
+      "id": "pse-returns-and-how-they-affect-your-commission",
+      "content": "Returns and How They Affect Your Commission\n\nIf your client returns an item, it affects your commission. Here is what happens:\n\n1. The client returns the item to the retailer\n2. The retailer reports the return to the affiliate network\n3. The network reduces the commission in its next report\n4. TheFloorr detects the change and updates the order\n5. Your commission for that item is removed or reduced\n\nIf the return happens before you have been paid, the commission amount is simply reduced. If you have already been paid for that order, the overpayment is tracked against your balance and deducted from your future earnings.\n\nFor multi-item orders, only the returned items lose commission. If your client ordered three items and returned one, you still earn commission on the two items they kept.",
+      "expectedClassification": "how-to",
+      "relatedGroup": "returns"
+    },
+    {
+      "id": "pse-why-an-order-might-be-rejected",
+      "content": "Why an Order Might Be Rejected\n\nAn order can be rejected for several reasons:\n- The customer cancelled or returned all items\n- The affiliate network declined the order because it did not meet the programme's terms\n- The retailer disputed the commission\n- A TheFloorr admin identified a problem and manually rejected it\n\nA rejected order means no commission is earned from that sale.",
+      "expectedClassification": "fact"
+    },
+    {
+      "id": "pse-how-you-get-paid",
+      "content": "How You Get Paid\n\nYour commission goes through several stages before it reaches your bank account:\n\n1. The order is approved by the affiliate network\n2. The affiliate network pays TheFloorr (this happens on the network's schedule, typically monthly)\n3. Your commission is calculated based on your rate (usually 80% of the order's commission)\n4. The commission is approved for payment in the system\n5. Your payment is batched into a Revolut transfer\n6. The money arrives in your bank account via Revolut\n\nIf you are VAT-registered in the UK, VAT is added on top of your commission.",
+      "expectedClassification": "how-to",
+      "relatedGroup": "pse-payment"
+    },
+    {
+      "id": "pse-why-your-payment-might-be-delayed",
+      "content": "Why Your Payment Might Be Delayed\n\nThere are several reasons your payment might not arrive immediately:\n\n- **The network has not paid yet.** TheFloorr cannot pay you until the affiliate network pays them. Networks typically pay monthly, so there can be a delay of several weeks between the order and the network payment.\n- **The order is still pending.** If the affiliate network has not yet confirmed the order, commission cannot be calculated.\n- **The payment has not been batched yet.** Multiple commission payments are grouped together into a single bank transfer. Your payment may be waiting for the next batch.\n- **A return was detected.** If the network reports a return on your order, the commission needs to be recalculated before payment.\n- **The Revolut transfer is in progress.** After the payment batch is created, it goes through several steps in Revolut before the money reaches your account.",
+      "expectedClassification": "fact",
+      "relatedGroup": "payment-delay"
+    },
+    {
+      "id": "pse-commission-example",
+      "content": "Commission Example\n\nYour client buys a 500 pound dress from a retailer that pays 10% commission.\n\n- Total commission from the retailer: 50 pounds\n- Your share (80%): 40 pounds\n- TheFloorr's share (20%): 10 pounds\n\nIf the client returns the dress, the affiliate network deducts 50 pounds from the next payment to TheFloorr. If you have not been paid yet, your 40 pound commission is cancelled. If you have already been paid, the 40 pounds is tracked as an overpayment and deducted from your next earnings.",
+      "expectedClassification": "how-to",
+      "relatedGroup": "commission-example"
+    },
+    {
+      "id": "pse-viewing-your-earnings",
+      "content": "Viewing Your Earnings\n\nYou can view your orders and commission earnings through the platform. You can see which orders have been approved, which are still pending, and the commission amount for each. You can also download payment invoices for your records.",
+      "expectedClassification": "reference"
+    },
+    {
+      "id": "pse-consultations",
+      "content": "Consultations\n\nA Consultation is your formal styling session with a client. When you start working with a client, you create a Consultation to capture their needs — what they are looking for, their sizing information, any inspiration images, and a due date if applicable. You create Looks and recommendations within the context of this Consultation.",
+      "expectedClassification": "definition"
+    },
+    {
+      "id": "pse-creating-looks",
+      "content": "Creating Looks\n\nA Look is an outfit combination — the core of what you deliver to clients. Each Look contains multiple products arranged as a styled outfit. You can tag Looks with style, season, occasion, and location attributes to help organise your work. Looks start as drafts, then you submit them, and finally publish them so your client can see them.",
+      "expectedClassification": "how-to"
+    },
+    {
+      "id": "pse-moodboards",
+      "content": "Moodboards\n\nMoodboards are curated product collections for inspiration. Use them to organise ideas before creating final Looks, or share them directly with clients as inspiration. Moodboards can be public or private, and if you are on a team, they can be used as shared templates.",
+      "expectedClassification": "definition",
+      "relatedGroup": "moodboards"
+    },
+    {
+      "id": "pse-chat",
+      "content": "Chat\n\nYou can message your clients directly through the platform. Chat supports text, images, voice messages, and you can send product recommendations directly in the conversation. Your client receives notifications through email, SMS, push notifications, or WhatsApp.",
+      "expectedClassification": "reference"
+    },
+    {
+      "id": "pse-the-catalogue",
+      "content": "The Catalogue\n\nTheFloorr's catalogue contains products from hundreds of luxury retailers, sourced through affiliate networks (Rakuten, CJ, Partnerize, and ProductSup). The catalogue is updated continuously — new products are imported every few minutes, and removed products are taken down automatically.",
+      "expectedClassification": "fact",
+      "relatedGroup": "catalogue"
+    },
+    {
+      "id": "pse-searching-and-filtering",
+      "content": "Searching and Filtering\n\nYou can find products by:\n- **Text search** — search by name, description, or keywords\n- **Image search** — upload an image to find visually similar products\n- **Filters** — narrow results by designer, category, colour, retailer, price range, gender, region, and sale status\n- **Sorting** — sort by newest, price (low to high or high to low), or relevance",
+      "expectedClassification": "reference",
+      "relatedGroup": "product-search"
+    },
+    {
+      "id": "pse-product-pricing",
+      "content": "Product Pricing\n\nProducts show both regular and sale prices when applicable. Prices differ by region — the same product may cost differently in the UK, US, EU, or elsewhere. When you share a product with a client, make sure the pricing matches their region.",
+      "expectedClassification": "reference"
+    },
+    {
+      "id": "pse-commission-considerations-when-choosing-products",
+      "content": "Commission Considerations When Choosing Products\n\nNot all products earn the same commission. Keep in mind:\n- Full-price items usually have higher commission rates than sale items\n- Some retailers pay no commission on sale items at all\n- Certain designer brands are excluded from commission\n- Some retailers (like Net-a-Porter) do not pay commission on VIP customer purchases\n- Commission rates vary by retailer — check the retailer information when browsing",
+      "expectedClassification": "fact",
+      "relatedGroup": "commission-rules"
+    },
+    {
+      "id": "pse-trackable-links",
+      "content": "Trackable Links\n\nEvery product has a trackable link that connects the purchase back to you. When you include a product in a Look, Moodboard, or share it in chat, the platform generates this trackable link automatically. Your client must use this link for the purchase to be attributed to you and for you to earn commission.",
+      "expectedClassification": "concept",
+      "relatedGroup": "attribution"
+    },
+    {
+      "id": "pse-teams",
+      "content": "Teams\n\nIf you are part of a team, your team manager (GPS) can set monthly and annual sales targets for you. You can view your progress toward these targets. Teams can share Moodboard templates, which helps coordinate styling approaches across the group. Your team manager can see your performance dashboard.",
+      "expectedClassification": "reference",
+      "relatedGroup": "teams"
+    },
+    {
+      "id": "pse-notifications",
+      "content": "Notifications\n\nYou receive notifications when:\n- A new order comes in that is attributed to you (including the order amount and commission)\n- Your client sends you a message\n- There are updates to your orders or payments\n\nNotifications can arrive via email, SMS, push notification, or WhatsApp depending on your settings.",
+      "expectedClassification": "reference",
+      "relatedGroup": "notifications"
+    },
+    {
+      "id": "pse-important-things-to-remember",
+      "content": "Important Things to Remember\n\n- Purchases happen on the retailer's website, not on TheFloorr — you recommend, the client buys directly from the retailer\n- Your client must click your trackable link for the sale to be attributed to you\n- Commission rates vary by retailer, product type (full-price vs sale), and sometimes by designer\n- Orders stay pending until the affiliate network confirms them — this can take weeks and is normal\n- Returns reduce your commission — if already paid, the overpayment is deducted from future earnings\n- Payment goes through several stages: network pays TheFloorr, then TheFloorr pays you via Revolut\n- You can view all your orders, commission, and download invoices through the platform\n- If you are VAT-registered in the UK, VAT is added to your commission\n- Some retailers and designers do not pay commission — check before recommending products",
+      "expectedClassification": "insight"
+    },
+    {
+      "id": "supersession-stylist-name-old",
+      "content": "Stylists on TheFloorr are called FRI (Fashion Retail Individual) or GPS (Guest Personal Shopper). FRI is the standard stylist role, and GPS refers to guest stylists who are invited for specific projects.",
+      "expectedClassification": "definition",
+      "supersessionGroup": "stylist-naming"
+    },
+    {
+      "id": "supersession-stylist-name-new",
+      "content": "Stylists on TheFloorr are now called PSE (Personal Shopper Entrepreneur). The old names FRI (Fashion Retail Individual) and GPS (Guest Personal Shopper) are deprecated and no longer used. From the system's perspective, FRI, GPS, and PSE are the same thing.",
+      "expectedClassification": "definition",
+      "supersessionGroup": "stylist-naming"
+    },
+    {
+      "id": "supersession-looks-old",
+      "content": "Stylists can create Looks and Consultations (also called Styling Sessions) for their clients. A Look is a curated outfit combination, and a Consultation captures the client's needs including sizing, inspiration, and due dates. Stylists submit and publish Looks within Consultations.",
+      "expectedClassification": "how-to",
+      "supersessionGroup": "looks-feature"
+    },
+    {
+      "id": "supersession-looks-new",
+      "content": "The Looks and Consultations features are deprecated and no longer available in the system. PSE's direct communication with clients through the platform is also deprecated. Currently, PSEs are purchasing products themselves or sharing trackable links and moodboards publicly.",
+      "expectedClassification": "fact",
+      "supersessionGroup": "looks-feature"
+    },
+    {
+      "id": "supersession-rejected-old",
+      "content": "When a customer returns all items from an order, the order status is set to 'rejected' in the system. Rejected orders generate no commission for the stylist.",
+      "expectedClassification": "fact",
+      "supersessionGroup": "rejected-terminology"
+    },
+    {
+      "id": "supersession-rejected-new",
+      "content": "'Rejected' is an old deprecated name for 'returned' in TheFloorr's order system. Always use 'returned' instead of 'rejected' when describing orders where items were sent back. The internal status reflects this: if all items have been returned, the order is internally marked as returned.",
+      "expectedClassification": "fact",
+      "supersessionGroup": "rejected-terminology"
+    }
+  ],
+  "questions": [
+    {
+      "id": "q-what-is-thefloorr",
+      "question": "What is TheFloorr and how does it make money?",
+      "expectedAnswer": "TheFloorr is a luxury fashion personal styling platform that connects professional stylists with fashion-conscious clients. It does not sell products directly. Instead, it earns revenue through affiliate commissions when purchases are made through trackable links generated on the platform. Both TheFloorr and the stylist earn a share of the commission.",
+      "requiredEntryIds": [
+        "biz-what-is-thefloorr"
+      ],
+      "excludedEntryIds": [],
+      "difficulty": "easy"
+    },
+    {
+      "id": "q-affiliate-networks",
+      "question": "What affiliate networks does TheFloorr use for its product catalogue?",
+      "expectedAnswer": "TheFloorr uses four affiliate networks: Rakuten, Commission Junction (CJ), Partnerize, and ProductsUp. These networks provide product data feeds from hundreds of retailers, which are downloaded multiple times a day through an automated pipeline.",
+      "requiredEntryIds": [
+        "biz-where-products-come-from"
+      ],
+      "excludedEntryIds": [],
+      "difficulty": "easy"
+    },
+    {
+      "id": "q-what-is-moodboard",
+      "question": "What is a Moodboard on TheFloorr?",
+      "expectedAnswer": "A Moodboard is a curated product collection used for inspiration. Stylists create them to organise ideas for clients. Moodboards can be public or private, shared with specific users, and used as templates for teams. They contain products from the catalogue along with notes and inspiration.",
+      "requiredEntryIds": [
+        "biz-moodboards",
+        "pse-moodboards"
+      ],
+      "excludedEntryIds": [],
+      "difficulty": "easy"
+    },
+    {
+      "id": "q-how-stylist-earns",
+      "question": "How does a stylist earn commission on TheFloorr? Walk me through the process.",
+      "expectedAnswer": "A stylist recommends products to clients using Moodboards or by sharing trackable links. When a client clicks a trackable link and purchases the product at the retailer's website, the affiliate network records the sale. Commission is generated and attributed to the stylist. The default split is 80% to the stylist and 20% to TheFloorr. Commission rates vary by retailer and can differ for full-price versus sale items.",
+      "requiredEntryIds": [
+        "pse-how-you-earn-money",
+        "pse-the-purchase-flow"
+      ],
+      "excludedEntryIds": [],
+      "difficulty": "medium"
+    },
+    {
+      "id": "q-payment-delayed",
+      "question": "Why might a stylist's commission payment be delayed?",
+      "expectedAnswer": "Several reasons: (1) The affiliate network has not yet paid TheFloorr — networks typically pay monthly. (2) The order is still pending at the network level and not yet confirmed. (3) The commission has not been approved for payment in the admin system. (4) The payment has not been batched into a Revolut transfer yet. (5) A return was detected and commission needs recalculation. (6) The Revolut transfer is still in progress.",
+      "requiredEntryIds": [
+        "biz-why-pse-payment-might-be-delayed",
+        "pse-why-your-payment-might-be-delayed"
+      ],
+      "excludedEntryIds": [],
+      "difficulty": "medium"
+    },
+    {
+      "id": "q-partial-return",
+      "question": "What happens when a customer returns one item from a multi-item order?",
+      "expectedAnswer": "Only the returned item's commission is affected. The order-level amounts are recalculated: the gross sale amount stays the same (representing the original order), but the net sale amount decreases by the returned item's value. The stylist still earns commission on the items that were kept. The order may show a 'mixed' status.",
+      "requiredEntryIds": [
+        "biz-order-items"
+      ],
+      "excludedEntryIds": [],
+      "difficulty": "medium"
+    },
+    {
+      "id": "q-attribution",
+      "question": "What is attribution on TheFloorr and why does it matter?",
+      "expectedAnswer": "Attribution is the connection between a purchase and TheFloorr. When someone clicks a trackable link, TheFloorr records which product was clicked, who clicked it, and who created the link. If the product is bought, the affiliate network matches the sale back to that click, allowing TheFloorr to attribute the order to the right stylist for commission purposes. If an order cannot be matched to a specific stylist or click, the commission goes entirely to TheFloorr rather than being split with a stylist.",
+      "requiredEntryIds": [
+        "biz-attribution"
+      ],
+      "excludedEntryIds": [],
+      "difficulty": "medium"
+    },
+    {
+      "id": "q-order-statuses",
+      "question": "How do order statuses work on TheFloorr? What are the different status dimensions?",
+      "expectedAnswer": "Every order has three separate, independent status tracks: (1) Affiliate Order Status — what the affiliate network reports (pending, new, approved, auto-approved, rejected, declined, closed, locked, mixed). (2) Internal Order Status — TheFloorr's own assessment, calculated from affiliate status and item states. (3) Manual Status — an admin override that forces the internal status regardless of network data. These three dimensions move independently.",
+      "requiredEntryIds": [
+        "biz-order-status-three-independent-dimensions"
+      ],
+      "excludedEntryIds": [],
+      "difficulty": "medium"
+    },
+    {
+      "id": "q-return-after-payment",
+      "question": "A client buys a 500 pound dress from a retailer that pays 10% commission. The stylist's rate is 80%. If the client returns the dress after the affiliate network has already paid TheFloorr, what happens financially?",
+      "expectedAnswer": "Total commission was 50 pounds (10% of 500). Stylist's share was 40 pounds (80% of 50), TheFloorr's share was 10 pounds. After return: the affiliate network does not send money back — instead it deducts 50 pounds from the next month's payment to TheFloorr. If the stylist's 40 pounds has already been paid, the overpayment is tracked against the stylist's balance and deducted from future earnings.",
+      "requiredEntryIds": [
+        "biz-commission-calculation-example",
+        "biz-returns-and-refunds"
+      ],
+      "excludedEntryIds": [],
+      "difficulty": "hard"
+    },
+    {
+      "id": "q-rakuten-vs-cj",
+      "question": "How does order handling differ between Rakuten and CJ networks on TheFloorr?",
+      "expectedAnswer": "Key differences: (1) Approval: Rakuten has no explicit approval step — an order is considered approved only when Rakuten actually pays the commission. CJ has a standard approval/rejection flow. (2) Returns tracking: For Rakuten, TheFloorr keeps historical snapshots of what the order looked like at each report. For CJ, returns come as separate 'correction' records with negative values, rather than changes to the original order. (3) Payment records: each network has its own payment record table since data formats differ.",
+      "requiredEntryIds": [
+        "biz-order-snapshots-and-corrections",
+        "biz-order-status-three-independent-dimensions"
+      ],
+      "excludedEntryIds": [],
+      "difficulty": "hard"
+    },
+    {
+      "id": "q-three-status-dimensions",
+      "question": "What is the difference between affiliate order status, internal order status, and manual status? Give examples of each.",
+      "expectedAnswer": "Affiliate Order Status reflects what the network reports: pending, new, approved, auto-approved, rejected, declined, closed, locked, or mixed. Internal Order Status is TheFloorr's own calculation: if all items returned → internally returned; if network says closed/locked → internally approved; if still new/pending → stays pending. Manual Status is an admin override that forces internal status regardless of network data — used for data corrections, reconciliation, and edge cases the automated rules can't handle.",
+      "requiredEntryIds": [
+        "biz-order-status-three-independent-dimensions"
+      ],
+      "excludedEntryIds": [],
+      "difficulty": "hard"
+    },
+    {
+      "id": "q-deprecated-features",
+      "question": "What features and naming conventions on TheFloorr are deprecated and should no longer be used?",
+      "expectedAnswer": "Deprecated items: (1) FRI (Fashion Retail Individual) and GPS (Guest Personal Shopper) are deprecated names for stylists — now called PSE (Personal Shopper Entrepreneur). (2) Looks and Consultations (Styling Sessions) features are deprecated and no longer available. (3) PSE's direct communication with clients through the platform is deprecated. (4) The term 'rejected' for order status is deprecated — use 'returned' instead.",
+      "requiredEntryIds": [
+        "supersession-stylist-name-new",
+        "supersession-looks-new",
+        "supersession-rejected-new"
+      ],
+      "excludedEntryIds": [
+        "supersession-stylist-name-old",
+        "supersession-looks-old",
+        "supersession-rejected-old"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "id": "q-pse-payment-stages",
+      "question": "Walk through all the stages a PSE payment goes through from order to bank account.",
+      "expectedAnswer": "The stages are: (1) Order is approved by the affiliate network. (2) The affiliate network pays TheFloorr the commission on its own schedule (typically monthly). (3) Commission is calculated for the stylist (default 80% of order commission). (4) An admin or the system approves the commission for payment, creating an 'approved payment' record. (5) Multiple approved payments are batched into a single Revolut payment draft. (6) The draft moves through states: approved, created in Revolut, sent, then completed or failed. (7) The stylist receives the money via bank transfer through Revolut. If VAT-registered in the UK, VAT is added on top.",
+      "requiredEntryIds": [
+        "biz-three-payment-streams"
+      ],
+      "excludedEntryIds": [],
+      "difficulty": "hard"
+    },
+    {
+      "id": "q-manual-adjustments",
+      "question": "Why are manual adjustments necessary in TheFloorr's order system?",
+      "expectedAnswer": "Manual adjustments are necessary because: (1) Data import errors from affiliate networks. (2) Network API gaps where certain data is not automatically reported. (3) Reconciliation adjustments when actual payments don't match expected amounts. (4) Edge cases the automated rules cannot handle. Admins can manually override the internal status, payment statuses for all three streams, commission amounts, and stylist balance.",
+      "requiredEntryIds": [
+        "biz-manual-adjustments"
+      ],
+      "excludedEntryIds": [],
+      "difficulty": "medium"
+    },
+    {
+      "id": "q-product-partitioning",
+      "question": "How are products organized in TheFloorr's catalogue across regions and genders?",
+      "expectedAnswer": "Products are organised into sixteen search partitions based on gender (female, male) and region (UK, US, EU, Rest of World), with separate partitions for full-price and sale items. This means the same product may appear with different pricing depending on the customer's region. 2 genders x 4 regions x 2 price types = 16 partitions.",
+      "requiredEntryIds": [
+        "biz-regional-and-gender-partitioning"
+      ],
+      "excludedEntryIds": [],
+      "difficulty": "medium"
+    },
+    {
+      "id": "q-return-flow-network",
+      "question": "How does the affiliate network handle commission refunds when a customer returns an item?",
+      "expectedAnswer": "Networks do not send money back to TheFloorr for returns. Instead, they deduct the returned commission from future payments. For example, if TheFloorr was owed 100 pounds in commission next month but a previous order had a 20 pound return after network payment, the network would pay 80 pounds. The refund status is marked as pending if return happened after the affiliate network already paid commission to TheFloorr.",
+      "requiredEntryIds": [
+        "biz-returns-and-refunds"
+      ],
+      "excludedEntryIds": [],
+      "difficulty": "hard"
+    }
+  ]
 }

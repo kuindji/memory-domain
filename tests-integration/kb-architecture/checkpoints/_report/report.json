@@ -1,136 +1,47 @@
 {
-    "phase": 6,
-    "config": "_report",
-    "timestamp": "2026-04-03T19:13:56.164Z",
-    "durationMs": 0,
-    "status": "success",
-    "data": {
-        "baseline": {
-            "config": "baseline-no-kb",
-            "avgScore": 3,
-            "avgTime": 10.889903914869565,
-            "qualityPerSecond": 0.2754845243311711,
-            "contextRelevance": 1,
-            "contextNoise": 0,
-            "supersessionAccuracy": 1,
-            "classificationAccuracy": 0,
-            "ingestTimeMs": 0
-        },
-        "configs": [
-            {
-                "config": "no-supersession-hybrid-noconsolidate-2000",
-                "avgScore": 4.565217391304348,
-                "avgTime": 12.037664902086977,
-                "qualityPerSecond": 0.37924443224141197,
-                "contextRelevance": 0.9130434782608695,
-                "contextNoise": 0.9006211180124224,
-                "supersessionAccuracy": 0.9565217391304348,
-                "classificationAccuracy": 0.5384615384615384,
-                "ingestTimeMs": 248987.635167
-            },
-            {
-                "config": "full-hybrid-consolidate-2000",
-                "avgScore": 4,
-                "avgTime": 11.599440592391264,
-                "qualityPerSecond": 0.3448442162481377,
-                "contextRelevance": 0.6086956521739131,
-                "contextNoise": 0.48550724637681164,
-                "supersessionAccuracy": 1,
-                "classificationAccuracy": 0.5384615384615384,
-                "ingestTimeMs": 606327.09975
-            },
-            {
-                "config": "full-hybrid-consolidate-4000",
-                "avgScore": 3.217391304347826,
-                "avgTime": 12.623402702913047,
-                "qualityPerSecond": 0.25487512203071544,
-                "contextRelevance": 0.391304347826087,
-                "contextNoise": 0.8768115942028986,
-                "supersessionAccuracy": 0.9565217391304348,
-                "classificationAccuracy": 0.5230769230769231,
-                "ingestTimeMs": 440779.16087499994
-            },
-            {
-                "config": "full-graph-heavy-noconsolidate-2000",
-                "avgScore": 4,
-                "avgTime": 27.441064113933326,
-                "qualityPerSecond": 0.1457669419594039,
-                "contextRelevance": 0.6333333333333333,
-                "contextNoise": 0.9396296296296297,
-                "supersessionAccuracy": 0.9333333333333333,
-                "classificationAccuracy": 0.6470588235294118,
-                "ingestTimeMs": 57096.073334
-            },
-            {
-                "config": "full-hybrid-noconsolidate-4000",
-                "avgScore": 3.8,
-                "avgTime": 26.578566586400008,
-                "qualityPerSecond": 0.14297234531618505,
-                "contextRelevance": 1,
-                "contextNoise": 0.9486369109047128,
-                "supersessionAccuracy": 0.8666666666666667,
-                "classificationAccuracy": 0.6764705882352942,
-                "ingestTimeMs": 92941.660667
-            },
-            {
-                "config": "minimal-hybrid-noconsolidate-2000",
-                "avgScore": 3.6,
-                "avgTime": 25.734599744733337,
-                "qualityPerSecond": 0.13988948869262094,
-                "contextRelevance": 0.8666666666666667,
-                "contextNoise": 0.9021909571909571,
-                "supersessionAccuracy": 0.8666666666666667,
-                "classificationAccuracy": 0.6764705882352942,
-                "ingestTimeMs": 27479.372376
-            },
-            {
-                "config": "full-fulltext-heavy-noconsolidate-2000",
-                "avgScore": 3.4,
-                "avgTime": 24.57211659733333,
-                "qualityPerSecond": 0.13836821856725937,
-                "contextRelevance": 1,
-                "contextNoise": 0.8942015392015392,
-                "supersessionAccuracy": 0.8666666666666667,
-                "classificationAccuracy": 0.6764705882352942,
-                "ingestTimeMs": 84059.300333
-            },
-            {
-                "config": "full-hybrid-noconsolidate-1000",
-                "avgScore": 3.466666666666667,
-                "avgTime": 25.23977473879999,
-                "qualityPerSecond": 0.1373493504812273,
-                "contextRelevance": 0.8666666666666667,
-                "contextNoise": 0.7644444444444446,
-                "supersessionAccuracy": 0.9333333333333333,
-                "classificationAccuracy": 0.6764705882352942,
-                "ingestTimeMs": 89984.30375
-            },
-            {
-                "config": "no-relations-hybrid-noconsolidate-2000",
-                "avgScore": 3.6666666666666665,
-                "avgTime": 27.15343430293333,
-                "qualityPerSecond": 0.13503509816695872,
-                "contextRelevance": 0.8666666666666667,
-                "contextNoise": 0.9155218855218855,
-                "supersessionAccuracy": 0.9333333333333333,
-                "classificationAccuracy": 0.5882352941176471,
-                "ingestTimeMs": 53667.618542000004
-            },
-            {
-                "config": "full-vector-heavy-noconsolidate-2000",
-                "avgScore": 3.3333333333333335,
-                "avgTime": 25.573418572066664,
-                "qualityPerSecond": 0.13034367399649366,
-                "contextRelevance": 0.9333333333333333,
-                "contextNoise": 0.900846560846561,
-                "supersessionAccuracy": 0.9333333333333333,
-                "classificationAccuracy": 0.6764705882352942,
-                "ingestTimeMs": 51749.975041
-            }
-        ],
-        "recommendations": [
-            "Best quality/speed tradeoff: \"no-supersession-hybrid-noconsolidate-2000\" (Q/s: 0.379)",
-            "Fastest: \"full-hybrid-consolidate-2000\" (11.6s avg)"
-        ]
-    }
+  "phase": 6,
+  "config": "_report",
+  "timestamp": "2026-04-06T10:30:59.643Z",
+  "durationMs": 0,
+  "status": "success",
+  "data": {
+    "baseline": {
+      "config": "baseline-no-kb",
+      "avgScore": 0.4375,
+      "avgTime": 9.6837677421875,
+      "qualityPerSecond": 0.045178696107510276,
+      "contextRelevance": 1,
+      "contextNoise": 0,
+      "supersessionAccuracy": 1,
+      "classificationAccuracy": 0,
+      "ingestTimeMs": 0
+    },
+    "configs": [
+      {
+        "config": "noise-reduce-AC",
+        "avgScore": 3.0625,
+        "avgTime": 12.808433830624992,
+        "qualityPerSecond": 0.2391002710009366,
+        "contextRelevance": 0.21875,
+        "contextNoise": 0.9468750000000001,
+        "supersessionAccuracy": 1,
+        "classificationAccuracy": 0.3783783783783784,
+        "ingestTimeMs": 473439.873292
+      },
+      {
+        "config": "no-supersession-hybrid-noconsolidate-2000",
+        "avgScore": 2.25,
+        "avgTime": 13.514960539062503,
+        "qualityPerSecond": 0.16648217310711264,
+        "contextRelevance": 0.020833333333333332,
+        "contextNoise": 0.9791666666666666,
+        "supersessionAccuracy": 1,
+        "classificationAccuracy": 0.3783783783783784,
+        "ingestTimeMs": 325889.138
+      }
+    ],
+    "recommendations": [
+      "Best quality/speed tradeoff: \"noise-reduce-AC\" (Q/s: 0.239)"
+    ]
+  }
 }

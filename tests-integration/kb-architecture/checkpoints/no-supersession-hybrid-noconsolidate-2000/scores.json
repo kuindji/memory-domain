@@ -1,202 +1,146 @@
 {
-    "phase": 5,
-    "config": "no-supersession-hybrid-noconsolidate-2000",
-    "timestamp": "2026-04-03T18:58:27.910Z",
-    "durationMs": 223999.0603339998,
-    "status": "success",
-    "data": {
-        "entries": [
-            {
-                "questionId": "q-manzikert-forces",
-                "score": 4,
-                "reasoning": "Correctly identifies both key points (modern 20,000-30,000 estimate vs. outdated 40,000 figure, and Andronikos Doukas desertion as primary cause) with appropriate historiographical context, though the added political analysis goes slightly beyond the stated ground truth.",
-                "contextRelevance": 1,
-                "contextNoise": 0.875,
-                "supersessionCorrect": false
-            },
-            {
-                "questionId": "q-hagia-status",
-                "score": 5,
-                "reasoning": "Answer correctly identifies Hagia Sophia as an active mosque reconverted in July 2020, mentions tourist access outside prayer times, and provides comprehensive historical context with no inaccuracies.",
-                "contextRelevance": 1,
-                "contextNoise": 0.8571428571428571,
-                "supersessionCorrect": true
-            },
-            {
-                "questionId": "q-silk-smuggle",
-                "score": 5,
-                "reasoning": "Answer accurately includes all key facts: Justinian I, 552 CE, two Nestorian monks, hollow bamboo canes, Book of the Eparch, and the three guilds (metaxopratai, katartarioi, serikarioi) with correct descriptions of their functions.",
-                "contextRelevance": 1,
-                "contextNoise": 0.75,
-                "supersessionCorrect": true
-            },
-            {
-                "questionId": "q-bezant-debasement",
-                "score": 5,
-                "reasoning": "All key facts match perfectly: Constantine IX initiated debasement in 1034 CE after 700+ years of stability at 4.48g/24 karats, falling to 8 karats under Nikephoros III (1078-1081), with correctly calculated 66% loss in purity; additional context strengthens the answer.",
-                "contextRelevance": 1,
-                "contextNoise": 0.8571428571428571,
-                "supersessionCorrect": true
-            },
-            {
-                "questionId": "q-varangian-origin",
-                "score": 5,
-                "reasoning": "Answer correctly covers all ground truth elements (988 CE establishment, Vladimir's 6,000 warriors, marriage to Anna, post-1066 Anglo-Saxon dominance) and adds well-sourced contextual detail about their strategic role as politically-neutral elite guards.",
-                "contextRelevance": 1,
-                "contextNoise": 0.8571428571428571,
-                "supersessionCorrect": true
-            },
-            {
-                "questionId": "q-theme-system",
-                "score": 5,
-                "reasoning": "Answer correctly identifies all four original themes and accurately explains the strategos' dual military-civil authority as a departure from Roman separation of powers, with comprehensive historical context.",
-                "contextRelevance": 1,
-                "contextNoise": 0.8571428571428571,
-                "supersessionCorrect": true
-            },
-            {
-                "questionId": "q-iconoclasm-phases",
-                "score": 5,
-                "reasoning": "The answer correctly provides all exact dates (726-787 CE and 814-843 CE), accurate emperors, key councils/events, and additional contextual detail about the Feast of Orthodoxy that aligns with the ground truth.",
-                "contextRelevance": 1,
-                "contextNoise": 0.8571428571428571,
-                "supersessionCorrect": true
-            },
-            {
-                "questionId": "q-greek-fire-inventor",
-                "score": 5,
-                "reasoning": "Answer correctly identifies Kallinikos from Heliopolis around 672 CE and accurately cites decisive use in Arab sieges of Constantinople 674-678 and 717-718 CE, with comprehensive supporting details on composition, deployment, and strategic impact.",
-                "contextRelevance": 1,
-                "contextNoise": 0.8571428571428571,
-                "supersessionCorrect": true
-            },
-            {
-                "questionId": "q-fourth-crusade-payment",
-                "score": 5,
-                "reasoning": "Accurately states both required facts (200,000 marks of silver and 1261 end date with Michael VIII's recapture) and enhances with well-contextualized historical detail about Alexios IV's other promises, political instability, and the Latin Empire's weakness.",
-                "contextRelevance": 0,
-                "contextNoise": 1,
-                "supersessionCorrect": true
-            },
-            {
-                "questionId": "q-filioque-origin",
-                "score": 5,
-                "reasoning": "Answer contains all core facts (Third Council of Toledo 589 CE, 381 CE original creed, 1054 schism, Cardinal Humbert/Patriarch Cerularius) with accurate detail, good structure, and helpful theological context.",
-                "contextRelevance": 1,
-                "contextNoise": 0.8571428571428571,
-                "supersessionCorrect": true
-            },
-            {
-                "questionId": "q-coin-dating",
-                "score": 5,
-                "reasoning": "Answer correctly identifies all four primary dating markers from the expected answer (simple cross, cross on steps, Christ's portrait, facing portraits post-705 CE) with accurate dates and adds well-integrated supporting details about reverse elements and analytical framework.",
-                "contextRelevance": 1,
-                "contextNoise": 0.8571428571428571,
-                "supersessionCorrect": true
-            },
-            {
-                "questionId": "q-empire-longevity",
-                "score": 4,
-                "reasoning": "Correct core thesis with strong supporting details (bureaucracy primacy, merit-based system, rotating officials, adaptive taxation, 1071 tax-base collapse), but hallucinated memory citations undermine credibility and 'examinations' is not explicitly mentioned despite merit-based system implying it.",
-                "contextRelevance": 1,
-                "contextNoise": 0.8571428571428571,
-                "supersessionCorrect": true
-            },
-            {
-                "questionId": "q-silk-diplomacy",
-                "score": 5,
-                "reasoning": "The answer correctly covers all ground truth elements (silk as diplomatic gift, cultural superiority symbol, purple-dyed silk export controls, Liudprand 968 CE) while adding well-documented historical detail about imperial guild monopolies and production control that enriches the explanation without introducing inaccuracies.",
-                "contextRelevance": 1,
-                "contextNoise": 0.875,
-                "supersessionCorrect": true
-            },
-            {
-                "questionId": "q-justinian-legal",
-                "score": 5,
-                "reasoning": "The answer correctly identifies the Corpus Juris Civilis and comprehensively lists all four components (Codex, Digest/Pandects, Institutes, Novellae) with accurate, well-organized explanations that exceed the expected answer's specificity.",
-                "contextRelevance": 1,
-                "contextNoise": 1,
-                "supersessionCorrect": true
-            },
-            {
-                "questionId": "q-nika-riots",
-                "score": 3,
-                "reasoning": "Correctly identifies chariot faction tensions and taxation as triggers, accurately describes Theodora's role, but omits General Belisarius and the Hippodrome specifics, and vaguely states 'tens of thousands' rather than the precise '30,000' figure.",
-                "contextRelevance": 1,
-                "contextNoise": 1,
-                "supersessionCorrect": true
-            },
-            {
-                "questionId": "q-theodora-role",
-                "score": 5,
-                "reasoning": "Actual answer correctly covers all key points from expected answer (532 CE timing, famous speech preventing Justinian's flight, co-ruler status, women's rights reforms including prostitution houses, divorce and property rights, humble actress origins, status as powerful Byzantine woman) with well-organized structure and substantial supporting detail.",
-                "contextRelevance": 1,
-                "contextNoise": 0.875,
-                "supersessionCorrect": true
-            },
-            {
-                "questionId": "q-theodosian-walls",
-                "score": 5,
-                "reasoning": "The answer is comprehensive and accurate: all construction dates, dimensions, defensive duration, breach date, and key figures (Theodosius II, Mehmed II, Orban) match the expected answer with no factual errors or omissions.",
-                "contextRelevance": 1,
-                "contextNoise": 0.875,
-                "supersessionCorrect": true
-            },
-            {
-                "questionId": "q-pantokrator-hospital",
-                "score": 5,
-                "reasoning": "Answer is accurate on all key facts (founding date, emperor, bed count, five wards, all staff roles), comprehensive in organization and analysis, and adds valuable historical context without errors.",
-                "contextRelevance": 1,
-                "contextNoise": 0.875,
-                "supersessionCorrect": true
-            },
-            {
-                "questionId": "q-eternal-peace",
-                "score": 4,
-                "reasoning": "Comprehensive and accurate on all key points (treaty parties, 11,000 pounds of gold, eight-year duration, resource reallocation for western campaigns), with additional valuable context, but lacks the specific detail about Khosrau sacking Antioch in 540 as the treaty's breaking point.",
-                "contextRelevance": 0,
-                "contextNoise": 1,
-                "supersessionCorrect": true
-            },
-            {
-                "questionId": "q-717-siege",
-                "score": 4,
-                "reasoning": "Covers all major factors (Greek fire, harsh winter, Bulgarian attacks, historical significance) with good detail and organization, but omits the specific troop count (120,000) mentioned in the expected answer.",
-                "contextRelevance": 1,
-                "contextNoise": 0.875,
-                "supersessionCorrect": true
-            },
-            {
-                "questionId": "q-basil-ii",
-                "score": 3,
-                "reasoning": "Correctly identifies the epithet, major campaigns (986-1018), Battle of Kleidion (1014), and conquest completion (1018), but omits the specific \"99 out of 100\" blinding detail with one-eyed guide and fails to mention the expansion to greatest extent since Justinian I.",
-                "contextRelevance": 1,
-                "contextNoise": 1,
-                "supersessionCorrect": true
-            },
-            {
-                "questionId": "q-byzantine-navy",
-                "score": 4,
-                "reasoning": "The answer correctly identifies the Byzantine navy's crucial defensive and trade-protection roles, accurately describes Greek fire's technology and devastating effect, and establishes its strategic dominance, but omits specific terminology (dromons, pressurized siphons) and the precise historical sieges (674-678, 717-718) mentioned in the expected answer.",
-                "contextRelevance": 1,
-                "contextNoise": 1,
-                "supersessionCorrect": true
-            },
-            {
-                "questionId": "q-latin-empire",
-                "score": 4,
-                "reasoning": "Comprehensive and accurate on the Latin Empire's definition, timeframe, and major impacts (religious, cultural, political), but omits the specific name Michael VIII Palaiologos and doesn't explicitly mention the plundering of wealth and art treasures mentioned in the expected answer.",
-                "contextRelevance": 1,
-                "contextNoise": 1,
-                "supersessionCorrect": true
-            }
-        ],
-        "avgScore": 4.565217391304348,
-        "avgTime": 12.037664902086977,
-        "qualityPerSecond": 0.37924443224141197,
-        "contextRelevance": 0.9130434782608695,
-        "contextNoise": 0.9006211180124224,
-        "supersessionAccuracy": 0.9565217391304348,
-        "classificationAccuracy": 0.5384615384615384
-    }
+  "phase": 5,
+  "config": "no-supersession-hybrid-noconsolidate-2000",
+  "timestamp": "2026-04-06T10:27:08.749Z",
+  "durationMs": 176432.00145899993,
+  "status": "success",
+  "data": {
+    "entries": [
+      {
+        "questionId": "q-what-is-thefloorr",
+        "score": 5,
+        "reasoning": "Answer is correct and comprehensive, covering all ground truth elements (luxury styling platform, no direct product sales, affiliate commission model, revenue sharing with stylists) while adding substantial accurate detail about commission splits, unmatched orders, and affiliate payment mechanics.",
+        "contextRelevance": 0,
+        "contextNoise": 1,
+        "supersessionCorrect": true
+      },
+      {
+        "questionId": "q-affiliate-networks",
+        "score": 1,
+        "reasoning": "The answer correctly identifies that the information is unavailable in the retrieved context, but provides zero of the four required network names (Rakuten, Commission Junction, Partnerize, ProductsUp) and instead discusses generic affiliate operations, completely failing to answer the specific question.",
+        "contextRelevance": 0,
+        "contextNoise": 1,
+        "supersessionCorrect": true
+      },
+      {
+        "questionId": "q-what-is-moodboard",
+        "score": 1,
+        "reasoning": "The answer admits lacking direct information and provides speculative inference rather than factual knowledge, missing all specific details about public/private status, sharing capabilities, template usage, and catalogue products with notes.",
+        "contextRelevance": 0,
+        "contextNoise": 1,
+        "supersessionCorrect": true
+      },
+      {
+        "questionId": "q-how-stylist-earns",
+        "score": 3,
+        "reasoning": "Correctly explains the 80/20 split and affiliate network verification process with good procedural detail, but omits how referrals are generated (Moodboards/trackable links), fails to mention that commission rates vary by retailer and item type, and doesn't specify the customer must purchase at the retailer's website via the tracked link.",
+        "contextRelevance": 0,
+        "contextNoise": 1,
+        "supersessionCorrect": true
+      },
+      {
+        "questionId": "q-payment-delayed",
+        "score": 2,
+        "reasoning": "Answer correctly identifies pending network confirmation and return recalculation but omits 4 of 6 major causes: network payment to TheFloorr, admin system approval, Revolut batching, and in-progress transfers.",
+        "contextRelevance": 0,
+        "contextNoise": 1,
+        "supersessionCorrect": true
+      },
+      {
+        "questionId": "q-partial-return",
+        "score": 3,
+        "reasoning": "Correctly explains item-level accounting and commission impact, but misses key expected details: the gross/net sale amount distinction (gross stays same, net decreases), and the 'mixed' order status outcome.",
+        "contextRelevance": 0,
+        "contextNoise": 1,
+        "supersessionCorrect": true
+      },
+      {
+        "questionId": "q-attribution",
+        "score": 4,
+        "reasoning": "Answer correctly explains attribution as purchase-to-link connection and commission distribution impact, covers all expected points, but adds specifics (80% split) not in ground truth while being otherwise comprehensive and well-structured.",
+        "contextRelevance": 0,
+        "contextNoise": 1,
+        "supersessionCorrect": true
+      },
+      {
+        "questionId": "q-order-statuses",
+        "score": 2,
+        "reasoning": "Correctly identifies affiliate order statuses but misses the core architectural answer: three independent status dimensions (Affiliate, Internal, and Manual), specifically omitting Internal Order Status and Manual Status override—the expected answer's key insight.",
+        "contextRelevance": 0,
+        "contextNoise": 1,
+        "supersessionCorrect": true
+      },
+      {
+        "questionId": "q-return-after-payment",
+        "score": 2,
+        "reasoning": "Correctly identifies the deduction mechanism for post-payment returns, but reverses the stylist/TheFloorr commission split (stylist should get 40 pounds at 80%, TheFloorr 10 pounds, not vice versa), making all subsequent financial figures incorrect.",
+        "contextRelevance": 0,
+        "contextNoise": 1,
+        "supersessionCorrect": true
+      },
+      {
+        "questionId": "q-rakuten-vs-cj",
+        "score": 1,
+        "reasoning": "Vaguely addresses order handling and network processes but completely misses all three key specific differences (Rakuten approval-via-payment vs CJ approval flow, historical snapshots vs correction records, separate payment tables) and explicitly admits lack of TheFloorr-specific knowledge rather than providing the factual answer.",
+        "contextRelevance": 0,
+        "contextNoise": 1,
+        "supersessionCorrect": true
+      },
+      {
+        "questionId": "q-three-status-dimensions",
+        "score": 3,
+        "reasoning": "Correctly identifies and explains the three status types with appropriate examples and layering, but lacks the specific technical details about internal status calculation rules (all items returned → internally returned, closed/locked → approved, etc.) and the complete list of affiliate statuses from the expected answer.",
+        "contextRelevance": 0,
+        "contextNoise": 1,
+        "supersessionCorrect": true
+      },
+      {
+        "questionId": "q-deprecated-features",
+        "score": 2,
+        "reasoning": "Correctly identifies three deprecated features (Looks, Consultations, PSE direct communication) but entirely misses the critical naming convention deprecations (FRI, GPS renamed to PSE) and order status terminology change (rejected → returned), which constitute half the expected answer.",
+        "contextRelevance": 0.3333333333333333,
+        "contextNoise": 0.6666666666666666,
+        "supersessionCorrect": true
+      },
+      {
+        "questionId": "q-pse-payment-stages",
+        "score": 2,
+        "reasoning": "Captures initial order approval and final payout stages but misses critical middle stages: TheFloorr receiving payment from network, approved payment record creation, batching into Revolut drafts, draft state transitions (approved→created→sent→completed/failed), and VAT handling for UK registrants.",
+        "contextRelevance": 0,
+        "contextNoise": 1,
+        "supersessionCorrect": true
+      },
+      {
+        "questionId": "q-manual-adjustments",
+        "score": 2,
+        "reasoning": "Partially correct on network delays and edge cases, but misses explicit reasons: data import errors, reconciliation adjustments when payments don't match, and fails to specify what admins can override (internal status, payment statuses, commission amounts, stylist balance).",
+        "contextRelevance": 0,
+        "contextNoise": 1,
+        "supersessionCorrect": true
+      },
+      {
+        "questionId": "q-product-partitioning",
+        "score": 1,
+        "reasoning": "Answer acknowledges missing information rather than providing the expected specific technical details (16 partitions, 2 genders × 4 regions × 2 price types formula, regional pricing variation), making it vaguely related but factually incomplete on core question requirements.",
+        "contextRelevance": 0,
+        "contextNoise": 1,
+        "supersessionCorrect": true
+      },
+      {
+        "questionId": "q-return-flow-network",
+        "score": 2,
+        "reasoning": "Partially correct on commission adjustments but fundamentally misses the key mechanism: networks deduct refunds from FUTURE payments, not recalculate current payments before issuance, and fails to mention the pending status for post-payment returns.",
+        "contextRelevance": 0,
+        "contextNoise": 1,
+        "supersessionCorrect": true
+      }
+    ],
+    "avgScore": 2.25,
+    "avgTime": 13.514960539062503,
+    "qualityPerSecond": 0.16648217310711264,
+    "contextRelevance": 0.020833333333333332,
+    "contextNoise": 0.9791666666666666,
+    "supersessionAccuracy": 1,
+    "classificationAccuracy": 0.3783783783783784
+  }
 }

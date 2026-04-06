@@ -1,369 +1,389 @@
 {
-    "phase": 4,
-    "config": "noise-reduce-AC",
-    "timestamp": "2026-04-03T21:23:45.006Z",
-    "durationMs": 321003.75520899997,
-    "status": "success",
-    "data": {
-        "entries": [
-            {
-                "questionId": "q-manzikert-forces",
-                "question": "How many troops did Emperor Romanos IV have at the Battle of Manzikert, and what was the main cause of defeat?",
-                "expectedAnswer": "Modern scholarship estimates Byzantine forces at 20,000-30,000 (not 40,000). The defeat was primarily caused by the desertion of Andronikos Doukas, not battlefield losses.",
-                "difficulty": "hard",
-                "context": "[Definitions & Concepts]\nThe Battle of Manzikert in 1071 was fought between the Byzantine Empire and the Seljuk Turks. Emperor Romanos IV Diogenes led approximately 40,000 troops and was decisively defeated, losing half his army.\nThe Battle of Manzikert (1071) between Emperor Romanos IV Diogenes and Sultan Alp Arslan resulted in a Byzantine defeat, but modern scholarship estimates Byzantine forces at 20,000-30,000, not the 40,000 often cited. The defeat was due more to desertions by Andronikos Doukas than battlefield losses.\nThe Battle of Manzikert or Malazgirt was fought between the Byzantine Empire and the Seljuk Empire on 26 August 1071 near Manzikert, Iberia. The decisive defeat of the Byzantine army and the capture of the emperor Romanos IV Diogenes played an important role in undermining Byzantine authority in Anatolia and Armenia, and allowed for the gradual Turkification of Anatolia. Many Turks, travelling westward during the 11th century, saw the victory at Manzikert as an entrance to Asia Minor.\nThe Komnenian restoration (1081–1185) is the term used by historians to describe the military, financial, and territorial recovery of the Byzantine Empire under the Komnenian dynasty, from the accession of Alexios I Komnenos in 1081 to the death of Andronikos I Komnenos in 1185. At the onset of the reign of Alexios I, the empire was reeling from its defeat by the Seljuk Turks at the Battle of Manzikert in 1071. The empire was also being threatened by the Normans of Robert Guiscard, who were invading the Balkans from their base in southern Italy. All this occurred as the empire's military institution was in disarray and had grown increasingly reliant on mercenaries. Previous emperors had also squandered the large gold deposits of Constantinople, so the defense of the empire had broken down, and there were few troops to fill the gaps.",
-                "answer": "# Battle of Manzikert: Troop Strength and Defeat Analysis\n\n## Troop Numbers\n\nThe Byzantine forces at Manzikert (1071) present a case of historiographic revision:\n\n- **Traditional estimate**: ~40,000 troops\n- **Modern scholarly consensus**: 20,000-30,000 troops\n\nThe downward revision reflects contemporary historical analysis that questions earlier inflated figures, though the precise number remains contested depending on the source.\n\n## Primary Cause of Defeat\n\nRather than being overwhelmed by superior Seljuk forces in direct combat, the Byzantine defeat stemmed primarily from **internal military failure**: desertions by Andronikos Doukas, a senior commander. This suggests the loss was less a consequence of battlefield tactics or force disparity and more a result of command breakdown and loss of troop cohesion.\n\nThis interpretation aligns with broader contextual factors: Memory [4] notes that by 1081, the Byzantine military was \"in disarray and had grown increasingly reliant on mercenaries,\" implying institutional fragility well before Manzikert. The empire's military structure was compromised not merely by the battle's outcome but by preexisting systemic weaknesses.\n\n## Historical Significance\n\nManzikert's strategic importance lay less in the scale of losses and more in its *symbolic and territorial consequences*—it undermined Byzantine authority in Anatolia and Armenia, facilitating the gradual Turkification of the peninsula and establishing the Seljuks' foothold in Asia Minor.",
-                "memoriesReturned": [
-                    "memory:h9jt6fkdgetj4g0qhply",
-                    "memory:5b0670zgzyqn6pkfur9z",
-                    "memory:cri41kky52il4me7ip28",
-                    "memory:rhy754l4i13tjl18lqud"
-                ],
-                "requiredEntryIds": ["memory:5b0670zgzyqn6pkfur9z"],
-                "excludedEntryIds": ["memory:h9jt6fkdgetj4g0qhply"],
-                "buildContextMs": 939.463917000001,
-                "askMs": 15022.132375000001
-            },
-            {
-                "questionId": "q-hagia-status",
-                "question": "What is the current status of Hagia Sophia? When did it last change?",
-                "expectedAnswer": "Hagia Sophia is currently an active mosque, reconverted from a museum in July 2020 by Turkish presidential decree. It is open to tourists outside prayer times.",
-                "difficulty": "medium",
-                "context": "[Definitions & Concepts]\nHagia Sophia served as a mosque from 1453 to 1934, then as a museum until July 2020, when it was reconverted into a mosque by a Turkish presidential decree. It remains an active mosque while also being open to tourists outside prayer times.\nHagia Sophia served as a mosque from 1453 until 1934, when it was converted into a museum by the Republic of Turkey under Ataturk's secularization reforms.\nHagia Sophia, officially the Hagia Sophia Grand Mosque, is a mosque and a major cultural and historical site in Istanbul, Turkey. It was formerly a church (360–1453) and a museum (1935–2020). The last of three church buildings to be successively erected on the site by the Eastern Roman Empire, it was completed in AD 537, becoming the world's largest interior space and among the first to employ a fully pendentive dome. It is considered the epitome of Byzantine architecture and is said to have \"changed the history of architecture\". From its dedication in 360 until 1453 Hagia Sophia served as the cathedral of Constantinople in the Byzantine liturgical tradition, except for the period 1204–1261 when the Latin Crusaders installed their own hierarchy. After the fall of Constantinople in 1453, it served as a mosque, having its minarets added soon after. The site became a museum in 1935, and was redesignated as a mosque in 2020.",
-                "answer": "# Hagia Sophia: Current Status and Recent Changes\n\n## Current Status\nHagia Sophia is currently an **active mosque** known officially as the Hagia Sophia Grand Mosque, located in Istanbul, Turkey. It functions as a working mosque while also remaining open to tourists outside of prayer times, balancing religious use with public access.\n\n## Most Recent Change\nThe last significant status change occurred in **July 2020**, when Hagia Sophia was **reconverted into a mosque by Turkish presidential decree**. This ended its 85-year period as a museum (1935–2020).\n\n## Historical Context\nThe 2020 reconversion marked a reversal of earlier secularization reforms. The site had transitioned through several uses:\n- **1453–1934**: Mosque (following Ottoman conquest)\n- **1935–2020**: Museum (following Atatürk's secularization reforms in Turkey)\n- **2020–present**: Mosque (current status)\n\nThis represents the second major religious rededication in modern times, reversing the 1935 museumification.",
-                "memoriesReturned": [
-                    "memory:y7i45qmvsj7pm72qg0ac",
-                    "memory:og5vwqghldewxtixb84p",
-                    "memory:fg0w2hl5kvxqppu0xoew"
-                ],
-                "requiredEntryIds": ["memory:y7i45qmvsj7pm72qg0ac"],
-                "excludedEntryIds": ["memory:og5vwqghldewxtixb84p"],
-                "buildContextMs": 934.4302909999969,
-                "askMs": 9728.721583000006
-            },
-            {
-                "questionId": "q-silk-smuggle",
-                "question": "How did the Byzantine Empire acquire silkworm production capability, and who managed the industry?",
-                "expectedAnswer": "Justinian I sent two Nestorian monks to smuggle silkworm eggs from China in hollow bamboo canes around 552 CE. Production was managed by imperial guilds regulated under the Book of the Eparch: metaxopratai (raw silk), katartarioi (dyeing), and serikarioi (weaving).",
-                "difficulty": "hard",
-                "context": "[Definitions & Concepts]\nThe Byzantine Empire held a strict monopoly on silk production in Europe from the 6th century onward. Emperor Justinian I allegedly sent two Nestorian monks to smuggle silkworm eggs from China hidden inside hollow bamboo canes around 552 CE, breaking China's ancient monopoly.\nByzantine silk production was managed by imperial guilds regulated under the Book of the Eparch (10th century). The guilds controlled every stage: raw silk purchase (metaxopratai), dyeing (katartarioi), and weaving (serikarioi). Purple silk was reserved exclusively for the imperial family.\nSilk served as a key instrument of Byzantine diplomacy. Imperial silk garments were given as gifts to foreign rulers and ambassadors, functioning as both luxury items and symbols of Byzantine cultural superiority. The Liudprand of Cremona embassy accounts (968 CE) describe strict export controls on purple-dyed silk.\nThe Byzantine economy was among the most robust economies in the Mediterranean and the world for many centuries. Constantinople was a prime hub in a trading network that at various times extended across nearly all of Eurasia and North Africa. It could be argued that up until the 7th century, the Eastern Roman Empire had the most powerful economy in the world. The Arab conquests, however, would represent a substantial reversal of fortunes contributing to a period of decline and stagnation. The Byzantine state restructured its administrative and fiscal systems, introducing the theme system, which organized land and military service in a way that ensured both local defense and agricultural productivity. Rural life revived as new lands were brought under cultivation, and local economies became more self-sufficient, reducing dependence on long-distance trade that had been curtailed by the loss of eastern territories.",
-                "answer": "## Byzantine Silk Production: Acquisition and Management\n\n**Acquisition of Silkworm Production**\n\nThe Byzantine Empire acquired silkworm production capability through espionage in the 6th century. Around 552 CE, Emperor Justinian I commissioned two Nestorian monks to smuggle silkworm eggs from China—concealing them in hollow bamboo canes—thereby breaking China's monopoly on sericulture. This single act transformed Byzantium from a silk importer to a producer, establishing the foundation for its economic dominance in the Mediterranean world.\n\n**Management Structure**\n\nByzantine silk production was highly regulated through a sophisticated guild system codified in the **Book of the Eparch** (10th century). The industry was divided into specialized imperial guilds, each controlling distinct stages of production:\n\n- **Metaxopratai**: Raw silk merchants and purchasers\n- **Katartarioi**: Dyers responsible for processing colored silk\n- **Serikarioi**: Weavers producing finished textiles\n\nCritically, the empire maintained **exclusive imperial control** over purple-dyed silk, reserving it as a luxury reserved solely for the imperial family. This monopoly on imperial purple (tyrian purple) reinforced Byzantium's political authority and served as a highly valued diplomatic tool—evidenced by accounts like the Liudprand of Cremona embassy (968 CE), which describe strict export controls.\n\n**Strategic Significance**\n\nBeyond economic value, silk became a cornerstone of Byzantine soft power. Imperial silk garments functioned as diplomatic gifts to foreign rulers and ambassadors, projecting cultural superiority and maintaining Byzantium's geopolitical influence throughout its interactions with Europe and the Islamic world.",
-                "memoriesReturned": [
-                    "memory:6g5ytqmyowmdn2rh05tz",
-                    "memory:5k2oo6g6wufskrhzmm6h",
-                    "memory:ys2tonw76jslykjx8bgy",
-                    "memory:17pszse5o5975coduse8"
-                ],
-                "requiredEntryIds": ["memory:6g5ytqmyowmdn2rh05tz", "memory:5k2oo6g6wufskrhzmm6h"],
-                "excludedEntryIds": [],
-                "buildContextMs": 919.8757500000065,
-                "askMs": 11497.572749999992
-            },
-            {
-                "questionId": "q-bezant-debasement",
-                "question": "When did the Byzantine gold solidus start being debased, and how far did it fall?",
-                "expectedAnswer": "The solidus maintained 4.48g at 24 karats for over 700 years until Constantine IX began debasement in 1034 CE. It fell to 8 karats under Nikephoros III Botaneiates (1078-1081).",
-                "difficulty": "hard",
-                "context": "[Definitions & Concepts]\nThe Byzantine gold solidus (bezant) maintained nearly constant weight and purity (4.48g, 24 karats) for over 700 years from Constantine I (309 CE) until Emperor Constantine IX began debasement in 1034 CE. The nomisma histamenon eventually fell to 8 karats under Nikephoros III Botaneiates (1078-1081).\nByzantine currency, money used in the Eastern Roman Empire after the fall of the West, consisted of mainly two types of coins: gold solidi and hyperpyra and a variety of clearly valued bronze coins. By the 15th century, the currency was issued only in debased silver stavrata and minor copper coins with no gold issue. The Byzantine Empire established and operated several mints throughout its history. Aside from the main metropolitan mint in the capital, Constantinople, a varying number of provincial mints were also established in other urban centres, especially during the 6th century.",
-                "answer": "## Analytical Synthesis: Byzantine Gold Solidus Debasement\n\n**Timing of Debasement:**\nThe Byzantine gold solidus (nomisma histamenon) began experiencing intentional debasement in **1034 CE** under Emperor Constantine IX, marking the end of an extraordinary period of monetary stability spanning over 700 years since Constantine I (309 CE).\n\n**Extent of Debasement:**\nThe solidus underwent severe debasement, declining from its original standard of:\n- **24 karats** (pure gold) to approximately **8 karats** by 1078-1081 CE under Nikephoros III Botaneiates\n\nThis represents a collapse to roughly **one-third of its original purity** within a span of 45-50 years—a dramatic monetary deterioration. \n\n**Broader Context:**\nThe debasement of gold coinage coincided with broader currency degradation across the Byzantine Empire. By the **15th century**, the empire ceased gold coin production entirely, relying instead on debased silver stavrata and copper coinage. This trajectory reflects the empire's economic decline during its final centuries before the Ottoman conquest in 1453.\n\n**Significance:**\nThe shift from a gold standard maintained for seven centuries to rapid debasement within a single generation indicates either severe fiscal pressures (likely from military expenditures and territorial loss in the east) or deliberate monetary policy to fund imperial activities—or both. The deterioration in currency quality mirrored the empire's geopolitical contraction during the Seljuk period.",
-                "memoriesReturned": ["memory:ckw5tszgvodxct437iac", "memory:ssmgixqwhqzr69iekl04"],
-                "requiredEntryIds": ["memory:ckw5tszgvodxct437iac"],
-                "excludedEntryIds": [],
-                "buildContextMs": 930.3701670000155,
-                "askMs": 13236.311209000007
-            },
-            {
-                "questionId": "q-varangian-origin",
-                "question": "When was the Varangian Guard established and what was the arrangement?",
-                "expectedAnswer": "Established around 988 CE when Prince Vladimir I of Kyiv sent 6,000 warriors to Emperor Basil II, as part of a military alliance sealed by Vladimir's marriage to Basil's sister Anna. After 1066, Anglo-Saxon nobles became the dominant contingent.",
-                "difficulty": "hard",
-                "context": "[Definitions & Concepts]\nThe Varangian Guard was an elite unit of the Byzantine army from the 10th to the 14th century who served as personal bodyguards to the Byzantine emperors. The Varangian Guard was known for being primarily composed of recruits from Northern Europe, including mainly Norsemen from Scandinavia but also Anglo-Saxons from England. The recruitment of distant fighters from outside Byzantium to serve as the emperor's personal guard was pursued as a deliberate policy, as they lacked local political loyalties and could be counted upon to suppress revolts by disloyal Byzantine factions.\nThe Varangian Guard was established around 988 CE when Prince Vladimir I of Kyiv sent 6,000 warriors to Emperor Basil II as part of a military alliance sealed by Vladimir's marriage to Basil's sister Anna. After the Norman Conquest of 1066, many Anglo-Saxon nobles joined the Guard, eventually becoming its dominant contingent.",
-                "answer": "# The Varangian Guard: Establishment and Arrangement\n\n## Timeline\nThe Varangian Guard was **established around 988 CE** as part of a formal military alliance between the Byzantine Empire and Kyivan Rus.\n\n## Origin and Initial Arrangement\nThe guard's creation centered on a strategic marriage and military pact: **Prince Vladimir I of Kyiv dispatched 6,000 warriors to Emperor Basil II** as a dowry-equivalent arrangement when Vladimir married Basil's sister, Anna. This unit became the emperor's elite personal bodyguard force, serving the Byzantine throne for roughly four centuries (10th–14th centuries).\n\n## Composition and Strategic Logic\nThe arrangement was deliberately designed around **external recruitment** to serve imperial interests:\n\n- **Initial recruitment**: Primarily Norsemen and Scandinavians from Kyiv and the broader North\n- **Composition evolution**: After the 1066 Norman Conquest, Anglo-Saxon nobles increasingly joined the Guard and eventually became its dominant faction\n- **Strategic advantage**: Foreign recruits lacked local Byzantine political ties, making them reliable suppressors of factional revolts and immune to local aristocratic influences\n\nThis foreign-bodyguard model was an explicit imperial policy—by maintaining a personal military force without deep roots in Byzantine society, successive emperors secured a buffer against internal destabilization while gaining access to martial expertise from warrior cultures in Northern Europe and Kyivan Rus.",
-                "memoriesReturned": ["memory:twwh5uka7hd4gpv7q1g2", "memory:loagehlg3cgksc7xav17"],
-                "requiredEntryIds": ["memory:loagehlg3cgksc7xav17"],
-                "excludedEntryIds": [],
-                "buildContextMs": 916.4919170000067,
-                "askMs": 11516.334541999997
-            },
-            {
-                "questionId": "q-theme-system",
-                "question": "What were the original four Byzantine themes and how did the strategos role differ from Roman governance?",
-                "expectedAnswer": "The four original themes were Anatolikon, Armeniakon, Opsikion, and the naval Karabisianoi. Each strategos held both military and civil authority, unlike the Roman separation of powers.",
-                "difficulty": "hard",
-                "context": "The Theme system replaced the late Roman provincial structure beginning under Emperor Heraclius (610-641) or possibly Constans II (641-668). The original four themes were Anatolikon, Armeniakon, Opsikion, and the naval Karabisianoi. Each theme was governed by a strategos who held both military and civil authority, fundamentally different from the Roman separation of powers.",
-                "answer": "## The Original Four Byzantine Themes and the Strategos System\n\n**The Four Themes:**\nThe original Byzantine theme system consisted of:\n1. **Anatolikon** — covering central Anatolia\n2. **Armeniakon** — the eastern region\n3. **Opsikion** — in the western Anatolian heartland\n4. **Karabisianoi** — the naval/maritime theme\n\nThese emerged as the primary administrative divisions during the reign of Heraclius (610-641) or possibly Constans II (641-668), marking a fundamental restructuring of provincial governance.\n\n**The Strategos Role vs. Roman Governance:**\n\nThe strategos represented a decisive departure from classical Roman administrative separation:\n\n| Aspect | Roman Model | Byzantine Strategos |\n|--------|------------|-------------------|\n| **Authority** | Separate military (legate) and civil (proconsul/governor) officials | **Single unified commander** |\n| **Powers** | Checks and balances; divided responsibility | Both military and civil authority in one person |\n| **Structure** | Civilian-military hierarchy with distinct lines | Integrated military-administrative authority |\n\nThe strategos consolidated what had been separate Roman functions—the military legatus and civilian governor—into a single administrator. This integration served Byzantine strategic needs, particularly the empire's need for rapid military response to Persian and later Arab threats, while maintaining civilian administration and tax collection. This reflected the Theme system's origin as a military-administrative hybrid designed to replace the increasingly dysfunctional late Roman provincial bureaucracy with a more responsive, centralized command structure.",
-                "memoriesReturned": ["memory:a0jn89idq78gl64x0vzu"],
-                "requiredEntryIds": ["memory:a0jn89idq78gl64x0vzu"],
-                "excludedEntryIds": [],
-                "buildContextMs": 929.1725839999854,
-                "askMs": 11334.10375000001
-            },
-            {
-                "questionId": "q-iconoclasm-phases",
-                "question": "What were the exact dates of the two phases of Byzantine Iconoclasm?",
-                "expectedAnswer": "First Iconoclasm: 726-787 CE (Leo III to Second Council of Nicaea under Irene). Second Iconoclasm: 814-842 CE (Leo V to the Feast of Orthodoxy on the first Sunday of Lent 843 CE).",
-                "difficulty": "hard",
-                "context": "[Definitions & Concepts]\nByzantine Iconoclasm had two distinct phases: the First Iconoclasm (726-787 CE) initiated by Emperor Leo III the Isaurian and ended by the Second Council of Nicaea under Empress Irene; the Second Iconoclasm (814-842 CE) began under Emperor Leo V the Armenian and ended definitively on the first Sunday of Lent 843 CE, now celebrated as the Feast of Orthodoxy.\nThe Byzantine Iconoclasm are two periods in the history of the Byzantine Empire when the use of religious images or icons was opposed by religious and imperial authorities within the Ecumenical Patriarchate and the temporal imperial hierarchy. The First Iconoclasm, as it is sometimes called, occurred between about 726 and 787, while the Second Iconoclasm occurred between 814 and 842. According to the traditional view, Byzantine Iconoclasm was started by a ban on religious images promulgated by the Byzantine Emperor Leo III the Isaurian, and continued under his successors. It was accompanied by widespread destruction of religious images and persecution of supporters of the veneration of images.\nTo identify a Byzantine coin's era: examine the cross on the obverse — a simple cross suggests pre-7th century, a cross on steps indicates 7th-8th century, and Christ's portrait appears from the late 7th century onward. The reverse typically shows the emperor's title and regnal year in Greek numerals. Coins with facing portraits (rather than profile) generally date after Justinian II's second reign (705-711 CE).\nByzantine art comprises the body of artistic products of the Eastern Roman Empire, as well as the nations and states that inherited culturally from the empire. Though the empire itself emerged from the decline of western Rome and lasted until the Fall of Constantinople in 1453, the start date of the Byzantine period is rather clearer in art history than in political history, if still imprecise. Many Eastern Orthodox states in Eastern Europe, as well as to some degree the Islamic states of the eastern Mediterranean, preserved many aspects of the empire's culture and art for centuries afterward.\nThe themes or thémata were the main military and administrative divisions of the Byzantine Empire. They were established in the mid-7th century in the aftermath of the Slavic migrations to the Balkans and Muslim conquests of parts of Eastern Roman territory, and replaced the earlier ancient provincial system established by Diocletian and Constantine the Great. In their origin, the first themes were created from the areas of encampment of the field armies of the East Roman army, and their names corresponded to the military units that had existed in those areas. The theme system reached its apogee in the 9th and 10th centuries, as older themes were split up and the conquest of territory resulted in the creation of new ones.",
-                "answer": "# Byzantine Iconoclasm: Exact Dates\n\nBased on the retrieved memories, the two phases of Byzantine Iconoclasm occurred during these periods:\n\n## First Iconoclasm\n**726–787 CE**\n\nInitiated by Emperor Leo III the Isaurian in 726 CE with a ban on religious images, this phase concluded definitively at the Second Council of Nicaea in 787 CE under Empress Irene, which restored the veneration of icons.\n\n## Second Iconoclasm\n**814–842 CE** (ending March 11, 843 CE)\n\nBeginning under Emperor Leo V the Armenian in 814 CE, the Second Iconoclasm lasted until 842 CE, with the definitive end marked on the first Sunday of Lent in 843 CE. This date is now commemorated as the **Feast of Orthodoxy**, celebrating the restoration of icon veneration.\n\n---\n\n**Summary:** The two phases span approximately 61 years of actual iconoclasm (726–787) and 28 years (814–842), separated by a 27-year period of restoration between them.",
-                "memoriesReturned": [
-                    "memory:nyvc852o0ag7rrvkk7gj",
-                    "memory:jig3cvf6dkzsn6pzyfc9",
-                    "memory:hwwkwm6pcxqv239je0lm",
-                    "memory:ppv8z5eg6w4rss6pr87g",
-                    "memory:oh6cema88j06c51qqpl9"
-                ],
-                "requiredEntryIds": ["memory:nyvc852o0ag7rrvkk7gj"],
-                "excludedEntryIds": [],
-                "buildContextMs": 938.0050420000043,
-                "askMs": 9592.362291999976
-            },
-            {
-                "questionId": "q-greek-fire-inventor",
-                "question": "Who invented Greek fire, where were they from, and when was it used decisively?",
-                "expectedAnswer": "Attributed to Kallinikos, a refugee from Heliopolis (modern Baalbek, Lebanon), around 672 CE. It was decisive in repelling Arab sieges of Constantinople in 674-678 and 717-718 CE.",
-                "difficulty": "hard",
-                "context": "[Definitions & Concepts]\nGreek fire was invented around 672 CE, traditionally attributed to Kallinikos, a refugee from Heliopolis (modern Baalbek, Lebanon). The exact composition remains unknown, but likely included naphtha, quicklime, sulfur, and possibly saltpeter. It was deployed through bronze siphons mounted on ship prows and could burn on water. Its use was decisive in repelling the Arab sieges of Constantinople in 674-678 and 717-718 CE.\nGreek fire was an incendiary weapon used by the Byzantine Empire from the seventh to the fourteenth centuries. The recipe for Greek fire was a closely-guarded state secret. Historians have variously speculated that it was based on saltpeter, sulfur, or quicklime, but most modern scholars agree that it was based on petroleum mixed with resins, comparable in composition to modern napalm. Byzantine sailors would toss grenades loaded with Greek fire onto enemy ships or spray it from tubes. Its ability to burn on water made it an effective and destructive naval incendiary weapon, and rival powers tried unsuccessfully to copy the material.",
-                "answer": "# Greek Fire: Invention, Origin, and Decisive Use\n\n**Inventor & Origin:**\nGreek fire was invented around **672 CE** by **Kallinikos**, a refugee from Heliopolis (modern Baalbek, in present-day Lebanon). His identity and origins represent the cosmopolitan nature of Byzantine innovation during this period.\n\n**Composition:**\nThe exact formula remained a closely guarded state secret, but historical evidence suggests it consisted of **naphtha (petroleum), quicklime, sulfur, and possibly saltpeter**—essentially a proto-napalm compound. Its critical advantage was the ability to **burn on water**, making it unprecedented as a naval weapon.\n\n**Decisive Military Use:**\nGreek fire proved decisively effective during the **Arab sieges of Constantinople**:\n- **674–678 CE** – First Arab siege\n- **717–718 CE** – Second Arab siege\n\nThe weapon was deployed through bronze siphons mounted on Byzantine ship prows, allowing crews to spray burning liquid onto enemy vessels. This capability fundamentally shifted naval warfare, as the incendiary couldn't be extinguished by conventional means and couldn't be replicated by rival powers despite centuries of attempts.\n\n**Legacy:**\nUsed throughout the Byzantine Empire from the 7th to 14th centuries, Greek fire became the empire's most jealously guarded military technology and a symbol of Byzantine technical superiority.",
-                "memoriesReturned": ["memory:h2iphk5uiwv0616w54cp", "memory:naiozlri6r0qre1ngk83"],
-                "requiredEntryIds": ["memory:h2iphk5uiwv0616w54cp"],
-                "excludedEntryIds": [],
-                "buildContextMs": 933.5612499999988,
-                "askMs": 9438.480167000002
-            },
-            {
-                "questionId": "q-fourth-crusade-payment",
-                "question": "How much did Alexios IV promise the crusaders, and when did the Latin Empire end?",
-                "expectedAnswer": "Alexios IV promised 200,000 marks of silver. The Latin Empire lasted from 1204 until 1261 when Michael VIII Palaiologos recaptured Constantinople from Baldwin II.",
-                "difficulty": "hard",
-                "context": "[Definitions & Concepts]\nThe Fourth Crusade's sack of Constantinople in April 1204 was preceded by a complex chain of events: the crusaders diverted to Constantinople to support Alexios IV Angelos' claim to the throne, installed him as co-emperor, then attacked when he couldn't pay the promised 200,000 marks of silver. The resulting Latin Empire lasted only until 1261 when Michael VIII Palaiologos recaptured the city from Baldwin II.\nThe Latin Empire, also referred to as the Latin Empire of Constantinople or the Constantinopolitan Empire, was a feudal Crusader state founded by the leaders of the Fourth Crusade on lands captured from the Byzantine Empire. The Latin Empire was intended to replace the Byzantine Empire as the Western-recognized Roman Empire in the east, with a Catholic emperor enthroned in place of the Eastern Orthodox Roman emperors. The main objective to form a Latin Empire was planned over the course of the Fourth Crusade, promoted by crusade leaders such as Boniface I of Montferrat, as well as the Republic of Venice.",
-                "answer": "Based on the retrieved memories, here are direct answers to both questions:\n\n**Alexios IV's Promise:**\nAlexios IV Angelos promised the crusaders **200,000 marks of silver** in exchange for military support to claim the Byzantine throne. According to the records, he was installed as co-emperor following this arrangement, but was unable to fulfill the full payment, which ultimately precipitated the crusaders' attack on Constantinople.\n\n**End of the Latin Empire:**\nThe Latin Empire lasted until **1261**, when Michael VIII Palaiologos recaptured Constantinople from Baldwin II, effectively ending the crusader state that had been established in 1204.\n\n**Summary:**\nThe Fourth Crusade's intervention in Byzantine succession politics in 1204 created a 57-year Latin Empire (1204-1261)—a feudal Crusader state intended by its Venetian and crusade leaders to replace the Byzantine Empire as the Western-recognized Roman Empire in the east. The empire's founding was directly tied to Alexios IV's unpaid debt of 200,000 marks, which transformed what began as a political alliance into a military conquest.",
-                "memoriesReturned": ["memory:txuszdyqo4qa4bnm5mql", "memory:kya60ux1y8457w2uclzl"],
-                "requiredEntryIds": ["memory:txuszdyqo4qa4bnm5mql"],
-                "excludedEntryIds": [],
-                "buildContextMs": 926.8625830000092,
-                "askMs": 8365.575624999998
-            },
-            {
-                "questionId": "q-filioque-origin",
-                "question": "When was the Filioque clause first added to the Creed, and what role did it play in the Great Schism?",
-                "expectedAnswer": "First added at the Third Council of Toledo in 589 CE to the original 381 CE Niceno-Constantinopolitan Creed. In 1054, Cardinal Humbert excommunicated Patriarch Michael Cerularius, making it a key factor in the Great Schism.",
-                "difficulty": "hard",
-                "context": "[Definitions & Concepts]\nThe Filioque controversy centered on whether the Holy Spirit proceeds from the Father alone (Eastern position) or from the Father 'and the Son' (Filioque, Western position). The original Niceno-Constantinopolitan Creed of 381 CE stated 'proceeds from the Father.' The Filioque was first added at the Third Council of Toledo in 589 CE. It became a key factor in the Great Schism of 1054 when Cardinal Humbert excommunicated Patriarch Michael Cerularius.\nFilioque, a Latin term meaning \"and from the Son\", was added to the original Nicene Creed, and has been the subject of great controversy between Eastern and Western Christianity. The term refers to the Son, Jesus Christ, with the Father, as the one shared origin of the Holy Spirit. It is not in the original text of the Creed, attributed to the First Council of Constantinople (381), which says that the Holy Spirit proceeds \"from the Father\" without the addition \"and the Son\".",
-                "answer": "# The Filioque Clause: Timing, Context, and Role in the Great Schism\n\n## Timeline of Addition\n\nThe **Filioque was first added in 589 CE at the Third Council of Toledo**, approximately 208 years after the original Niceno-Constantinopolitan Creed (381 CE). The original creed stated that the Holy Spirit proceeds \"from the Father\" alone. The addition of \"and the Son\" (Latin: *Filioque*) represented a significant theological modification to orthodox doctrine.\n\n## Theological Significance\n\nThe Filioque introduced a substantive doctrinal dispute:\n- **Eastern position**: The Holy Spirit proceeds exclusively from the Father (Monoprocession)\n- **Western position**: The Holy Spirit proceeds from both the Father and the Son (Filioque)\n\nThis wasn't merely semantic—it reflected differing understandings of divine procession and the relationship among the three persons of the Trinity.\n\n## Role in the Great Schism (1054)\n\nThe Filioque became **a key catalytic factor** in the formal break between Eastern and Western Christianity. By 1054, the clause had become institutionalized in Western liturgy and theology, making it a flashpoint of doctrinal tension. When **Cardinal Humbert excommunicated Patriarch Michael Cerularius** that year, the Filioque stood as one of the principal theological grievances—a symbol of Western unilateral modification of ecumenical creedal tradition.\n\n## Analysis\n\nThe Filioque exemplifies how incremental theological changes, adopted locally (Toledo, 589) over centuries, can accumulate into schism-level conflicts when competing ecclesial authorities refuse reconciliation. Rather than causing the schism directly, it crystallized deeper East-West divisions over authority, tradition, and theological methodology.",
-                "memoriesReturned": ["memory:9h4vok918esntd6k12lw", "memory:qpi28l6bbwib7r6wfgo4"],
-                "requiredEntryIds": ["memory:9h4vok918esntd6k12lw"],
-                "excludedEntryIds": [],
-                "buildContextMs": 905.486917000002,
-                "askMs": 12410.412332999986
-            },
-            {
-                "questionId": "q-coin-dating",
-                "question": "How can you determine the era of a Byzantine coin from its imagery?",
-                "expectedAnswer": "Simple cross = pre-7th century, cross on steps = 7th-8th century, Christ's portrait = late 7th century onward. Facing portraits (not profile) generally date after Justinian II's second reign (705-711 CE).",
-                "difficulty": "hard",
-                "context": "[Definitions & Concepts]\nTo identify a Byzantine coin's era: examine the cross on the obverse — a simple cross suggests pre-7th century, a cross on steps indicates 7th-8th century, and Christ's portrait appears from the late 7th century onward. The reverse typically shows the emperor's title and regnal year in Greek numerals. Coins with facing portraits (rather than profile) generally date after Justinian II's second reign (705-711 CE).\nByzantine currency, money used in the Eastern Roman Empire after the fall of the West, consisted of mainly two types of coins: gold solidi and hyperpyra and a variety of clearly valued bronze coins. By the 15th century, the currency was issued only in debased silver stavrata and minor copper coins with no gold issue. The Byzantine Empire established and operated several mints throughout its history. Aside from the main metropolitan mint in the capital, Constantinople, a varying number of provincial mints were also established in other urban centres, especially during the 6th century.\nByzantine art comprises the body of artistic products of the Eastern Roman Empire, as well as the nations and states that inherited culturally from the empire. Though the empire itself emerged from the decline of western Rome and lasted until the Fall of Constantinople in 1453, the start date of the Byzantine period is rather clearer in art history than in political history, if still imprecise. Many Eastern Orthodox states in Eastern Europe, as well as to some degree the Islamic states of the eastern Mediterranean, preserved many aspects of the empire's culture and art for centuries afterward.\nThe Byzantine Iconoclasm are two periods in the history of the Byzantine Empire when the use of religious images or icons was opposed by religious and imperial authorities within the Ecumenical Patriarchate and the temporal imperial hierarchy. The First Iconoclasm, as it is sometimes called, occurred between about 726 and 787, while the Second Iconoclasm occurred between 814 and 842. According to the traditional view, Byzantine Iconoclasm was started by a ban on religious images promulgated by the Byzantine Emperor Leo III the Isaurian, and continued under his successors. It was accompanied by widespread destruction of religious images and persecution of supporters of the veneration of images.\nThe Byzantine gold solidus (bezant) maintained nearly constant weight and purity (4.48g, 24 karats) for over 700 years from Constantine I (309 CE) until Emperor Constantine IX began debasement in 1034 CE. The nomisma histamenon eventually fell to 8 karats under Nikephoros III Botaneiates (1078-1081).",
-                "answer": "# Determining the Era of a Byzantine Coin from Imagery\n\nByzantine coins can be dated through systematic analysis of their iconographic elements, particularly the imagery on the obverse (front) and reverse (back):\n\n## Primary Dating Indicators\n\n**Cross Symbolism (Most Reliable)**\n- **Simple cross**: Pre-7th century\n- **Cross on steps**: 7th-8th century  \n- **Christ's portrait**: Late 7th century onward\n\n**Portrait Style**\n- **Profile portraits**: Prior to Justinian II's second reign (705-711 CE)\n- **Facing portraits**: 705-711 CE and later\n\n## Secondary Indicators\n\n**Reverse Imagery**\nThe reverse typically displays the emperor's title and regnal year in Greek numerals, providing precise chronological anchoring once the emperor is identified.\n\n**Religious Imagery Context**\nThe presence or absence of religious figures correlates with two major Iconoclasm periods (726-787 and 814-842) when religious imagery was suppressed by imperial decree, creating distinct visual gaps in coin design.\n\n## Material Composition as Chronological Marker\n\nWhile not purely \"imagery,\" the metal composition supports dating:\n- **Gold solidi**: Maintained high purity (24 karats) from Constantine I (~309 CE) until 1034 CE\n- **Debased coins**: By the 15th century, coins were issued only in debased silver and copper, indicating late-period specimens\n\n## Practical Application\n\nBegin by identifying the predominant cross type and portrait orientation, cross-reference these with the emperor's name and Greek numerals on the reverse, then verify against the Iconoclasm timeline to refine the dating range.",
-                "memoriesReturned": [
-                    "memory:hwwkwm6pcxqv239je0lm",
-                    "memory:ssmgixqwhqzr69iekl04",
-                    "memory:ppv8z5eg6w4rss6pr87g",
-                    "memory:jig3cvf6dkzsn6pzyfc9",
-                    "memory:ckw5tszgvodxct437iac"
-                ],
-                "requiredEntryIds": ["memory:hwwkwm6pcxqv239je0lm"],
-                "excludedEntryIds": [],
-                "buildContextMs": 930.5172080000048,
-                "askMs": 12283.679875000002
-            },
-            {
-                "questionId": "q-empire-longevity",
-                "question": "What was more important to the Byzantine Empire's longevity — military or bureaucracy?",
-                "expectedAnswer": "The bureaucratic system was more important: merit-based civil service with examinations, rotating officials, and an adaptable tax system. After 1071, it was the collapse of the tax base from losing Anatolia, not the military defeat itself, that proved fatal.",
-                "difficulty": "medium",
-                "context": "[Definitions & Concepts]\nThe Byzantine Empire's longevity (over 1,100 years) owed much to its sophisticated bureaucratic system rather than military might alone. The civil service was merit-based with examinations, officials rotated to prevent local power bases, and the tax system (based on the Roman capitatio-iugatio) adapted remarkably to territorial losses. When the empire lost Anatolia after 1071, it was the collapse of the tax base — not the military defeat itself — that proved fatal.\nThe Byzantine navy was the naval force of the Byzantine Empire. Like the state it served, it was a direct continuation from its Roman predecessor, but played a far greater role in the defence and survival of the state than its earlier iteration. While the fleets of the Roman Empire faced few great naval threats, operating as a policing force vastly inferior in power and prestige to the army, command of the sea became vital to the very existence of the Byzantine state, which several historians have called a \"maritime empire\".\nThe Byzantine economy was among the most robust economies in the Mediterranean and the world for many centuries. Constantinople was a prime hub in a trading network that at various times extended across nearly all of Eurasia and North Africa. It could be argued that up until the 7th century, the Eastern Roman Empire had the most powerful economy in the world. The Arab conquests, however, would represent a substantial reversal of fortunes contributing to a period of decline and stagnation. The Byzantine state restructured its administrative and fiscal systems, introducing the theme system, which organized land and military service in a way that ensured both local defense and agricultural productivity. Rural life revived as new lands were brought under cultivation, and local economies became more self-sufficient, reducing dependence on long-distance trade that had been curtailed by the loss of eastern territories.\nByzantine art comprises the body of artistic products of the Eastern Roman Empire, as well as the nations and states that inherited culturally from the empire. Though the empire itself emerged from the decline of western Rome and lasted until the Fall of Constantinople in 1453, the start date of the Byzantine period is rather clearer in art history than in political history, if still imprecise. Many Eastern Orthodox states in Eastern Europe, as well as to some degree the Islamic states of the eastern Mediterranean, preserved many aspects of the empire's culture and art for centuries afterward.\nByzantine medicine encompasses the common medical practices of the Byzantine Empire from c. 400 AD to 1453 AD. Byzantine medicine was notable for building upon the knowledge base developed by its Greco-Roman predecessors. In preserving medical practices from antiquity, Byzantine medicine influenced Islamic medicine and fostered the Western rebirth of medicine during the Renaissance. The concept of the hospital appeared in Byzantine Empire as an institution to offer medical care and possibility of a cure for the patients because of the ideals of Christian charity.\n\n[Facts & References]\nByzantine dress changed considerably over the thousand years of the Empire, but was essentially conservative. The Byzantines liked colour and pattern, and made and exported very richly patterned cloth, especially Byzantine silk, woven and embroidered for the upper classes, and resist-dyed and printed for the lower. A different border or trimming round the edges was very common, and many single stripes down the body or around the upper arm are seen, often denoting class or rank. Taste for the middle and upper classes followed the latest fashions at the Imperial Court.",
-                "answer": "## Analytical Synthesis\n\nBased on the retrieved evidence, **bureaucracy emerges as the more decisive factor** in the Byzantine Empire's exceptional longevity, though the relationship was deeply integrated rather than strictly binary.\n\n### The Case for Bureaucracy's Primacy\n\nThe most compelling evidence comes from the empire's response to territorial collapse. Memory [1] presents a critical insight: when the Byzantine Empire lost Anatolia after 1071—a catastrophic military defeat—the fatal blow came not from the military loss itself, but from the **collapse of the tax base**. This reveals that military defeats were survivable if the administrative and fiscal systems remained intact. The merit-based civil service, systematic official rotation to prevent power consolidation, and adaptable tax structures (evolved from the Roman *capitatio-iugatio*) provided institutional resilience that military victories alone could never guarantee.\n\n### The Military-Administrative Integration\n\nHowever, the evidence also shows bureaucracy and military were not truly separable. Memory [3] describes the theme system—which reorganized both **land and military service** simultaneously to ensure \"local defense and agricultural productivity.\" This wasn't pure administration; it was an administrative *framework for military organization*. The economy's robustness (Memory [3]) and the navy's critical role in Mediterranean survival (Memory [2]) demonstrate that military capacity depended on bureaucratic infrastructure to provision, organize, and sustain itself.\n\n### Conclusion\n\nBureaucracy was more foundational because it was **conditional** to military effectiveness, whereas military strength alone could not sustain the state without it. The empire's thousand-year survival depended ultimately on whether it could tax, administer, and reorganize—not simply on whether it could win battles.",
-                "memoriesReturned": [
-                    "memory:5ex8uv5uyvmtyhtze4ol",
-                    "memory:e97i06beuegpmmahwui0",
-                    "memory:17pszse5o5975coduse8",
-                    "memory:ppv8z5eg6w4rss6pr87g",
-                    "memory:grub1o7j5g3sr2splfix",
-                    "memory:hp6qk5upicjk8rardb4i"
-                ],
-                "requiredEntryIds": ["memory:5ex8uv5uyvmtyhtze4ol"],
-                "excludedEntryIds": [],
-                "buildContextMs": 1064.0502500000002,
-                "askMs": 14422.478792000009
-            },
-            {
-                "questionId": "q-silk-diplomacy",
-                "question": "How was silk used in Byzantine diplomacy?",
-                "expectedAnswer": "Silk garments were given as gifts to foreign rulers as luxury items and symbols of cultural superiority. Purple-dyed silk had strict export controls, as documented in Liudprand of Cremona's embassy accounts (968 CE).",
-                "difficulty": "hard",
-                "context": "[Definitions & Concepts]\nSilk served as a key instrument of Byzantine diplomacy. Imperial silk garments were given as gifts to foreign rulers and ambassadors, functioning as both luxury items and symbols of Byzantine cultural superiority. The Liudprand of Cremona embassy accounts (968 CE) describe strict export controls on purple-dyed silk.\nByzantine silk production was managed by imperial guilds regulated under the Book of the Eparch (10th century). The guilds controlled every stage: raw silk purchase (metaxopratai), dyeing (katartarioi), and weaving (serikarioi). Purple silk was reserved exclusively for the imperial family.\nThe Byzantine Empire held a strict monopoly on silk production in Europe from the 6th century onward. Emperor Justinian I allegedly sent two Nestorian monks to smuggle silkworm eggs from China hidden inside hollow bamboo canes around 552 CE, breaking China's ancient monopoly.\nByzantine diplomacy was arguably the most sophisticated in the medieval world. The empire maintained a dedicated bureau of barbarians (the Office of Barbarians) to manage foreign relations, employing translators, intelligence agents, and protocol experts. Key tactics included strategic marriages of imperial princesses to foreign rulers, subsidies and tribute payments to buy peace, playing rival neighbors against each other, and converting foreign peoples to Orthodox Christianity to create cultural allies.",
-                "answer": "# Silk in Byzantine Diplomacy: Analytical Synthesis\n\nByzantine silk functioned as a multifaceted diplomatic instrument, operating simultaneously as **luxury commodity, political symbol, and soft power tool**.\n\n## Monopoly as Strategic Leverage\n\nThe Byzantine Empire's tight control over European silk production (secured after the 6th-century industrial espionage against China) created a crucial asymmetry in medieval diplomacy. Only Constantinople could produce certain goods—particularly the coveted purple silk reserved exclusively for the imperial family. This scarcity made silk an irreplaceable gift commodity, one that competitors could neither produce nor replicate. The strict export controls documented in the Liudprand embassy accounts (968 CE) show this monopoly was actively weaponized: access to silk became something the empire could grant or withhold.\n\n## Gifting as Cultural Supremacy\n\nImperial silk garments served as what modern scholars might call \"prestige goods diplomacy.\" When Byzantine rulers gifted elaborately woven or dyed silks to foreign rulers and ambassadors, they communicated several messages simultaneously:\n\n- **Material superiority**: Only Byzantium could create these objects\n- **Cultural hierarchy**: Recipients occupied a subordinate position worthy of imperial patronage\n- **Binding obligation**: Gift-exchange created relational debt in medieval diplomatic culture\n\nThis aligns with Byzantine diplomatic sophistication more broadly—the empire employed strategic marriages, tribute payments, religious conversion, and balance-of-power tactics. Silk was simply the *material expression* of these strategies.\n\n## Controlled Distribution Ensures Status\n\nThe guild system (Book of the Eparch) wasn't merely economic; it was diplomatic infrastructure. By preventing private silk production and controlling who received what materials, Byzantine authorities ensured that silk distribution remained a prerogative of imperial authority—impossible for rival powers to replicate or compete with directly.\n\n**In essence**: Silk transformed monopoly into diplomacy, and luxury into statecraft.",
-                "memoriesReturned": [
-                    "memory:ys2tonw76jslykjx8bgy",
-                    "memory:5k2oo6g6wufskrhzmm6h",
-                    "memory:6g5ytqmyowmdn2rh05tz",
-                    "memory:xa8q24uxt2xxglv6215a"
-                ],
-                "requiredEntryIds": ["memory:ys2tonw76jslykjx8bgy"],
-                "excludedEntryIds": [],
-                "buildContextMs": 922.1128750000207,
-                "askMs": 12688.834499999997
-            },
-            {
-                "questionId": "q-justinian-legal",
-                "question": "What was the full name of Justinian's legal code and what did it contain?",
-                "expectedAnswer": "The Corpus Juris Civilis, which codified Roman law into a systematic collection including the Codex Justinianus, the Digest (Pandects), the Institutes, and the Novellae.",
-                "difficulty": "easy",
-                "context": "[Definitions & Concepts]\nThe Corpus Juris Civilis is the modern name for a collection of fundamental works in jurisprudence, enacted from 529 to 534 by order of Roman Emperor Justinian I. It is also sometimes referred to metonymically after one of its parts, the Code of Justinian.",
-                "answer": "# Justinian's Legal Code: The Corpus Juris Civilis\n\n## Full Name and Official Title\n\nThe complete name of Justinian's legal code is the **Corpus Juris Civilis** (literally \"Body of Civil Law\"). It is also known metonymically as the **Code of Justinian**, though this technically refers to only one of its component parts.\n\n## What It Contained\n\nThe Corpus Juris Civilis was a comprehensive legal compilation enacted between **529-534 CE** by order of Roman Emperor Justinian I. It consisted of four main parts:\n\n1. **The Codex** — A systematized collection of imperial constitutions and decrees\n2. **The Digest (or Pandects)** — An extensive compilation of excerpts from classical Roman legal writings and jurisprudential interpretations\n3. **The Institutes** — A structured introduction and elementary textbook on Roman law\n4. **The Novellae** — A collection of new imperial legislation issued after the Codex was compiled\n\n## Significance\n\nTogether, these works synthesized over a thousand years of Roman legal development into a unified, authoritative body of law. The Corpus Juris Civilis became foundational to European legal systems and remains one of the most influential legal codes in history, forming the basis of civil law traditions used across much of the world today.",
-                "memoriesReturned": ["memory:ywj6gwldbnx0bq93vt78"],
-                "requiredEntryIds": [],
-                "excludedEntryIds": [],
-                "buildContextMs": 971.1389169999748,
-                "askMs": 10667.457750000001
-            },
-            {
-                "questionId": "q-nika-riots",
-                "question": "What triggered the Nika riots and how many people were killed?",
-                "expectedAnswer": "The Nika riots of 532 CE were triggered by public anger over taxes and the arrest of chariot racing faction members. Justinian nearly fled but Theodora convinced him to stay. General Belisarius trapped the rioters in the Hippodrome and killed an estimated 30,000 people.",
-                "difficulty": "medium",
-                "context": "[Definitions & Concepts]\nThe Nika riots, Nika revolt or Nika sedition took place against Byzantine emperor Justinian I in Constantinople over the course of a week in 532 AD. They are often regarded as the most violent riots in the city's history, with nearly half of Constantinople being burned or destroyed and tens of thousands of people killed.",
-                "answer": "# Analysis: The Nika Riots (532 AD)\n\n## Triggers\n\nThe Nika riots were sparked by **factional violence and political instability** in Constantinople:\n\n- **Immediate catalyst**: A chariot racing incident in which Blues supporters were executed for murders, inflaming tensions between the rival racing factions (Blues and Greens) who dominated urban life and politics\n- **Underlying causes**: \n  - Deep rivalry between the Blues and Greens—organized fan groups with significant political influence\n  - Social discontent over Justinian I's tax increases and economic policies\n  - Growing class tensions and resentment of imperial authority\n\nThe riots erupted as a broader uprising rather than purely a sports dispute, with the \"Nika\" chant (meaning \"victory\") becoming a rallying cry for anti-government sentiment across all social classes.\n\n## Casualty Estimates\n\nAccording to the retrieved memory, the riots resulted in **tens of thousands of deaths**—making them among the deadliest urban disturbances in history. The destruction was equally catastrophic, with **nearly half of Constantinople burned or destroyed** during the week-long violence.\n\nLater historical sources (notably Procopius) estimated casualties as high as 30,000, though exact figures remain debated by scholars.\n\n## Historical Significance\n\nThe Nika riots nearly toppled Justinian I's reign. His survival—and the brutal military response that suppressed the uprising—secured his position to pursue his ambitious reconquest of the former Roman Empire.",
-                "memoriesReturned": ["memory:gj8la27825p57pvfrlp9"],
-                "requiredEntryIds": [],
-                "excludedEntryIds": [],
-                "buildContextMs": 1126.3319580000243,
-                "askMs": 12015.223834000004
-            },
-            {
-                "questionId": "q-theodora-role",
-                "question": "What role did Empress Theodora play during the Nika riots, and what were her social reforms?",
-                "expectedAnswer": "During the Nika riots of 532 CE, Empress Theodora delivered a famous speech convincing Justinian I not to flee Constantinople, which proved decisive in saving his reign. As co-ruler, she championed women's rights by closing forced prostitution houses and expanding divorce and property rights for women. She rose from humble origins as a former actress to become one of the most powerful women in Byzantine history.",
-                "difficulty": "medium",
-                "context": "[Definitions & Concepts]\nEmpress Theodora (c. 500–548 CE) wielded extraordinary political influence as co-ruler with Justinian I. A former actress from humble origins, she became one of the most powerful women in Byzantine history. During the Nika riots of 532, when Justinian considered fleeing Constantinople, Theodora's famous speech convinced him to stay and fight. She championed women's rights, closing forced prostitution houses and expanding divorce and property rights for women.\nThe Nika riots, Nika revolt or Nika sedition took place against Byzantine emperor Justinian I in Constantinople over the course of a week in 532 AD. They are often regarded as the most violent riots in the city's history, with nearly half of Constantinople being burned or destroyed and tens of thousands of people killed.\nTheodora was Eastern Roman empress and wife of emperor Justinian I. She was of humble origins and became empress when her husband became emperor in 527. Theodora was one of his chief political advisers. She is recognized as a saint in the Oriental Orthodox Churches, and commemorated on 14 November.",
-                "answer": "## Empress Theodora's Role During the Nika Riots and Her Social Reforms\n\n### Role During the Nika Riots (532 CE)\n\nTheodora's intervention during the Nika riots proved pivotal in Byzantine history. When Constantinople erupted in violence—with tens of thousands killed and nearly half the city destroyed—Emperor Justinian I considered abandoning the capital. Theodora's famous speech convinced him to remain and mount a military response, effectively preventing what could have been the collapse of his reign. This decisive moment demonstrated her political acumen and willingness to challenge even the emperor when she deemed action necessary.\n\nHer ability to influence this critical decision underscored her position as more than ceremonial—she functioned as a genuine co-ruler and chief political adviser, wielding authority typical of few women in ancient history.\n\n### Social Reforms\n\nTheodora's legacy extended beyond political crisis management to substantive institutional reform:\n\n- **Women's legal rights**: She expanded divorce and property rights for women, giving them greater autonomy in marriage and economic matters\n- **Ending forced prostitution**: She closed forced prostitution houses, directly addressing the exploitation that had characterized much of Byzantine urban life\n- **Broader women's protections**: Her reforms collectively positioned her as an early advocate for women's rights in a patriarchal empire\n\n### Historical Significance\n\nThat a woman of humble origins (she was a former actress) rose to become one of the most powerful figures in Byzantine history, and that her influence extended to both crisis resolution and institutional reform, made Theodora exceptional. She was later recognized as a saint in Oriental Orthodox Churches, reflecting her enduring impact on religious and social thought.",
-                "memoriesReturned": [
-                    "memory:vpev1l1soqi6y0i9akii",
-                    "memory:gj8la27825p57pvfrlp9",
-                    "memory:odc9363shsswy965e0mv"
-                ],
-                "requiredEntryIds": ["memory:vpev1l1soqi6y0i9akii"],
-                "excludedEntryIds": [],
-                "buildContextMs": 957.8449580000015,
-                "askMs": 12137.730582999997
-            },
-            {
-                "questionId": "q-theodosian-walls",
-                "question": "When were the Theodosian Walls built and how were they eventually breached?",
-                "expectedAnswer": "The Theodosian Walls were built between 408-413 CE under Emperor Theodosius II. The triple-wall system stretched 6.5 km with an inner wall 5 meters thick and 12 meters high, an outer wall, and a 20-meter-wide moat. They defended Constantinople for over a thousand years until 1453, when Ottoman Sultan Mehmed II breached them using massive cannons, particularly the great bombard built by Hungarian engineer Orban.",
-                "difficulty": "medium",
-                "context": "[Definitions & Concepts]\nThe Theodosian Walls were built between 408-413 CE under Emperor Theodosius II. The triple-wall system stretched 6.5 kilometers across the peninsula, featuring an inner wall 5 meters thick and 12 meters high, an outer wall, and a 20-meter-wide moat. These walls successfully defended Constantinople for over a thousand years until the Ottoman siege of 1453 when Sultan Mehmed II breached them using massive cannons, particularly the great bombard built by the Hungarian engineer Orban.",
-                "answer": "# The Theodosian Walls: Construction and Breach\n\n## Construction Timeline\nThe Theodosian Walls were built between **408–413 CE** under Emperor Theodosius II, representing one of the most ambitious defensive engineering projects of the late Roman Empire. This timing placed the walls shortly after the Gothic invasions under Alaric, reflecting Constantinople's strategic need for enhanced protection.\n\n## Defensive Architecture\nThe walls formed a sophisticated **triple-wall system** spanning 6.5 kilometers across the peninsula:\n- **Inner wall**: 5 meters thick, 12 meters high\n- **Outer wall**: Complementary defensive structure\n- **Moat**: 20 meters wide, providing an additional barrier\n\nThis layered design created overlapping fields of fire and forced attackers to breach multiple obstacles sequentially.\n\n## Defensive Longevity\nThe walls proved extraordinarily effective, successfully defending Constantinople for **over 1,000 years**—a testament to both their engineering quality and the relative weakness of siege technology during the medieval period.\n\n## The 1453 Breach\nThe walls' dominance ended during the **Ottoman siege of 1453** under Sultan Mehmed II, not through conventional medieval siegecraft but through technological innovation:\n- **Artillery advantage**: Ottoman forces deployed massive cannons, particularly a **great bombard** designed by Hungarian engineer Orban\n- **Mechanism of breach**: Artillery bombardment systematically breached sections of the walls, rendering traditional medieval fortifications vulnerable to early gunpowder weaponry\n- **Historical significance**: This siege marked the definitive transition from medieval to early modern siege warfare\n\nThe walls' eventual failure illustrates how technological advancement—specifically portable cannons—fundamentally altered military architecture rather than any weakness in the original design.",
-                "memoriesReturned": ["memory:1a9g56vr9fpfn5wsa94v"],
-                "requiredEntryIds": ["memory:1a9g56vr9fpfn5wsa94v"],
-                "excludedEntryIds": [],
-                "buildContextMs": 898.890000000014,
-                "askMs": 11840.434625000053
-            },
-            {
-                "questionId": "q-pantokrator-hospital",
-                "question": "Describe the Pantokrator monastery hospital and its significance in medical history.",
-                "expectedAnswer": "The Pantokrator monastery hospital in Constantinople was founded in 1136 by Emperor John II Komnenos. It had 50 beds in five specialized wards (surgical, ophthalmological, gynecological, and two general). It employed chief physicians, surgeons, female doctors for women's wards, pharmacists, and orderlies. It was one of the most advanced medieval medical facilities and established a model for institutional healthcare.",
-                "difficulty": "hard",
-                "context": "[Definitions & Concepts]\nThe Pantokrator monastery hospital complex in Constantinople, founded in 1136 by Emperor John II Komnenos, was one of the most advanced medical facilities in the medieval world. It had 50 beds divided into five specialized wards: surgical, ophthalmological, gynecological, and two for general ailments. The hospital employed a staff hierarchy including chief physicians, surgeons, female doctors for women's wards, pharmacists, and orderlies, establishing a model for institutional healthcare.\nByzantine medicine encompasses the common medical practices of the Byzantine Empire from c. 400 AD to 1453 AD. Byzantine medicine was notable for building upon the knowledge base developed by its Greco-Roman predecessors. In preserving medical practices from antiquity, Byzantine medicine influenced Islamic medicine and fostered the Western rebirth of medicine during the Renaissance. The concept of the hospital appeared in Byzantine Empire as an institution to offer medical care and possibility of a cure for the patients because of the ideals of Christian charity.",
-                "answer": "# The Pantokrator Monastery Hospital: A Byzantine Medical Landmark\n\n## Historical Significance\n\nThe Pantokrator monastery hospital, founded in 1136 by Emperor John II Komnenos in Constantinople, represents a pivotal moment in the institutionalization of medical care. It was among the most advanced medical facilities of the medieval world, demonstrating that systematic, evidence-based healthcare delivery was possible outside the ancient world.\n\n## Architectural and Organizational Innovation\n\nThe hospital's design was remarkably sophisticated:\n- **50 beds** organized into **five specialized wards** (surgical, ophthalmological, gynecological, and two general wards)—an early example of departmental medicine\n- A **professional staff hierarchy** including chief physicians, surgeons, female doctors (serving women's wards), pharmacists, and orderlies—establishing what became the model for institutional healthcare\n\nThis structure introduced vertical organizational discipline and task specialization to medicine, laying foundational principles for modern hospital administration.\n\n## Broader Historical Impact\n\nThe Pantokrator hospital exemplifies the Byzantine Empire's role as a medical bridge between antiquity and modernity:\n\n1. **Preservation Function**: Byzantine medicine preserved Greco-Roman medical knowledge that might have been lost to the West\n2. **Cross-Cultural Influence**: Byzantine practices influenced Islamic medicine, which later fed into the Western European medical renaissance\n3. **Philosophical Foundation**: The hospital embodied Christian charity ideals, transforming medicine from a private practice into an institutional obligation—a conceptual shift that remains foundational to modern healthcare\n\nThe Pantokrator represents the convergence of administrative sophistication, specialization, and institutional purpose that characterizes modern medicine. It demonstrates that the medieval period was capable of organizing complex systems when resources and ideology aligned.",
-                "memoriesReturned": ["memory:i3q0m7t9w1xwj8ii7wsc", "memory:grub1o7j5g3sr2splfix"],
-                "requiredEntryIds": ["memory:i3q0m7t9w1xwj8ii7wsc"],
-                "excludedEntryIds": [],
-                "buildContextMs": 932.4712079999736,
-                "askMs": 12176.516499999969
-            },
-            {
-                "questionId": "q-eternal-peace",
-                "question": "What was the Eternal Peace of 532, and how long did it last?",
-                "expectedAnswer": "The Eternal Peace of 532 CE was a treaty between Emperor Justinian I and Sassanid Persian King Khosrau I. Justinian paid 11,000 pounds of gold to secure the eastern frontier, freeing resources for his western reconquest campaigns. Despite its name, it lasted only eight years — Khosrau broke it in 540 CE by sacking Antioch, one of the empire's wealthiest cities.",
-                "difficulty": "hard",
-                "context": "[Definitions & Concepts]\nThe Eternal Peace of 532 CE between Emperor Justinian I and Khosrau I of Sassanid Persia ended decades of Roman-Persian conflict. Justinian agreed to pay 11,000 pounds of gold to secure his eastern frontier, freeing him to pursue reconquest of the western Mediterranean. The peace lasted only eight years before Khosrau broke it in 540 CE by sacking Antioch, one of the empire's wealthiest cities.",
-                "answer": "# The Eternal Peace of 532: Brief Duration and Strategic Context\n\n## Definition and Parties\nThe Eternal Peace of 532 CE was a diplomatic agreement between **Emperor Justinian I** of the Byzantine (Eastern Roman) Empire and **Khosrau I** of the Sassanid Persian Empire, ending a prolonged period of Roman-Persian conflict along their shared frontier.\n\n## Duration\n**The peace lasted only 8 years (532–540 CE)** before collapsing when Khosrau violated its terms.\n\n## Strategic Significance\nJustinian secured the agreement through substantial financial concession—paying **11,000 pounds of gold**—to Khosrau. This was strategically calculated: by pacifying his eastern frontier, Justinian freed military and financial resources to pursue his ambitious **reconquest of the western Mediterranean**, including campaigns against the Germanic kingdoms that had overrun the former Western Roman Empire.\n\n## Failure and Legacy\nThe treaty's brevity underscores its fragility. Despite its grandiose name suggesting permanence, Khosrau broke the agreement in 540 CE by **sacking Antioch**, one of the Byzantine Empire's wealthiest and most important cities. This indicates that the \"eternal\" designation was more aspirational than realistic—the underlying territorial and imperial ambitions of both powers remained fundamentally incompatible.\n\nThe Eternal Peace exemplifies how military necessity can drive temporary diplomatic solutions, but without resolving deeper strategic conflicts, such treaties often prove ephemeral.",
-                "memoriesReturned": ["memory:sf91wcrhwk5cukcr3yvw"],
-                "requiredEntryIds": ["memory:sf91wcrhwk5cukcr3yvw"],
-                "excludedEntryIds": [],
-                "buildContextMs": 896.2980830000015,
-                "askMs": 11702.72112500004
-            },
-            {
-                "questionId": "q-717-siege",
-                "question": "How was the Arab siege of Constantinople in 717-718 defeated?",
-                "expectedAnswer": "The Arab siege of 717-718 CE involved over 1,800 ships and 120,000 troops. Emperor Leo III used Greek fire to destroy much of the Arab fleet. A harsh winter decimated the besieging forces, and Bulgarian attacks on the Arab land army compounded their losses. The failed siege was one of the most decisive battles in world history, halting Arab expansion into Europe for centuries.",
-                "difficulty": "hard",
-                "context": "[Definitions & Concepts]\nThe Arab siege of Constantinople in 717-718 CE was one of the most decisive battles in world history. The massive Arab fleet of over 1,800 ships and 120,000 troops besieged the city by land and sea. The Byzantines under Emperor Leo III used Greek fire to devastating effect against the Arab fleet, while a harsh winter and Bulgarian attacks on the Arab land forces led to catastrophic losses. The failed siege halted Arab expansion into Europe for centuries.\nThe Fall of Constantinople, also known as the Conquest of Constantinople, was the capture of the capital of the Byzantine Empire by the Ottoman Empire. The city was captured on 29 May 1453 as part of the culmination of a 53-day siege which had begun on 6 April.\nThe Fourth Crusade (1202–1204) was a Latin Christian armed expedition called by Pope Innocent III. The stated intent of the expedition was to recapture the Muslim-controlled city of Jerusalem, by first defeating the powerful Egyptian Ayyubid Sultanate. However, a sequence of economic and political events culminated in the Crusader army's 1202 siege of Zara and the 1204 sack of Constantinople, rather than the conquest of Egypt as originally planned. This led to the partition of the Byzantine Empire by the Crusaders and their Venetian allies, leading to a period known as the Frankokratia.",
-                "answer": "# The Byzantine Victory at the Arab Siege of Constantinople (717-718)\n\nThe Arab siege of Constantinople in 717-718 was defeated through a combination of **technological superiority, environmental factors, and external military pressure**:\n\n## Key Factors\n\n**1. Greek Fire (Primary Advantage)**\nThe Byzantine military's deployment of Greek fire—an incendiary weapon of closely guarded Byzantine origin—proved devastatingly effective against the Arab fleet of over 1,800 ships. This technological edge gave the Byzantines a decisive advantage in the crucial naval dimension of the siege.\n\n**2. Winter Conditions (Environmental)**\nThe harsh winter severely impacted the besieging Arab forces, who faced supply difficulties and the challenges of maintaining a massive army (120,000+ troops) during prolonged cold weather. This attrition weakened their capacity to sustain the extended siege.\n\n**3. Bulgarian Military Intervention (External Pressure)**\nBulgarian forces attacked the Arab land forces from the north, creating a two-front pressure situation that the already-weakened Arab army could not withstand, compounding their losses.\n\n**4. Leadership**\nEmperor Leo III's command proved effective in orchestrating the defensive strategy and deploying Byzantine advantages.\n\n## Significance\n\nThe failed siege of 717-718 represented a pivotal moment in world history—it halted Arab expansion into Europe for centuries, preserving the Byzantine Empire and fundamentally shaping the geopolitical trajectory of medieval Europe and the Mediterranean world.\n\nThe victory was comprehensive: the combination of technological dominance, natural hardship, and coordinated external resistance created conditions that made Arab victory strategically impossible.",
-                "memoriesReturned": [
-                    "memory:i2b4ds8kl4l2ewknucvi",
-                    "memory:78w846vmushounmpperi",
-                    "memory:fc0aqgqloniwknfkevjc"
-                ],
-                "requiredEntryIds": ["memory:i2b4ds8kl4l2ewknucvi"],
-                "excludedEntryIds": [],
-                "buildContextMs": 1190.900500000047,
-                "askMs": 12073.269208000042
-            },
-            {
-                "questionId": "q-basil-ii",
-                "question": "What military achievements made Basil II known as 'the Bulgar Slayer'?",
-                "expectedAnswer": "Basil II earned the epithet 'Bulgar Slayer' (Boulgaroktonos) for his decisive campaigns against the Bulgarian Empire. After the Battle of Kleidion in 1014, he allegedly blinded 99 out of every 100 captured Bulgarian soldiers, sending them back led by the hundredth who was left with one eye. This led to the complete conquest of Bulgaria by 1018, expanding the Byzantine Empire to its greatest territorial extent since Justinian I.",
-                "difficulty": "hard",
-                "context": "[Definitions & Concepts]\nBasil II Porphyrogenitus, given the epithet the Bulgar Slayer, was the senior Byzantine emperor from 976 to 1025. He and his brother Constantine VIII were crowned before their father Romanos II died in 963, but they were too young to rule. The throne thus went to two generals, Nikephoros Phokas and John Tzimiskes before Basil became senior emperor, though his influential great-uncle Basil Lekapenos remained as the de facto ruler until 985. His reign of 49 years and 11 months was the longest of any Roman emperor.",
-                "answer": "# Basil II's Military Achievements: The \"Bulgar Slayer\"\n\n## Military Context\n\nThe retrieved memory confirms that Basil II (r. 976–1025) earned the epithet \"the Bulgar Slayer,\" though it doesn't detail the specific campaigns. His 49-year reign provided an extended period to consolidate Byzantine power against external threats, particularly the Bulgarian Empire.\n\n## Key Military Achievements\n\n**The Bulgarian Wars (986–1018)**\nBasil II's primary claim to the \"Bulgar Slayer\" epithet stems from his relentless military campaigns against the Bulgarian state. After initial setbacks (including a major defeat at the Battle of the Gates of Trajan in 986), he reorganized Byzantine forces and launched a systematic conquest of Bulgarian territories.\n\n**Major Victories:**\n- **Battle of the Spurs (1001)**: A decisive victory that demonstrated Basil's improved military strategy\n- **Systematic territorial conquest**: Over three decades, Basil methodically conquered Bulgarian-held lands in the Balkans, reducing the once-powerful First Bulgarian Empire to a vassal state\n- **The final submission (1018)**: Bulgarian forces were decisively defeated, bringing the entire region under Byzantine control\n\n**Brutal Military Policy**\nThe epithet's severity reflects Basil's approach: after the Battle of Kleidion (1014), he allegedly blinded 15,000 Bulgarian prisoners, earning him the reputation as the \"Bulgar Slayer.\" This campaign of conquest and subjugation became his defining legacy.\n\n## Legacy\n\nThese military achievements transformed the Byzantine Empire into a dominant Balkan power and remain his most significant historical contribution—a reign that effectively ended Bulgarian independence for nearly two centuries.",
-                "memoriesReturned": ["memory:rmtlfaycc3sos4wafjj1"],
-                "requiredEntryIds": [],
-                "excludedEntryIds": [],
-                "buildContextMs": 941.9523749999935,
-                "askMs": 11675.605708000017
-            },
-            {
-                "questionId": "q-byzantine-navy",
-                "question": "What was the role of the Byzantine navy and what technology gave it an advantage?",
-                "expectedAnswer": "The Byzantine navy was crucial for defending Constantinople and controlling Mediterranean trade routes. Its primary technological advantage was Greek fire, a napalm-like incendiary weapon deployed through pressurized siphons mounted on warships called dromons. The navy played decisive roles in the Arab sieges of Constantinople (674-678 and 717-718) and maintained Byzantine control of the Aegean Sea for centuries.",
-                "difficulty": "medium",
-                "context": "[Definitions & Concepts]\nThe Byzantine navy was the naval force of the Byzantine Empire. Like the state it served, it was a direct continuation from its Roman predecessor, but played a far greater role in the defence and survival of the state than its earlier iteration. While the fleets of the Roman Empire faced few great naval threats, operating as a policing force vastly inferior in power and prestige to the army, command of the sea became vital to the very existence of the Byzantine state, which several historians have called a \"maritime empire\".\nThe Byzantine economy was among the most robust economies in the Mediterranean and the world for many centuries. Constantinople was a prime hub in a trading network that at various times extended across nearly all of Eurasia and North Africa. It could be argued that up until the 7th century, the Eastern Roman Empire had the most powerful economy in the world. The Arab conquests, however, would represent a substantial reversal of fortunes contributing to a period of decline and stagnation. The Byzantine state restructured its administrative and fiscal systems, introducing the theme system, which organized land and military service in a way that ensured both local defense and agricultural productivity. Rural life revived as new lands were brought under cultivation, and local economies became more self-sufficient, reducing dependence on long-distance trade that had been curtailed by the loss of eastern territories.\nByzantine medicine encompasses the common medical practices of the Byzantine Empire from c. 400 AD to 1453 AD. Byzantine medicine was notable for building upon the knowledge base developed by its Greco-Roman predecessors. In preserving medical practices from antiquity, Byzantine medicine influenced Islamic medicine and fostered the Western rebirth of medicine during the Renaissance. The concept of the hospital appeared in Byzantine Empire as an institution to offer medical care and possibility of a cure for the patients because of the ideals of Christian charity.",
-                "answer": "# The Role of the Byzantine Navy and Its Technological Advantage\n\n## Role and Strategic Importance\n\nBased on the retrieved memories, the Byzantine navy occupied a fundamentally different strategic position than its Roman predecessor. While Roman naval forces functioned primarily as a policing mechanism subordinate to the army, the Byzantine navy became **vital to the empire's survival**. Historians have characterized the Byzantine state as a \"maritime empire,\" reflecting the critical role naval power played in both defense and the empire's continued existence across turbulent centuries.\n\nThis shift reflected the Byzantine Empire's geography and circumstances: as a shrinking territorial power after the 7th-century Arab conquests, control of Mediterranean sea lanes became essential for:\n- Defending remaining territories\n- Maintaining trade networks (Constantinople remained a crucial hub in Eurasian commerce)\n- Protecting supply lines and communication routes\n\n## Technological Advantage: Greek Fire\n\nWhile the retrieved memories do not address naval technology specifically, historical records indicate the Byzantine navy's decisive advantage came from **Greek Fire** (also called liquid fire or sea fire). This was an incendiary weapon—likely a petroleum-based mixture with lime and sulfur—deployed through siphons mounted on ships. \n\nKey advantages:\n- **Psychological impact**: Devastating and difficult to extinguish, it demoralized enemy fleets\n- **Maritime dominance**: Particularly effective at sea where wooden ships were vulnerable\n- **Strategic monopoly**: Kept secret for centuries, giving Byzantines an asymmetric advantage\n- **Defensive capability**: Enabled smaller Byzantine fleets to repel larger invading forces (notably Arab fleets in the 7th-8th centuries)\n\nGreek Fire exemplified Byzantine pragmatism: facing larger rivals with inferior numbers, they leveraged technological innovation to maintain naval supremacy.",
-                "memoriesReturned": [
-                    "memory:e97i06beuegpmmahwui0",
-                    "memory:17pszse5o5975coduse8",
-                    "memory:grub1o7j5g3sr2splfix"
-                ],
-                "requiredEntryIds": [],
-                "excludedEntryIds": [],
-                "buildContextMs": 938.7814160000416,
-                "askMs": 40871.75016599998
-            },
-            {
-                "questionId": "q-latin-empire",
-                "question": "What was the Latin Empire and how did it affect Byzantine civilization?",
-                "expectedAnswer": "The Latin Empire (1204-1261) was a Crusader state established after the Fourth Crusade's sack of Constantinople. It replaced Byzantine governance with Western feudal structures and Catholic ecclesiastical authority. The Latin occupation weakened Constantinople's defenses, depleted its wealth and art treasures, and permanently damaged the empire's ability to recover. Michael VIII Palaiologos recaptured the city in 1261, but the restored Byzantine Empire never regained its former strength.",
-                "difficulty": "medium",
-                "context": "[Definitions & Concepts]\nThe Latin Empire, also referred to as the Latin Empire of Constantinople or the Constantinopolitan Empire, was a feudal Crusader state founded by the leaders of the Fourth Crusade on lands captured from the Byzantine Empire. The Latin Empire was intended to replace the Byzantine Empire as the Western-recognized Roman Empire in the east, with a Catholic emperor enthroned in place of the Eastern Orthodox Roman emperors. The main objective to form a Latin Empire was planned over the course of the Fourth Crusade, promoted by crusade leaders such as Boniface I of Montferrat, as well as the Republic of Venice.\nThe Byzantine economy was among the most robust economies in the Mediterranean and the world for many centuries. Constantinople was a prime hub in a trading network that at various times extended across nearly all of Eurasia and North Africa. It could be argued that up until the 7th century, the Eastern Roman Empire had the most powerful economy in the world. The Arab conquests, however, would represent a substantial reversal of fortunes contributing to a period of decline and stagnation. The Byzantine state restructured its administrative and fiscal systems, introducing the theme system, which organized land and military service in a way that ensured both local defense and agricultural productivity. Rural life revived as new lands were brought under cultivation, and local economies became more self-sufficient, reducing dependence on long-distance trade that had been curtailed by the loss of eastern territories.\nBy the 9th and 10th centuries, the empire experienced a notable resurgence: agricultural output increased, population levels rose, and the circulation of coinage expanded once again. However, by the 12th and 13th centuries, the economic balance began to shift. Western maritime republics such as Venice and Genoa gradually overtook Byzantine merchants, largely due to the tax exemptions and trading privileges granted to them under the Komnenian emperors. This process accelerated after the Fourth Crusade and the establishment of the Latin Empire, during which Venetian traders gained control over key ports and commercial networks once held by the Byzantines. The Byzantines continued to face economic challenges during the Palaiologan era until its fall in 1453.\nByzantine art comprises the body of artistic products of the Eastern Roman Empire, as well as the nations and states that inherited culturally from the empire. Though the empire itself emerged from the decline of western Rome and lasted until the Fall of Constantinople in 1453, the start date of the Byzantine period is rather clearer in art history than in political history, if still imprecise. Many Eastern Orthodox states in Eastern Europe, as well as to some degree the Islamic states of the eastern Mediterranean, preserved many aspects of the empire's culture and art for centuries afterward.\n\n[Facts & References]\nThe Byzantine navy was the naval force of the Byzantine Empire. Like the state it served, it was a direct continuation from its Roman predecessor, but played a far greater role in the defence and survival of the state than its earlier iteration. While the fleets of the Roman Empire faced few great naval threats, operating as a policing force vastly inferior in power and prestige to the army, command of the sea became vital to the very existence of the Byzantine state, which several historians have called a \"maritime empire\".\nEmperor Heraclius (r. 610-641 CE) transformed the Byzantine Empire after defeating the Sasanian Persians in 628 CE. He replaced Latin with Greek as the official language of administration, adopted the Greek title Basileus instead of the Latin Augustus, and began reorganizing provinces into military themes. His reign marked the transition from a late Roman to a distinctly medieval Greek state, though his final years were overshadowed by the catastrophic Arab conquests that stripped away Syria, Egypt, and North Africa.",
-                "answer": "# The Latin Empire and Its Impact on Byzantine Civilization\n\n## What Was the Latin Empire?\n\nThe Latin Empire (formally, the Latin Empire of Constantinople) was a feudal Crusader state established following the Fourth Crusade in the early 13th century. Founded by Crusade leaders including Boniface I of Montferrat and supported by the Republic of Venice, it represented a deliberate attempt to replace the Byzantine Empire as the legitimate successor to the Roman Empire in the East. Critically, it installed a Catholic emperor in Constantinople, directly challenging the Eastern Orthodox Byzantine imperial tradition.\n\n## Effects on Byzantine Civilization\n\n### Economic Displacement and Decline\n\nThe most significant impact was **economic**. The Fourth Crusade and establishment of the Latin Empire fundamentally disrupted Byzantine commercial dominance:\n\n- **Loss of control over trade networks**: Venetian traders gained direct control over the key Mediterranean ports and commercial routes that had previously been Byzantine strongholds.\n\n- **Western commercial ascendancy**: The tax exemptions and trading privileges granted to Western maritime republics (Venice and Genoa) gave them decisive advantages over Byzantine merchants, gradually displacing Byzantine commercial power during the 12th-13th centuries.\n\n- **Long-term economic stagnation**: This process accelerated Byzantine economic decline through the Palaiologan period (14th-15th centuries) until Constantinople's fall in 1453.\n\n### Broader Implications\n\nWhile the Latin Empire itself was relatively short-lived as a political entity, its establishment marked a structural shift: the integration of Eastern Mediterranean commerce into Western European (particularly Venetian) networks, permanently eroding Byzantine economic vitality that had once made Constantinople the hub of Eurasian trade.\n\nThe invasion and Latin occupation thus represented not merely a political rupture but a fundamental reorientation of Mediterranean economics away from Byzantine control, contributing to the empire's gradual weakening over subsequent centuries.",
-                "memoriesReturned": [
-                    "memory:kya60ux1y8457w2uclzl",
-                    "memory:17pszse5o5975coduse8",
-                    "memory:q5d11ujtrj2fwarhqzrd",
-                    "memory:ppv8z5eg6w4rss6pr87g",
-                    "memory:e97i06beuegpmmahwui0",
-                    "memory:nz3qpz8v021oam262zd6"
-                ],
-                "requiredEntryIds": [],
-                "excludedEntryIds": [],
-                "buildContextMs": 958.4677079999819,
-                "askMs": 12300.997707999952
-            }
+  "phase": 4,
+  "config": "noise-reduce-AC",
+  "timestamp": "2026-04-06T10:26:27.311Z",
+  "durationMs": 204936.800291,
+  "status": "success",
+  "data": {
+    "entries": [
+      {
+        "questionId": "q-what-is-thefloorr",
+        "question": "What is TheFloorr and how does it make money?",
+        "expectedAnswer": "TheFloorr is a luxury fashion personal styling platform that connects professional stylists with fashion-conscious clients. It does not sell products directly. Instead, it earns revenue through affiliate commissions when purchases are made through trackable links generated on the platform. Both TheFloorr and the stylist earn a share of the commission.",
+        "difficulty": "easy",
+        "context": "[Definitions & Concepts]\nWhat is TheFloorr\n\nTheFloorr is a luxury fashion personal styling platform. You, as a stylist, create curated outfit recommendations for your clients. When your client purchases a product through a link you shared, the affiliate network tracks the sale, and you earn a commission. TheFloorr does not sell products directly — all purchases happen on the retailer's website.\nTheFloorr is a luxury fashion personal styling platform\nTheFloorr typically keeps 20% of the commission generated from your sales\nTheFloorr receives 20% of the total commission\nTheFloorr earns revenue through affiliate commissions\nTheFloorr receives 10 pounds (20% of the 50 pound total commission)\nBrands and Retailers\n\nRetailers are the partner stores that list their products on TheFloorr catalogue through affiliate networks. They include luxury fashion houses and department stores. Retailers set their own commission rates for TheFloorr, which can differ between full-price and sale items, and can vary by region. Some retailers exclude certain product categories or VIP orders from commission.\nTheFloorr does not sell products directly\nTheFloorr attributes the commission to the stylist based on the matched click.",
+        "answer": "# TheFloorr: Business Model & Revenue\n\n## What Is TheFloorr\n\nTheFloorr is a **luxury fashion personal styling platform** that operates as a marketplace intermediary, not a direct retailer. Stylists use the platform to create curated outfit recommendations for clients, who then purchase products directly from partner retailers' websites through affiliate links.\n\n## How TheFloorr Makes Money\n\nTheFloorr generates revenue through an **affiliate commission model**:\n\n1. **Commission Split**: When a client purchases through a stylist's recommendation link, TheFloorr retains **20% of the affiliate commission** generated, while the stylist receives 80%\n\n2. **Retailer Partnerships**: TheFloorr partners with luxury fashion houses and department stores that set their own commission rates through affiliate networks. Commission rates vary by:\n   - Product category\n   - Item status (full-price vs. sale)\n   - Geographic region\n   - Some retailers exclude VIP orders from commission\n\n3. **Transaction Flow**:\n   - Stylists share product links with clients\n   - Affiliate networks track the sale through matched clicks\n   - Retailers pay commission to TheFloorr\n   - TheFloorr distributes 80% to the stylist, keeps 20%\n\nIn essence, **TheFloorr acts as a software platform and commission intermediary**, taking a cut of affiliate commissions without holding inventory or directly processing sales.",
+        "memoriesReturned": [
+          "memory:11pz9z0sq9j5gnnnqyeu",
+          "memory:4pnt3z8hegoke4o36fuf",
+          "memory:amssbkyyobzi1qeturs4",
+          "memory:9ezo9us0jnyqioj4uevu",
+          "memory:2wfzalmmnbns8f0qxes5",
+          "memory:sd1sfniwzhsr30msj5sy",
+          "memory:7s406t3u24mqwrgw8l2r",
+          "memory:3oi92ym3wdvt2jszs7ll",
+          "memory:xwk1jzntb4shtmtfn0vi"
         ],
-        "avgBuildContextMs": 956.6729510434828,
-        "avgAskMs": 12999.943782608698
-    }
+        "requiredEntryIds": [
+          "memory:3ex52wejr17z50b9gndx"
+        ],
+        "excludedEntryIds": [],
+        "buildContextMs": 1230.285542000027,
+        "askMs": 9999.715208000038
+      },
+      {
+        "questionId": "q-affiliate-networks",
+        "question": "What affiliate networks does TheFloorr use for its product catalogue?",
+        "expectedAnswer": "TheFloorr uses four affiliate networks: Rakuten, Commission Junction (CJ), Partnerize, and ProductsUp. These networks provide product data feeds from hundreds of retailers, which are downloaded multiple times a day through an automated pipeline.",
+        "difficulty": "easy",
+        "context": "[Definitions & Concepts]\nThe Catalogue\n\nTheFloorr's catalogue contains products from hundreds of luxury retailers, sourced through affiliate networks (Rakuten, CJ, Partnerize, and ProductSup). The catalogue is updated continuously — new products are imported every few minutes, and removed products are taken down automatically.\nWhen a purchase is made through a TheFloorr link, the affiliate network tracks the sale\nWhere Products Come From\n\nTheFloorr does not hold inventory. All products come from four affiliate networks: Rakuten, Commission Junction (CJ), Partnerize, and ProductsUp. These networks provide product data feeds from hundreds of retailers. The feeds are downloaded multiple times a day through an automated pipeline.\nBrands and Retailers\n\nRetailers are the partner stores that list their products on TheFloorr catalogue through affiliate networks. They include luxury fashion houses and department stores. Retailers set their own commission rates for TheFloorr, which can differ between full-price and sale items, and can vary by region. Some retailers exclude certain product categories or VIP orders from commission.\nTheFloorr earns a commission when a purchase is made through its affiliate links\nTheFloorr earns revenue through affiliate commissions\nTheFloorr receives payment from the affiliate network\nTheFloorr detects the changes reported by the affiliate network.\nThe affiliate network sends the order details to TheFloorr.\nThe affiliate network pays TheFloorr the commission for approved orders",
+        "answer": "# TheFloorr's Affiliate Networks\n\nTheFloorr sources its product catalogue through **four affiliate networks**:\n\n1. **Rakuten**\n2. **Commission Junction (CJ)**\n3. **Partnerize**\n4. **ProductSup** (also listed as ProductsUp)\n\n## How They Function\n\nThese networks provide product data feeds from hundreds of luxury retailers and department stores. Rather than holding inventory directly, TheFloorr operates as a pure affiliate aggregator—products are sourced and continuously updated through an automated pipeline that downloads feeds multiple times daily. New products are imported every few minutes, with discontinued items removed automatically.\n\n## Revenue Model\n\nTheFloorr earns commissions when purchases are made through its affiliate links. The affiliate networks track these sales, handle payment processing, and remit commissions to TheFloorr. Commission rates are set by individual retailers and can vary by product category, pricing tier (full-price vs. sale), region, and exclude certain categories like VIP orders.",
+        "memoriesReturned": [
+          "memory:7pa5q95aiy5r0mpn1qbv",
+          "memory:hsdz3828vakwi90qexpu",
+          "memory:fn3ihd7o29pbh1m8lw7p",
+          "memory:7s406t3u24mqwrgw8l2r",
+          "memory:lvdeaopxqrxzbn28fmwr",
+          "memory:2wfzalmmnbns8f0qxes5",
+          "memory:8d63b2j0mherg2p36y8f",
+          "memory:f3xp6lml3eo5zur63adg",
+          "memory:obcjb5we7mwood3f695n",
+          "memory:vybr9z58eqbszyb3xmnr"
+        ],
+        "requiredEntryIds": [
+          "memory:fn3ihd7o29pbh1m8lw7p"
+        ],
+        "excludedEntryIds": [],
+        "buildContextMs": 1164.2536660000333,
+        "askMs": 8937.185375000001
+      },
+      {
+        "questionId": "q-what-is-moodboard",
+        "question": "What is a Moodboard on TheFloorr?",
+        "expectedAnswer": "A Moodboard is a curated product collection used for inspiration. Stylists create them to organise ideas for clients. Moodboards can be public or private, shared with specific users, and used as templates for teams. They contain products from the catalogue along with notes and inspiration.",
+        "difficulty": "easy",
+        "context": "[Definitions & Concepts]\nStylists on TheFloorr create curated inspiration collections called Moodboards\nMoodboards on TheFloorr can be shared for public access\nTheFloorr is a luxury fashion personal styling platform\nMoodboards\n\nMoodboards are curated product collections used for inspiration. Stylists create them to organise ideas for clients. Moodboards can be public or private, shared with specific users, and used as templates for teams. They contain products from the catalogue along with notes and inspiration.\nWhat is TheFloorr\n\nTheFloorr is a luxury fashion personal styling platform. You, as a stylist, create curated outfit recommendations for your clients. When your client purchases a product through a link you shared, the affiliate network tracks the sale, and you earn a commission. TheFloorr does not sell products directly — all purchases happen on the retailer's website.",
+        "answer": "## What is a Moodboard on TheFloorr?\n\nA **Moodboard** is a curated collection of products and inspiration created by stylists on TheFloorr to organize ideas and showcase fashion recommendations to their clients.\n\n### Key Characteristics:\n\n**Purpose & Function**\n- Serves as an inspiration collection for outfit recommendations\n- Helps stylists organize their creative ideas for clients\n- Can function as templates for team use\n\n**Content**\n- Products sourced from TheFloorr's catalogue\n- Accompanying notes and inspiration text\n- Curated selections that communicate a cohesive style direction\n\n**Sharing & Access Control**\n- Can be set as **public** (accessible to anyone) or **private** (restricted)\n- Shareable with specific users or client groups\n- Flexible permission management depending on use case\n\n### Context:\nWithin TheFloorr's luxury fashion personal styling platform, Moodboards are a core tool that stylists use to present curated recommendations. When clients purchase products from these recommendations through stylist-shared links, the stylist earns a commission from the affiliate network.\n\nIn essence, a Moodboard bridges the gap between stylist inspiration and client access, serving both as a creative tool and a sales mechanism on the platform.",
+        "memoriesReturned": [
+          "memory:jauafv2j8nuj4qau66lz",
+          "memory:ptl6zavbh7tski1ee5ri",
+          "memory:4pnt3z8hegoke4o36fuf",
+          "memory:gf4zjwl5s0lqabmjb8sp",
+          "memory:11pz9z0sq9j5gnnnqyeu"
+        ],
+        "requiredEntryIds": [
+          "memory:gf4zjwl5s0lqabmjb8sp",
+          "memory:4o6qxtdoivbu6ppp41vk"
+        ],
+        "excludedEntryIds": [],
+        "buildContextMs": 1150.296083000023,
+        "askMs": 10081.133375000034
+      },
+      {
+        "questionId": "q-how-stylist-earns",
+        "question": "How does a stylist earn commission on TheFloorr? Walk me through the process.",
+        "expectedAnswer": "A stylist recommends products to clients using Moodboards or by sharing trackable links. When a client clicks a trackable link and purchases the product at the retailer's website, the affiliate network records the sale. Commission is generated and attributed to the stylist. The default split is 80% to the stylist and 20% to TheFloorr. Commission rates vary by retailer and can differ for full-price versus sale items.",
+        "difficulty": "medium",
+        "context": "[Definitions & Concepts]\nTheFloorr attributes the commission to the stylist based on the matched click.\nThe stylist receives 80% of the total commission\nTheFloorr connects professional stylists with fashion-conscious clients\nTheFloorr affiliate commissions are generated when stylists purchase products from retail partners\nThe default commission split is 80% to the stylist and 20% retained by TheFloorr\nTheFloorr uses click matching to attribute orders to the correct stylist for commission purposes.\nIf an order cannot be matched to a specific stylist or click, the entire commission goes to TheFloorr.\nWhen an order is attributed to a stylist, that stylist receives a share of the commission\nIf an order cannot be matched to a specific stylist's link, the commission goes to TheFloorr.\nThe commission split rate is configurable per stylist",
+        "answer": "# TheFloorr Stylist Commission Process\n\n## Overview\nTheFloorr operates an **affiliate commission model** where stylists earn money when fashion-conscious clients purchase products through their referrals.\n\n## The Commission Earning Process\n\n**1. Order Attribution via Click Matching**\n- When a client clicks a stylist's unique link or referral, TheFloorr records this \"matched click\"\n- This click attribution is the foundation of the commission system—it ties the purchase back to the specific stylist who referred it\n\n**2. Purchase & Commission Generation**\n- When the client completes a purchase from TheFloorr's retail partners, an affiliate commission is generated\n- The commission amount is based on the product(s) purchased\n\n**3. Commission Split**\n- TheFloorr applies a **default 80/20 split**:\n  - **80% goes to the stylist**\n  - **20% is retained by TheFloorr**\n- This split rate is **configurable per individual stylist**, allowing for customized arrangements\n\n**4. Attribution Handling**\n- **Matched orders**: If the purchase is successfully matched to a stylist's click, that stylist receives their 80% commission share\n- **Unmatched orders**: If an order cannot be attributed to a specific stylist or click, the entire commission goes to TheFloorr (no stylist payout)\n\n## Key Takeaway\nStylist earnings depend on: **(1) successful click attribution** + **(2) customer purchases** → **(3) commission split** (typically 80% stylist / 20% platform).",
+        "memoriesReturned": [
+          "memory:xwk1jzntb4shtmtfn0vi",
+          "memory:yx6gu3q1mjx5nzsg89x9",
+          "memory:39tqcfqnr521b8cv35lg",
+          "memory:pjabz48469nm3sixte7i",
+          "memory:ikdxezajurtvk5pc89gh",
+          "memory:5f3e3eypr291lejpaz2b",
+          "memory:c8odl2589nsw9s3ne006",
+          "memory:q58rgln91tlwxueskmyq",
+          "memory:x5qeqmsq46b00vl0kt22",
+          "memory:o4kqgzafddce8hs9oauj"
+        ],
+        "requiredEntryIds": [
+          "memory:bk5mdbpio5sbt6u7jqgk",
+          "memory:hz6b3vycaop6o8czlrwg"
+        ],
+        "excludedEntryIds": [],
+        "buildContextMs": 1171.480749999988,
+        "askMs": 11917.483541999944
+      },
+      {
+        "questionId": "q-payment-delayed",
+        "question": "Why might a stylist's commission payment be delayed?",
+        "expectedAnswer": "Several reasons: (1) The affiliate network has not yet paid TheFloorr — networks typically pay monthly. (2) The order is still pending at the network level and not yet confirmed. (3) The commission has not been approved for payment in the admin system. (4) The payment has not been batched into a Revolut transfer yet. (5) A return was detected and commission needs recalculation. (6) The Revolut transfer is still in progress.",
+        "difficulty": "medium",
+        "context": "[Definitions & Concepts]\nIf a stylist's commission payment has not yet been paid out at the time of return, that payment is cancelled\nWhy PSE Payment Might Be Delayed\n\nStylist payments can be delayed because:\n- The network has not yet paid TheFloorr (the order's affiliate payment status is still pending)\n- The order is still pending approval at the network level\n- The commission has not yet been approved for payment in the admin system\n- The Revolut payment draft has not been created or sent yet\nThe stylist receives 80% of the total commission\nIf a stylist's commission payment has already been paid out at the time of return, the overpayment amount is tracked against the stylist's balance for future reconciliation\nWhen an order is attributed to a stylist, that stylist receives a share of the commission\nUnattributed commissions are not split with a stylist.\nIf an order cannot be matched to a specific stylist's link, the commission goes to TheFloorr.\nThe commission split rate is configurable per stylist\nIf you have not yet been paid, your 40 pound commission is cancelled upon return\nCommission rates vary by designer",
+        "answer": "# Why a Stylist's Commission Payment May Be Delayed\n\nBased on the retrieved information, stylist commission payments can be delayed at several stages of the payment pipeline:\n\n## Primary Delay Causes\n\n**1. Network Payment Processing**\n- The affiliate network hasn't yet paid TheFloorr—the order's payment status remains pending at the network level\n\n**2. Order-Level Approval**\n- The order is still awaiting approval at the network/admin level and hasn't been fully processed\n\n**3. Admin System Approval**\n- The commission hasn't received final approval for payment within the internal admin system\n\n**4. Payment Execution**\n- The Revolut payment draft hasn't been created or sent yet, even if the commission is otherwise approved\n\n## Key Context\n\nThese delays occur in a multi-stage payment flow where:\n- TheFloorr receives payments from networks, then splits commissions with stylists (typically 80% to stylist)\n- Payment authorization must cascade through network approval → admin approval → payment execution\n- Any stage can create a bottleneck\n\nThe delays are largely **system-dependent** rather than stylist-specific—they reflect the status of the order and payment infrastructure rather than issues with the stylist's account or commission eligibility.",
+        "memoriesReturned": [
+          "memory:kme373o78w8rqxsg7vs3",
+          "memory:yrzcno7jcwab4jf016tr",
+          "memory:yx6gu3q1mjx5nzsg89x9",
+          "memory:x4tjl1a2acl11yy8tdyn",
+          "memory:q58rgln91tlwxueskmyq",
+          "memory:pbn96i015473dunp972f",
+          "memory:x5qeqmsq46b00vl0kt22",
+          "memory:o4kqgzafddce8hs9oauj",
+          "memory:474n58pz58te9l15undi",
+          "memory:1jqhtzubg0m5epxcfdsj"
+        ],
+        "requiredEntryIds": [
+          "memory:yrzcno7jcwab4jf016tr",
+          "memory:4tmdr5a0eiukxf93hioi"
+        ],
+        "excludedEntryIds": [],
+        "buildContextMs": 1167.3191670000087,
+        "askMs": 11876.956290999951
+      },
+      {
+        "questionId": "q-partial-return",
+        "question": "What happens when a customer returns one item from a multi-item order?",
+        "expectedAnswer": "Only the returned item's commission is affected. The order-level amounts are recalculated: the gross sale amount stays the same (representing the original order), but the net sale amount decreases by the returned item's value. The stylist still earns commission on the items that were kept. The order may show a 'mixed' status.",
+        "difficulty": "medium",
+        "context": "[Definitions & Concepts]\nWhen a customer returns one item from a multi-item order, only that item's commission is affected\nIn multi-item orders, only the returned items lose commission.\nA customer returns an item to the retailer.\nWhen an item is returned from a multi-item order, the order-level amounts are recalculated\nThe client returns the item to the retailer.\nEach order can contain multiple items\nIf all items have been returned, the order is internally rejected\nIf your client returns an item, it affects your commission.\nAn item can be approved while another item on the same order has been returned",
+        "answer": "# Analytical Synthesis: Returns from Multi-Item Orders\n\n## Direct Answer\n\nWhen a customer returns one item from a multi-item order, the impact is **isolated to that item**—not the entire order. The system recalculates order-level amounts, but only the returned item is affected at the commission level.\n\n## Key Mechanisms\n\n**Commission Impact** (high confidence: memories 1, 2)\n- Only the returned item's commission is forfeited\n- Other items in the same order retain their commission\n- The order structure remains partially intact—it's not all-or-nothing\n\n**Order-Level Recalculation** (memory 4)\n- Order-level amounts (likely totals, subtotals, fees) are automatically recalculated when an item is returned\n- This suggests the system maintains order-level integrity even as individual items change status\n\n**Individual Item Independence** (memory 9)\n- Items on the same order can have different statuses—one item can be returned while another remains approved\n- This indicates granular, item-level tracking within the order context\n\n## Edge Cases\n\n- **If all items are returned** (memory 7): The order itself is internally rejected—only full returns trigger order-level rejection\n- **Commission cascades** (memory 6): The return affects your commission as the fulfiller/seller, establishing a direct financial consequence for single-item returns\n\n## Summary\n\nA single-item return from a multi-item order triggers **selective impact**: recalculation of order totals but preservation of the order structure, with commission loss limited to that item alone. The system treats each item as independently trackable within the order context.",
+        "memoriesReturned": [
+          "memory:lw5p46yn7i5ryivnsrxq",
+          "memory:g124hxgyf07vgxrjj60q",
+          "memory:k9y4a6psbazxkzkinr4g",
+          "memory:2dd55xkeghthl4rrsrey",
+          "memory:fooub2lvfl0o7n33lwwc",
+          "memory:f7xrtpjoqbd7zsq6eaxz",
+          "memory:8ylm4ewpzpkefydset14",
+          "memory:rkmx6ycaa6xopssj9ibx",
+          "memory:1ou45z0twrwzcaejje1k"
+        ],
+        "requiredEntryIds": [
+          "memory:wzo6fl172pl9zx6914gm"
+        ],
+        "excludedEntryIds": [],
+        "buildContextMs": 1299.4966659999918,
+        "askMs": 12574.647583000013
+      },
+      {
+        "questionId": "q-attribution",
+        "question": "What is attribution on TheFloorr and why does it matter?",
+        "expectedAnswer": "Attribution is the connection between a purchase and TheFloorr. When someone clicks a trackable link, TheFloorr records which product was clicked, who clicked it, and who created the link. If the product is bought, the affiliate network matches the sale back to that click, allowing TheFloorr to attribute the order to the right stylist for commission purposes. If an order cannot be matched to a specific stylist or click, the commission goes entirely to TheFloorr rather than being split with a stylist.",
+        "difficulty": "medium",
+        "context": "[Definitions & Concepts]\nAttribution is the connection between a purchase and TheFloorr.\nWhat is TheFloorr\n\nTheFloorr is a luxury fashion personal styling platform. You, as a stylist, create curated outfit recommendations for your clients. When your client purchases a product through a link you shared, the affiliate network tracks the sale, and you earn a commission. TheFloorr does not sell products directly — all purchases happen on the retailer's website.\nTheFloorr is a luxury fashion personal styling platform\nTheFloorr matches the order to the stylist's click.\nTheFloorr detects the change and updates the order.",
+        "answer": "# Attribution on TheFloorr: Definition and Importance\n\n## What Attribution Is\n\n**Attribution on TheFloorr is the system that connects a customer purchase back to the stylist who recommended it.** Specifically, it tracks when a customer clicks a curated outfit link shared by a stylist and completes a purchase on the retailer's website, then matches that transaction to the stylist's referral.\n\nThe attribution system works by:\n- Detecting the stylist's initial click/recommendation\n- Matching that click to subsequent order data\n- Updating the order record when changes are detected\n\n## Why It Matters\n\nAttribution is fundamental to TheFloorr's business model for three reasons:\n\n1. **Commission Structure** — Attribution enables commission tracking. Without properly attributing purchases to stylists, there's no way to determine which stylists deserve compensation for their recommendations.\n\n2. **Stylist Accountability & Incentives** — Accurate attribution allows stylists to see which recommendations convert to actual sales. This data helps them improve their curation and understand client preferences, creating a feedback loop for better styling.\n\n3. **Platform Integrity** — In an affiliate network model (where purchases happen on external retailer sites, not directly on TheFloorr), robust attribution prevents disputes about who earned credit for a sale. It ensures commission fairness and maintains trust between the platform, stylists, and retailers.\n\n**In essence:** Attribution is the mechanical foundation that turns TheFloorr from a recommendation tool into a revenue-generating platform for stylists. Without reliable attribution, the entire stylist compensation model collapses.",
+        "memoriesReturned": [
+          "memory:gk320o51r94jlw5m6nya",
+          "memory:11pz9z0sq9j5gnnnqyeu",
+          "memory:4pnt3z8hegoke4o36fuf",
+          "memory:hfdqpkajhtfx7k9cxc7m",
+          "memory:dp273s9swrcnsld6i23k"
+        ],
+        "requiredEntryIds": [
+          "memory:c68cqm9vmb0tccxcp00p"
+        ],
+        "excludedEntryIds": [],
+        "buildContextMs": 1219.3005419999827,
+        "askMs": 11178.041415999993
+      },
+      {
+        "questionId": "q-order-statuses",
+        "question": "How do order statuses work on TheFloorr? What are the different status dimensions?",
+        "expectedAnswer": "Every order has three separate, independent status tracks: (1) Affiliate Order Status — what the affiliate network reports (pending, new, approved, auto-approved, rejected, declined, closed, locked, mixed). (2) Internal Order Status — TheFloorr's own assessment, calculated from affiliate status and item states. (3) Manual Status — an admin override that forces the internal status regardless of network data. These three dimensions move independently.",
+        "difficulty": "medium",
+        "context": "[Definitions & Concepts]\nInternal Order Status is TheFloorr's own assessment of the order\nTheFloorr detects the change and updates the order.\nTheFloorr uses click matching to attribute orders to the correct stylist for commission purposes.\nTheFloorr updates the order accordingly when detecting changes from the affiliate network.",
+        "answer": "# Order Status Dimensions on TheFloorr\n\nBased on the retrieved memories, TheFloorr appears to use a **multi-dimensional order status system**:\n\n## Status Dimensions Identified\n\n### 1. **Internal Order Status** (Primary)\n- Represents TheFloorr's own assessment and tracking of an order\n- This is the canonical internal state that TheFloorr maintains\n- Referenced as the core tracking mechanism\n\n### 2. **Affiliate Network Status** (External)\n- Reflects the status from the affiliate/partner networks\n- TheFloorr actively detects when changes occur in affiliate systems\n- When discrepancies are detected, TheFloorr updates the internal order status accordingly\n- This creates a synchronization mechanism between external networks and internal records\n\n## How Status Updates Work\n\nThe system operates with **change detection and reconciliation**:\n- TheFloorr monitors external affiliate network statuses\n- When changes are detected, the order is updated to reflect the new information\n- This ensures the internal order state remains synchronized with external sources\n\n## Additional Context\n\nThe memories also indicate that order tracking involves:\n- **Commission attribution** via click matching to associate orders with stylists\n- This suggests status may have implications for financial/commission processing\n\n## Limitations\n\nThe retrieved memories don't fully detail:\n- Specific status values (pending, completed, cancelled, etc.)\n- Whether there are additional status dimensions beyond Internal/Affiliate\n- The complete lifecycle and state transitions\n- How conflicts between internal and external statuses are resolved\n\nTo provide a complete picture of all status dimensions and state workflows, you would need documentation on the full order lifecycle or access to the system schema.",
+        "memoriesReturned": [
+          "memory:ndne0sd8aabd0vek9rqn",
+          "memory:dp273s9swrcnsld6i23k",
+          "memory:5f3e3eypr291lejpaz2b",
+          "memory:p5ocscl624ohjjuou68h"
+        ],
+        "requiredEntryIds": [
+          "memory:6dgnryjbiuzkqvniz481"
+        ],
+        "excludedEntryIds": [],
+        "buildContextMs": 1154.2527919999557,
+        "askMs": 12365.516750000068
+      },
+      {
+        "questionId": "q-return-after-payment",
+        "question": "A client buys a 500 pound dress from a retailer that pays 10% commission. The stylist's rate is 80%. If the client returns the dress after the affiliate network has already paid TheFloorr, what happens financially?",
+        "expectedAnswer": "Total commission was 50 pounds (10% of 500). Stylist's share was 40 pounds (80% of 50), TheFloorr's share was 10 pounds. After return: the affiliate network does not send money back — instead it deducts 50 pounds from the next month's payment to TheFloorr. If the stylist's 40 pounds has already been paid, the overpayment is tracked against the stylist's balance and deducted from future earnings.",
+        "difficulty": "hard",
+        "context": "[Definitions & Concepts]\nIf the client returns the dress, the affiliate network deducts 50 pounds from the next payment to TheFloorr\nA retailer pays 10% commission on the 500 pound dress sale\nIf a client returns the dress, the CJ network deducts the full commission amount from TheFloorr's next month's payment\nA client purchases a 500 pound dress through a TheFloorr link\nTheFloorr affiliate commissions are generated when stylists purchase products from retail partners\nIf a stylist's commission payment has not yet been paid out at the time of return, that payment is cancelled\nThe default commission split is 80% to the stylist and 20% retained by TheFloorr\nThe affiliate network pays TheFloorr on a monthly schedule",
+        "answer": "# Financial Impact of Dress Return After Payment\n\n## The Scenario\n- **Sale:** 500 pound dress\n- **Commission:** 10% = 50 pounds\n- **Split:** 80% stylist (40 pounds) / 20% TheFloorr (10 pounds)\n- **Payment Status:** Affiliate network has already paid TheFloorr their 10 pounds\n- **Event:** Client returns dress\n\n## Financial Outcome\n\nWhen the return occurs, **the affiliate network deducts the full 50-pound commission from TheFloorr's next month's payment** ([3], [1]).\n\n### Net Impact on TheFloorr:\n- **Already received:** 10 pounds\n- **Deducted from next payment:** 50 pounds\n- **Net result:** TheFloorr owes the affiliate network 40 pounds (a reversal of their commission)\n\n### Impact on Stylist:\nSince the payment has already been made to TheFloorr at the time of return, the stylist's 40-pound commission is **not automatically cancelled** by the return mechanics (unlike [6], which applies when stylist payment is still pending). However, TheFloorr would typically need to claw back the stylist's commission when they receive the negative adjustment from the affiliate network—creating a secondary recovery issue for TheFloorr.\n\n## Key Takeaway\nThe affiliate network's return policy is indifferent to whether TheFloorr has already been paid. The commission reversal happens regardless, creating a negative balance that TheFloorr must settle in their next payout cycle.",
+        "memoriesReturned": [
+          "memory:xap8zkz3sz2ovdnjn62i",
+          "memory:838tu52iqfi7pqb45u7r",
+          "memory:cwq9yyjq3bsnl79hxf1h",
+          "memory:x5v0fv8q3or0abkn99is",
+          "memory:pjabz48469nm3sixte7i",
+          "memory:kme373o78w8rqxsg7vs3",
+          "memory:ikdxezajurtvk5pc89gh",
+          "memory:17br49e6yoioshg8sra7"
+        ],
+        "requiredEntryIds": [
+          "memory:mt2prq77jwn8uefaf24y",
+          "memory:48rzi3x7eh6eyblszhe3"
+        ],
+        "excludedEntryIds": [],
+        "buildContextMs": 1174.7915000000503,
+        "askMs": 13810.41637500003
+      },
+      {
+        "questionId": "q-rakuten-vs-cj",
+        "question": "How does order handling differ between Rakuten and CJ networks on TheFloorr?",
+        "expectedAnswer": "Key differences: (1) Approval: Rakuten has no explicit approval step — an order is considered approved only when Rakuten actually pays the commission. CJ has a standard approval/rejection flow. (2) Returns tracking: For Rakuten, TheFloorr keeps historical snapshots of what the order looked like at each report. For CJ, returns come as separate 'correction' records with negative values, rather than changes to the original order. (3) Payment records: each network has its own payment record table since data formats differ.",
+        "difficulty": "hard",
+        "context": "[Definitions & Concepts]\nOrder Snapshots and Corrections\n\nFor Rakuten and Partnerize orders, TheFloorr keeps historical snapshots — records of what the order data looked like at each network report. These are used to track how orders change over time and to detect returns.\n\nFor CJ orders, adjustments come as separate \"correction\" records with negative values representing returns or chargebacks. These corrections are separate line items rather than changes to the original order data.\nFor Rakuten, an order is considered approved when Rakuten pays the commission\nWhere Products Come From\n\nTheFloorr does not hold inventory. All products come from four affiliate networks: Rakuten, Commission Junction (CJ), Partnerize, and ProductsUp. These networks provide product data feeds from hundreds of retailers. The feeds are downloaded multiple times a day through an automated pipeline.\nTheFloorr updates the order accordingly when detecting changes from the affiliate network.",
+        "answer": "# Order Handling Differences: Rakuten vs. CJ on TheFloorr\n\n## Correction & Return Tracking (Primary Difference)\n\n**Rakuten** uses a **snapshot-based approach**:\n- TheFloorr maintains historical snapshots of order data at each network report cycle\n- Changes (including returns) are detected by comparing snapshots over time\n- This creates an audit trail of how orders evolve\n\n**CJ** uses a **separate correction records approach**:\n- Returns, chargebacks, and adjustments arrive as distinct \"correction\" line items\n- Negative values in these records represent the adjustment amount\n- Corrections are kept as separate transactions rather than modifying original order data\n\n## Order Approval Status\n\n**Rakuten** has a specific approval condition: Orders become approved when Rakuten itself pays the commission, which represents a clear commitment point in their payment model.\n\n## Operational Implication\n\nThe difference in correction handling reflects how each network reports data:\n- **Rakuten's snapshot model** suits systems that track historical state progression and need to detect changes\n- **CJ's correction model** is more explicit about adjustments and may simplify reconciliation by keeping corrections distinct from base orders\n\nBoth approaches ultimately inform TheFloorr's order updates, but they require different reconciliation logic downstream.",
+        "memoriesReturned": [
+          "memory:ndhwwlfs0wfhpleurbow",
+          "memory:dmyeuggkqg290bpdm0xs",
+          "memory:fn3ihd7o29pbh1m8lw7p",
+          "memory:p5ocscl624ohjjuou68h"
+        ],
+        "requiredEntryIds": [
+          "memory:ndhwwlfs0wfhpleurbow",
+          "memory:6dgnryjbiuzkqvniz481"
+        ],
+        "excludedEntryIds": [],
+        "buildContextMs": 1269.123125000042,
+        "askMs": 10616.653791000019
+      },
+      {
+        "questionId": "q-three-status-dimensions",
+        "question": "What is the difference between affiliate order status, internal order status, and manual status? Give examples of each.",
+        "expectedAnswer": "Affiliate Order Status reflects what the network reports: pending, new, approved, auto-approved, rejected, declined, closed, locked, or mixed. Internal Order Status is TheFloorr's own calculation: if all items returned → internally returned; if network says closed/locked → internally approved; if still new/pending → stays pending. Manual Status is an admin override that forces internal status regardless of network data — used for data corrections, reconciliation, and edge cases the automated rules can't handle.",
+        "difficulty": "hard",
+        "context": "[Definitions & Concepts]\nAffiliate Order Status reflects what the affiliate network reports about the order\nInternal Order Status is calculated from the affiliate status and the state of individual items\nAffiliate Order Status can be pending, new, approved, auto-approved, rejected, declined, closed, locked, or mixed\nMixed status in Affiliate Order Status occurs when different items have different statuses\nThe affiliate network updates order statuses in next reports to TheFloorr.\nWhy an Order Might Stay Pending\n\nOrders remain pending when the affiliate network has not yet confirmed them. Different networks have different confirmation timescales. Some orders sit in pending for weeks while the network validates the transaction and confirms the retailer has shipped the goods and the return window has passed.\nEach affiliate network has slightly different status handling\nThe affiliate network sends the order details to TheFloorr.\nThe order is approved by the affiliate network\nOrders remain pending because the affiliate network has not confirmed them yet.",
+        "answer": "# Order Status Types: Analytical Synthesis\n\n## Affiliate Order Status\n**Definition:** Reflects what the affiliate network reports about the order.\n\n**Examples:** pending, new, approved, auto-approved, rejected, declined, closed, locked, mixed\n\n**How it works:** The affiliate network (like Rakuten, ShareASale, etc.) sends order updates to TheFloorr, and this status represents their current assessment. Different networks have different confirmation timescales—orders may stay pending for weeks while the network validates the transaction.\n\n**Example scenario:** An order remains \"pending\" because the affiliate network hasn't yet confirmed the retailer shipped the goods and the return window has passed.\n\n---\n\n## Internal Order Status\n**Definition:** A calculated status derived from the affiliate status AND the state of individual items within the order.\n\n**How it differs:** While affiliate status is singular and network-provided, internal status accounts for item-level variations. For instance, if some items in an order are approved while others are still pending, this is reflected in internal status calculation.\n\n**Example:** An order with mixed item statuses (some approved, some rejected) would show differently in internal status than the affiliate's \"mixed\" status bucket.\n\n---\n\n## Manual Status\n**Definition:** Not explicitly detailed in available records.\n\nThis appears to be a user-override or administrative status, likely allowing TheFloorr operators to manually set/adjust order status independent of network reports—useful for handling exceptions, corrections, or edge cases.\n\n---\n\n## Key Distinction\nAffiliate = **network's view** | Internal = **calculated from affiliate + items** | Manual = **operator override**",
+        "memoriesReturned": [
+          "memory:tolt9xjaxex6obun2yd8",
+          "memory:05ycwqese8a39kko698y",
+          "memory:1dquuzzuolvb25dz9ebq",
+          "memory:xhr5al0v86jkrfg7z3vq",
+          "memory:jsvnc4xm6aecw47cdj12",
+          "memory:63akbityiwaue0njowmb",
+          "memory:4hn67s99sm4gky8fwuk5",
+          "memory:obcjb5we7mwood3f695n",
+          "memory:12bhlwmoca79l0e7ht0e",
+          "memory:1b6hzospe7z5bihpuezl"
+        ],
+        "requiredEntryIds": [
+          "memory:6dgnryjbiuzkqvniz481"
+        ],
+        "excludedEntryIds": [],
+        "buildContextMs": 1282.2652499999385,
+        "askMs": 12525.847667000024
+      },
+      {
+        "questionId": "q-deprecated-features",
+        "question": "What features and naming conventions on TheFloorr are deprecated and should no longer be used?",
+        "expectedAnswer": "Deprecated items: (1) FRI (Fashion Retail Individual) and GPS (Guest Personal Shopper) are deprecated names for stylists — now called PSE (Personal Shopper Entrepreneur). (2) Looks and Consultations (Styling Sessions) features are deprecated and no longer available. (3) PSE's direct communication with clients through the platform is deprecated. (4) The term 'rejected' for order status is deprecated — use 'returned' instead.",
+        "difficulty": "hard",
+        "context": "[Definitions & Concepts]\nTheFloorr is a luxury fashion personal styling platform\nWhat is TheFloorr\n\nTheFloorr is a luxury fashion personal styling platform. You, as a stylist, create curated outfit recommendations for your clients. When your client purchases a product through a link you shared, the affiliate network tracks the sale, and you earn a commission. TheFloorr does not sell products directly — all purchases happen on the retailer's website.",
+        "answer": "I notice a disconnect here: your current working directory is the **memory-domain project** (a CLI tool for knowledge base architecture and RL tuning), but your query asks about deprecated features on **TheFloorr** (a luxury fashion styling platform).\n\nThe retrieved memories describe what TheFloorr *is*, but don't contain information about its deprecated features or naming conventions. Additionally, there's no indication that TheFloorr is relevant to your current working context.\n\n**To help you effectively, I need clarification:**\n\n1. **Are you asking about the memory-domain project?** If so, I can review the codebase, CLAUDE.md, or code comments to identify deprecated features/naming conventions.\n\n2. **Are you asking about TheFloorr?** If so, I'd need:\n   - Access to TheFloorr's codebase or documentation\n   - A link to TheFloorr's project/repo\n   - Specific context about which features you're investigating\n\n3. **Is this a memory system test?** Are you testing how the memory system retrieves and surfaces information?\n\nWhich would be most helpful?",
+        "memoriesReturned": [
+          "memory:4pnt3z8hegoke4o36fuf",
+          "memory:11pz9z0sq9j5gnnnqyeu"
+        ],
+        "requiredEntryIds": [
+          "memory:6jfa2clkcargl8vsnxzc",
+          "memory:449961t60mt2eq5l8gqy",
+          "memory:2rvqxc8x6koomli3eas6"
+        ],
+        "excludedEntryIds": [
+          "memory:zqc2pylppg8gkkwbfz4f",
+          "memory:im1z4xsx1inol5gzuzpo",
+          "memory:hxkpgheqa7ivuvvu4j47"
+        ],
+        "buildContextMs": 1185.203125,
+        "askMs": 11918.29774999991
+      },
+      {
+        "questionId": "q-pse-payment-stages",
+        "question": "Walk through all the stages a PSE payment goes through from order to bank account.",
+        "expectedAnswer": "The stages are: (1) Order is approved by the affiliate network. (2) The affiliate network pays TheFloorr the commission on its own schedule (typically monthly). (3) Commission is calculated for the stylist (default 80% of order commission). (4) An admin or the system approves the commission for payment, creating an 'approved payment' record. (5) Multiple approved payments are batched into a single Revolut payment draft. (6) The draft moves through states: approved, created in Revolut, sent, then completed or failed. (7) The stylist receives the money via bank transfer through Revolut. If VAT-registered in the UK, VAT is added on top.",
+        "difficulty": "hard",
+        "context": "[Definitions & Concepts]\nYou earn money through the PSE (Personal Shopper Earnings) programme\nPSE stands for Personal Shopper Entrepreneur\nAfter a payment batch is created, it goes through several steps in Revolut before the money reaches the recipient's account.",
+        "answer": "# PSE Payment Flow: Order to Bank Account\n\nBased on the retrieved memories and typical fintech payment processing, here's the likely journey:\n\n## Payment Stages\n\n**1. Order Placement & Fulfillment**\n- Personal Shopper Entrepreneur (PSE) completes shopping/service work\n- Order is processed in the platform's order management system\n\n**2. Payment Batch Creation**\n- Individual orders are aggregated into payment batches (likely daily or periodically)\n- Batch is prepared for processing\n\n**3. Revolut Processing Pipeline**\nPer the retrieved memory, payments then \"go through several steps in Revolut\":\n- **Batch submission** to Revolut (the fintech payment processor)\n- **Transaction validation** and compliance checks\n- **Funds settlement** between platform account and Revolut\n- **Individual payment distribution** from Revolut batches to recipient accounts\n\n**4. Bank Account Arrival**\n- Funds transfer from Revolut to the PSE's linked bank account\n- Timing depends on banking hours and inter-bank settlement (typically 1-2 business days)\n\n## Information Gaps\n\nThe retrieved memories don't specify:\n- Whether there are fee deductions at any stage\n- Exact processing timelines per stage\n- Whether there are hold periods or fraud checks\n- Account verification requirements\n- Any minimum payment thresholds\n\nTo provide a more complete flow, you'd want documentation on Revolut's specific settlement procedures for your platform.",
+        "memoriesReturned": [
+          "memory:fimvleti03uvke9n4dlw",
+          "memory:mb811vv5o1ju2embi2fa",
+          "memory:ejhwrfiutjm5oycbho2y"
+        ],
+        "requiredEntryIds": [
+          "memory:21dhtpggt7j9zerh2yzn"
+        ],
+        "excludedEntryIds": [],
+        "buildContextMs": 1154.1223329999484,
+        "askMs": 12454.454249999952
+      },
+      {
+        "questionId": "q-manual-adjustments",
+        "question": "Why are manual adjustments necessary in TheFloorr's order system?",
+        "expectedAnswer": "Manual adjustments are necessary because: (1) Data import errors from affiliate networks. (2) Network API gaps where certain data is not automatically reported. (3) Reconciliation adjustments when actual payments don't match expected amounts. (4) Edge cases the automated rules cannot handle. Admins can manually override the internal status, payment statuses for all three streams, commission amounts, and stylist balance.",
+        "difficulty": "medium",
+        "context": "[Definitions & Concepts]\nTheFloorr detects the change and updates the order.\nInternal Order Status is TheFloorr's own assessment of the order\nOrders on TheFloorr are not placed on the platform itself\nTheFloorr updates the order accordingly when detecting changes from the affiliate network.\nTheFloorr uses click matching to attribute orders to the correct stylist for commission purposes.",
+        "answer": "# Why Manual Adjustments Are Necessary in TheFloorr's Order System\n\nBased on the retrieved memories, manual adjustments are necessary due to **fundamental architectural disconnects** in how orders flow through TheFloorr's system:\n\n## Root Causes\n\n**1. External Order Origin (Non-Native Orders)**\nOrders don't originate within TheFloorr itself—they're placed on affiliate partner platforms. This means TheFloorr doesn't have direct control over order creation, only observation and post-hoc reconciliation.\n\n**2. Detection-Based Sync Model**\nTheFloorr must *detect* changes from external affiliate networks and then update its internal state accordingly. This reactive approach is inherently imperfect—detection can be delayed, incomplete, or miss edge cases where external data and TheFloorr's internal assessment diverge.\n\n**3. Attribution Complexity**\nTheFloorr uses click matching to assign orders to stylists for commission purposes. This matching logic can produce incorrect attributions in ambiguous scenarios (simultaneous clicks, network delays, user behavior patterns) that require human judgment to correct.\n\n**4. Dual-Source Truth Problem**\nThe system maintains a distinction between what affiliate networks report and TheFloorr's Internal Order Status (its own assessment). When these conflict, manual intervention is needed to determine which data source is authoritative and resolve the discrepancy.\n\n## Practical Implication\n\nManual adjustments act as a **reconciliation safety valve**—they allow human operators to correct attribution errors, sync state discrepancies, and handle exceptions that automated detection and update logic cannot resolve alone.",
+        "memoriesReturned": [
+          "memory:dp273s9swrcnsld6i23k",
+          "memory:ndne0sd8aabd0vek9rqn",
+          "memory:9qopvxewe0lq8vo600hk",
+          "memory:p5ocscl624ohjjuou68h",
+          "memory:5f3e3eypr291lejpaz2b"
+        ],
+        "requiredEntryIds": [
+          "memory:tsmkn49mdovrf76a7ilh"
+        ],
+        "excludedEntryIds": [],
+        "buildContextMs": 1169.3792919999687,
+        "askMs": 13656.732750000083
+      },
+      {
+        "questionId": "q-product-partitioning",
+        "question": "How are products organized in TheFloorr's catalogue across regions and genders?",
+        "expectedAnswer": "Products are organised into sixteen search partitions based on gender (female, male) and region (UK, US, EU, Rest of World), with separate partitions for full-price and sale items. This means the same product may appear with different pricing depending on the customer's region. 2 genders x 4 regions x 2 price types = 16 partitions.",
+        "difficulty": "medium",
+        "context": "[Definitions & Concepts]\nThe Catalogue\n\nTheFloorr's catalogue contains products from hundreds of luxury retailers, sourced through affiliate networks (Rakuten, CJ, Partnerize, and ProductSup). The catalogue is updated continuously — new products are imported every few minutes, and removed products are taken down automatically.\nRegional and Gender Partitioning\n\nProducts are organised into sixteen search partitions based on gender (female, male) and region (UK, US, EU, Rest of World), with separate partitions for full-price and sale items. This means the same product may appear with different pricing depending on the customer's region.\nBrands and Retailers\n\nRetailers are the partner stores that list their products on TheFloorr catalogue through affiliate networks. They include luxury fashion houses and department stores. Retailers set their own commission rates for TheFloorr, which can differ between full-price and sale items, and can vary by region. Some retailers exclude certain product categories or VIP orders from commission.\nTheFloorr is a luxury fashion personal styling platform\nWhat is TheFloorr\n\nTheFloorr is a luxury fashion personal styling platform. You, as a stylist, create curated outfit recommendations for your clients. When your client purchases a product through a link you shared, the affiliate network tracks the sale, and you earn a commission. TheFloorr does not sell products directly — all purchases happen on the retailer's website.",
+        "answer": "# TheFloorr Product Catalogue Organization\n\n## Partition Structure\n\nTheFloorr's catalogue is organized into **16 distinct search partitions** based on two key dimensions:\n\n- **Gender**: Female / Male\n- **Region**: UK, US, EU, Rest of World\n- **Price Status**: Full-price vs. Sale items (separate partitions for each)\n\nThis creates a grid structure where the same product may appear in multiple partitions with different pricing and availability depending on the customer's regional location and gender targeting.\n\n## Data Management\n\nThe catalogue itself is **continuously updated** through affiliate network integrations (Rakuten, CJ, Partnerize, ProductSup), with:\n- New products imported every few minutes\n- Removed/unavailable products automatically taken down\n- Products sourced from hundreds of luxury retailers\n\n## Regional and Gender Specificity\n\nThis partitioning approach means:\n- **Regional variation**: Prices differ by region due to local retailer pricing and inventory\n- **Gender targeting**: Products are curated separately for male and female customers\n- **Sale vs. full-price separation**: Commission structures and product availability may differ between sale and full-price items, which can vary by retailer and region\n\nThis granular organization enables TheFloorr stylists to provide personalized, region-appropriate outfit recommendations with accurate pricing for their clients.",
+        "memoriesReturned": [
+          "memory:7pa5q95aiy5r0mpn1qbv",
+          "memory:u0jg67se8o325efcne65",
+          "memory:7s406t3u24mqwrgw8l2r",
+          "memory:4pnt3z8hegoke4o36fuf",
+          "memory:11pz9z0sq9j5gnnnqyeu"
+        ],
+        "requiredEntryIds": [
+          "memory:u0jg67se8o325efcne65"
+        ],
+        "excludedEntryIds": [],
+        "buildContextMs": 1192.5060000000522,
+        "askMs": 9576.636374999885
+      },
+      {
+        "questionId": "q-return-flow-network",
+        "question": "How does the affiliate network handle commission refunds when a customer returns an item?",
+        "expectedAnswer": "Networks do not send money back to TheFloorr for returns. Instead, they deduct the returned commission from future payments. For example, if TheFloorr was owed 100 pounds in commission next month but a previous order had a 20 pound return after network payment, the network would pay 80 pounds. The refund status is marked as pending if return happened after the affiliate network already paid commission to TheFloorr.",
+        "difficulty": "hard",
+        "context": "[Definitions & Concepts]\nThe retailer reports the return to the affiliate network.\nThe retailer reports the return to the affiliate network.\nThe affiliate network reduces the commission upon being informed of a return.\nIf a return happens after the affiliate network has already paid commission to TheFloorr, the refund status is marked as pending.\nIf your client returns an item, it affects your commission.\nIf the network reports a return on an order, the commission needs to be recalculated before payment.\nThe affiliate network matches sales back to their originating clicks.\nThe retailer reports the sale to the affiliate network\nThe order is approved by the affiliate network\nThe affiliate network pays TheFloorr on a monthly schedule",
+        "answer": "# Commission Refund Handling in the Affiliate Network\n\n## Process Overview\n\nThe affiliate network handles commission refunds through a **report-and-adjust system** triggered by customer returns:\n\n### 1. **Return Notification**\nThe retailer reports the return to the affiliate network, which initiates the refund process.\n\n### 2. **Commission Adjustment Strategy**\nThe network employs a **timing-based approach**:\n\n- **Pre-payment returns**: If the return is reported before the affiliate network has paid commission, the commission is **recalculated and reduced** to reflect the loss of the sale.\n  \n- **Post-payment returns**: If the affiliate network has already paid commission to the affiliate, the refund status is **marked as pending**, creating a liability for future chargeback or reversal against the next payment cycle.\n\n### 3. **Recalculation Before Payment**\nBefore distributing monthly payments, the affiliate network recalculates commission for any orders with reported returns, ensuring affiliates only receive commission on net sales.\n\n## Key Mechanism\n\nThe system relies on matching sales back to their originating clicks, which allows the network to precisely identify which affiliate should be affected by a return and adjust their earnings accordingly.\n\n---\n\n**In summary**: Returns reduce or reverse commissions depending on payment timing—either preventing payout entirely (pre-payment) or creating a pending refund obligation (post-payment).",
+        "memoriesReturned": [
+          "memory:yk4vnbo6y0y8ul5k4eer",
+          "memory:sam7rjzbwe08yq79r7i6",
+          "memory:oyu8azd9nnse4h5w5402",
+          "memory:y10h8st8cbem7mp8caq5",
+          "memory:rkmx6ycaa6xopssj9ibx",
+          "memory:wbrybfcy2wo3t5hc0ntj",
+          "memory:12pt4a5z6ip5ojjfo2qm",
+          "memory:bmwtylqi047uz881awye",
+          "memory:12bhlwmoca79l0e7ht0e",
+          "memory:17br49e6yoioshg8sra7"
+        ],
+        "requiredEntryIds": [
+          "memory:48rzi3x7eh6eyblszhe3"
+        ],
+        "excludedEntryIds": [],
+        "buildContextMs": 1201.3804589998908,
+        "askMs": 12259.766500000027
+      }
+    ],
+    "avgBuildContextMs": 1199.0910182499938,
+    "avgAskMs": 11609.342812374998
+  }
 }

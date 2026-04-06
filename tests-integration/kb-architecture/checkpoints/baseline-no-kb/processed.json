@@ -1,12 +1,12 @@
 {
-    "phase": 2,
-    "config": "baseline-no-kb",
-    "timestamp": "2026-04-03T20:24:54.879Z",
-    "durationMs": 0,
-    "status": "success",
-    "data": {
-        "entries": [],
-        "stageTiming": {},
-        "classificationAccuracy": 0
-    }
+  "phase": 2,
+  "config": "baseline-no-kb",
+  "timestamp": "2026-04-06T10:17:42.969Z",
+  "durationMs": 0,
+  "status": "success",
+  "data": {
+    "entries": [],
+    "stageTiming": {},
+    "classificationAccuracy": 0
+  }
 }
