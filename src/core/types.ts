@@ -73,6 +73,7 @@ export interface IndexDef {
     fields: string[];
     type?: "unique" | "search" | "hnsw";
     config?: Record<string, unknown>;
+    condition?: string;
 }
 
 export interface NodeDef {
