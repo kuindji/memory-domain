@@ -4,9 +4,9 @@ import type { LLMAdapter } from "../src/core/types.js";
 
 function mockLlm(response: string): LLMAdapter {
     return {
-        extract: async () => [],
-        consolidate: async () => "",
-        generate: async () => response,
+        extract: () => Promise.resolve([]),
+        consolidate: () => Promise.resolve(""),
+        generate: () => Promise.resolve(response),
     };
 }
 
@@ -31,11 +31,9 @@ describe("classifyQueryIntent", () => {
 
     test("returns all classifications on LLM failure", async () => {
         const llm: LLMAdapter = {
-            extract: async () => [],
-            consolidate: async () => "",
-            generate: async () => {
-                throw new Error("LLM unavailable");
-            },
+            extract: () => Promise.resolve([]),
+            consolidate: () => Promise.resolve(""),
+            generate: () => Promise.reject(new Error("LLM unavailable")),
         };
         const intent = await classifyQueryIntent("test query", llm);
         expect(intent.classifications).toHaveLength(6);
@@ -50,8 +48,8 @@ describe("classifyQueryIntent", () => {
 
     test("returns all classifications when generate is not available", async () => {
         const llm: LLMAdapter = {
-            extract: async () => [],
-            consolidate: async () => "",
+            extract: () => Promise.resolve([]),
+            consolidate: () => Promise.resolve(""),
         };
         const intent = await classifyQueryIntent("test query", llm);
         expect(intent.classifications).toHaveLength(6);

@@ -245,14 +245,12 @@ export function createKbDomain(options?: KbDomainOptions): DomainConfig {
             { name: "minScore", default: 0.5, min: -1, max: 0.8, step: 0.05 },
             { name: "definitionBudgetPct", default: 0.3, min: 0.1, max: 0.6, step: 0.05 },
             { name: "factBudgetPct", default: 0.4, min: 0.1, max: 0.6, step: 0.05 },
-            { name: "topicBoostFactor", default: 1.5, min: 1.0, max: 3.0, step: 0.25 },
             { name: "embeddingRerank", default: 1, min: 0, max: 1, step: 1 },
             { name: "llmRerank", default: 0, min: 0, max: 1, step: 1 },
             { name: "decayFactor", default: 0.95, min: 0.5, max: 1.0, step: 0.05 },
             { name: "importanceBoost", default: 1.5, min: 1.0, max: 3.0, step: 0.25 },
             { name: "adaptiveContext", default: 1, min: 0, max: 1, step: 1 },
             { name: "useQueryIntent", default: 1, min: 0, max: 1, step: 1 },
-            { name: "intentFallbackWidth", default: 2, min: 0, max: 6, step: 1 },
         ],
 
         async bootstrap(context: DomainContext) {
@@ -372,6 +370,9 @@ export function createKbDomain(options?: KbDomainOptions): DomainConfig {
             const filters: Record<string, unknown> = {};
             if (intent && intent.classifications.length < ALL_CLASSIFICATIONS.length) {
                 filters.classification = intent.classifications;
+            }
+            if (intent?.topic) {
+                filters.topics = { containsAny: [intent.topic] };
             }
 
             // Step 3: Search with filters
