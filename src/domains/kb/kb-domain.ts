@@ -307,12 +307,15 @@ export function createKbDomain(options?: KbDomainOptions): DomainConfig {
             // Step 6: Resolve children to parents
             const resolved = await resolveToParents(entries, context, now);
 
-            // Step 7: Relevance-first budget — fill by score, then group for output
-            resolved.sort((a, b) => b.score - a.score);
+            // Step 7: Deduplicate near-duplicate content
+            const deduped = deduplicateByContent(resolved, 0.5);
+
+            // Step 8: Relevance-first budget — fill by score, then group for output
+            deduped.sort((a, b) => b.score - a.score);
 
             const selected: Array<{ mem: ScoredMemory; classification: string }> = [];
             let usedTokens = 0;
-            for (const entry of resolved) {
+            for (const entry of deduped) {
                 const tokens = countTokens(entry.content);
                 if (usedTokens + tokens > budgetTokens) continue;
                 usedTokens += tokens;
@@ -382,6 +385,44 @@ export function createKbDomain(options?: KbDomainOptions): DomainConfig {
             };
         },
     };
+}
+
+function extractWordSet(text: string): Set<string> {
+    return new Set(
+        text
+            .toLowerCase()
+            .split(/\s+/)
+            .filter((w) => w.length > 2),
+    );
+}
+
+function jaccardSimilarity(a: Set<string>, b: Set<string>): number {
+    if (a.size === 0 && b.size === 0) return 1;
+    let intersection = 0;
+    for (const word of a) {
+        if (b.has(word)) intersection++;
+    }
+    const union = a.size + b.size - intersection;
+    return union > 0 ? intersection / union : 0;
+}
+
+/**
+ * Removes near-duplicate entries by word-overlap similarity.
+ * Entries are processed in score order — higher-scored entries are kept.
+ */
+function deduplicateByContent(entries: ScoredMemory[], threshold: number): ScoredMemory[] {
+    const sorted = [...entries].sort((a, b) => b.score - a.score);
+    const accepted: Array<{ mem: ScoredMemory; words: Set<string> }> = [];
+
+    for (const entry of sorted) {
+        const words = extractWordSet(entry.content);
+        const isDuplicate = accepted.some((a) => jaccardSimilarity(a.words, words) >= threshold);
+        if (!isDuplicate) {
+            accepted.push({ mem: entry, words });
+        }
+    }
+
+    return accepted.map((a) => a.mem);
 }
 
 /**
