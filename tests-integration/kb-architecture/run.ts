@@ -11,6 +11,7 @@ import { runScore } from "./phases/5-score.js";
 import { runReport } from "./phases/6-report.js";
 import { runTune } from "./phases/7-tune.js";
 import { runBaseline } from "./phases/baseline.js";
+import { runBaselineFullDoc } from "./phases/baseline-full-doc.js";
 import type { ArchitectureConfig } from "./types.js";
 import { buildOramaIndex, serializeOramaIndex } from "./orama-index.js";
 import { createOramaBuildContext } from "./orama-kb-domain.js";
@@ -22,6 +23,8 @@ const { values } = parseArgs({
         "from-phase": { type: "string", short: "f" },
         "only-phase": { type: "string", short: "o" },
         baseline: { type: "boolean", short: "b" },
+        "full-doc": { type: "boolean" },
+        score: { type: "string" },
         report: { type: "boolean", short: "r" },
         collect: { type: "boolean" },
         tune: { type: "string", short: "t" },
@@ -133,6 +136,49 @@ async function main(): Promise<void> {
             process.exit(1);
         }
         await runTune(tuneConfig);
+        return;
+    }
+
+    // Full-doc baseline — entire dataset as context, Sonnet answers
+    if (values["full-doc"]) {
+        await runBaselineFullDoc("sonnet");
+        await runScore({
+            name: "baseline-full-doc-sonnet",
+            pipeline: {
+                classify: false,
+                tagAssign: false,
+                topicLink: false,
+                supersede: false,
+                relateKnowledge: false,
+            },
+            search: {
+                mode: "hybrid",
+                weights: { vector: 0.5, fulltext: 0.3, graph: 0.2 },
+            },
+            consolidate: false,
+            contextBudget: 100000,
+        });
+        return;
+    }
+
+    // Score-only for a specific config name
+    if (values.score) {
+        await runScore({
+            name: values.score as string,
+            pipeline: {
+                classify: false,
+                tagAssign: false,
+                topicLink: false,
+                supersede: false,
+                relateKnowledge: false,
+            },
+            search: {
+                mode: "hybrid",
+                weights: { vector: 0.5, fulltext: 0.3, graph: 0.2 },
+            },
+            consolidate: false,
+            contextBudget: 2000,
+        });
         return;
     }
 
