@@ -11,7 +11,7 @@ import type { KbAttributes } from "../../src/domains/kb/types.js";
 import { KB_DOMAIN_ID, KB_TAG } from "../../src/domains/kb/types.js";
 
 const ORAMA_SCHEMA = {
-    id: "string",
+    memoryId: "string",
     content: "string",
     classification: "string",
     topics: "string[]",
@@ -72,7 +72,7 @@ export async function buildOramaIndex(engine: MemoryEngine): Promise<OramaDb> {
         const topics = topicsByMemory.get(memId) ?? [];
 
         await insert(db, {
-            id: memId,
+            memoryId: memId,
             content: row.content ?? "",
             classification: String(attrs.classification ?? "fact"),
             topics,
@@ -130,7 +130,7 @@ export function searchOrama(db: OramaDb, queryText: string, limit: number): Scor
             importance: doc.importance,
         };
         return {
-            id: doc.id,
+            id: doc.memoryId,
             content: doc.content,
             score: hit.score,
             scores: { fulltext: hit.score },
