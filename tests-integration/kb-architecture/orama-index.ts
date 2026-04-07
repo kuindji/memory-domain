@@ -64,16 +64,17 @@ export async function buildOramaIndex(engine: MemoryEngine): Promise<OramaDb> {
 
     const db = create({ schema: ORAMA_SCHEMA });
 
+    let indexed = 0;
     for (const row of ownershipRows) {
         const attrs = row.attributes ?? ({} as KbAttributes);
         const attrsRecord: Record<string, unknown> = { ...attrs };
         const importance = computeImportance(attrsRecord, 0.95);
-        const memId = row.id;
+        const memId = String(row.id);
         const topics = topicsByMemory.get(memId) ?? [];
 
         await insert(db, {
             memoryId: memId,
-            content: row.content ?? "",
+            content: String(row.content ?? ""),
             classification: String(attrs.classification ?? "fact"),
             topics,
             importance,
@@ -85,8 +86,10 @@ export async function buildOramaIndex(engine: MemoryEngine): Promise<OramaDb> {
             parentMemoryId: typeof attrs.parentMemoryId === "string" ? attrs.parentMemoryId : "",
             confidence: typeof attrs.confidence === "number" ? attrs.confidence : 1,
         });
+        indexed++;
     }
 
+    console.log(`[Orama] Indexed ${indexed} entries`);
     return db;
 }
 

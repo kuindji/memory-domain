@@ -76,9 +76,16 @@ async function runConfig(config: ArchitectureConfig, fromPhase: number): Promise
         await runConsolidate(config, engine);
     }
 
-    // For Orama configs resuming from a later phase, load the serialized index
-    if (config.useOrama && !oramaIndex && fromPhase > 2) {
-        oramaIndex = await loadOramaIndex(config.name);
+    // For Orama configs: build or load the index if we don't have it yet
+    if (config.useOrama && !oramaIndex) {
+        // Need an engine to build the index — re-ingest if we don't have one
+        if (!engine) {
+            const result = await runIngest(config);
+            engine = result.engine;
+        }
+        console.log(`\n[Phase 2.5: Build Orama Index] Config: "${config.name}"`);
+        oramaIndex = await buildOramaIndex(engine);
+        await serializeOramaIndex(oramaIndex, config.name);
     }
 
     // Phase 4: Evaluate
