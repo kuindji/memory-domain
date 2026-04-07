@@ -44,6 +44,7 @@ export interface ArchitectureConfig {
         llmRerank?: boolean;
         useQueryIntent?: boolean;
     };
+    useOrama?: boolean;
 }
 
 export interface Checkpoint<T = unknown> {
