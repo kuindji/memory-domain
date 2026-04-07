@@ -268,8 +268,8 @@ export function createKbDomain(options?: KbDomainOptions): DomainConfig {
 
             if (entries.length === 0) return empty;
 
-            // Step 4.5: Boost entries whose answers_question matches the query
-            entries = await boostByQuestionMatch(entries, text, context.graph);
+            // Step 4.5: Dual-path search — find additional entries via answers_question fulltext
+            entries = await mergeQuestionSearchResults(entries, text, context);
 
             // Step 5: Optional LLM rerank
             if (useLlmRerank && context.llm) {
@@ -487,68 +487,91 @@ async function resolveToParents(
 }
 
 /**
- * Boosts scores of entries whose `answers_question` field matches the query text.
- * Uses SurrealDB fulltext search on the answers_question index.
- * Entries that match get a score boost; non-matches pass through unchanged.
+ * Searches the answers_question fulltext index and merges results with existing entries.
+ * Entries found via question search that aren't already in the candidate set are added.
+ * Entries found in both get a score boost.
  */
-async function boostByQuestionMatch(
+async function mergeQuestionSearchResults(
     entries: ScoredMemory[],
     queryText: string,
-    graph: GraphApi,
+    context: DomainContext,
 ): Promise<ScoredMemory[]> {
-    if (entries.length === 0) return entries;
-
-    const ids = entries.map((e) =>
-        e.id.startsWith("memory:")
-            ? new StringRecordId(e.id)
-            : new StringRecordId(`memory:${e.id}`),
-    );
+    const now = Date.now();
 
     try {
-        const rows = await graph.query<Array<{ id: unknown; answers_question: string | null }>>(
-            `SELECT id, answers_question FROM memory WHERE id IN $ids AND answers_question IS NOT NONE`,
-            { ids },
+        const rows = await context.graph.query<
+            Array<{
+                id: unknown;
+                content: string;
+                score: number;
+                event_time: number | null;
+                created_at: number;
+                token_count?: number;
+            }>
+        >(
+            `SELECT *, search::score(1) AS score FROM memory
+             WHERE answers_question @1@ $text
+             ORDER BY score DESC
+             LIMIT 20`,
+            { text: queryText },
         );
 
         if (!rows || rows.length === 0) return entries;
 
-        // Build a set of keywords from the query for matching
-        const queryWords = new Set(
-            queryText
-                .toLowerCase()
-                .split(/\s+/)
-                .filter((w) => w.length > 2),
-        );
+        const existingMap = new Map(entries.map((e) => [e.id, e]));
+        const QUESTION_BOOST = 0.3;
+        const newEntries: ScoredMemory[] = [];
 
-        // Compute question-match scores based on keyword overlap
-        const questionScores = new Map<string, number>();
-        for (const row of rows) {
-            if (!row.answers_question) continue;
-            const qWords = row.answers_question
-                .toLowerCase()
-                .split(/\s+/)
-                .filter((w) => w.length > 2);
-            if (qWords.length === 0) continue;
+        // Fetch domain attributes for entries not already in the candidate set
+        const newIds = rows.map((r) => String(r.id)).filter((id) => !existingMap.has(id));
 
-            let matches = 0;
-            for (const w of qWords) {
-                if (queryWords.has(w)) matches++;
-            }
-            const overlap = matches / Math.max(queryWords.size, 1);
-            if (overlap > 0) {
-                questionScores.set(String(row.id), overlap);
+        const attrMap = new Map<string, Record<string, Record<string, unknown>>>();
+        if (newIds.length > 0) {
+            const surrealIds = newIds.map((id) =>
+                id.startsWith("memory:")
+                    ? new StringRecordId(id)
+                    : new StringRecordId(`memory:${id}`),
+            );
+            const ownershipEdges = await context.graph.query<
+                Array<{ in: unknown; out: unknown; attributes: Record<string, unknown> }>
+            >("SELECT in, out, attributes FROM owned_by WHERE in IN $ids", {
+                ids: surrealIds,
+            });
+            if (ownershipEdges) {
+                for (const edge of ownershipEdges) {
+                    const memId = String(edge.in);
+                    const domainId = String(edge.out).replace("domain:", "");
+                    if (!attrMap.has(memId)) attrMap.set(memId, {});
+                    attrMap.get(memId)![domainId] = edge.attributes ?? {};
+                }
             }
         }
 
-        if (questionScores.size === 0) return entries;
+        for (const row of rows) {
+            const id = String(row.id);
+            const existing = existingMap.get(id);
 
-        // Boost: entries with question match get up to 30% score boost
-        const QUESTION_BOOST = 0.3;
-        return entries.map((e) => {
-            const qScore = questionScores.get(e.id);
-            if (qScore === undefined) return e;
-            return { ...e, score: e.score * (1 + QUESTION_BOOST * qScore) };
-        });
+            if (existing) {
+                existing.score *= 1 + QUESTION_BOOST;
+            } else {
+                const domainAttributes = attrMap.get(id) ?? {};
+                if (!isEntryValid(getKbAttrs(domainAttributes), now)) continue;
+
+                newEntries.push({
+                    id,
+                    content: row.content,
+                    score: row.score * 0.8,
+                    scores: { fulltext: row.score },
+                    tags: [],
+                    domainAttributes,
+                    eventTime: row.event_time ?? null,
+                    createdAt: row.created_at,
+                    tokenCount: row.token_count,
+                });
+            }
+        }
+
+        return [...entries, ...newEntries];
     } catch {
         return entries;
     }
