@@ -700,9 +700,10 @@ async function mergeKeywordSearch(
             const domainAttributes = attrMap.get(id) ?? {};
             if (!isEntryValid(getKbAttrs(domainAttributes), now)) continue;
 
-            // Score based on keyword match count
+            // Score based on keyword match count — require 2+ matches to reduce noise
             const content = row.content.toLowerCase();
             const matchCount = keywords.filter((kw) => content.includes(kw)).length;
+            if (matchCount < 2) continue;
             const score = matchCount / keywords.length;
 
             newEntries.push({

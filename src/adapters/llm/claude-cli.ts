@@ -214,7 +214,7 @@ Return ONLY the consolidated text (no JSON, no markdown).`;
             ? `\nRelevant context tags: ${tagContext.join(", ")}`
             : "";
 
-        const prompt = `Given the following query and retrieved memories, provide an analytical synthesis.
+        const prompt = `Answer the following query using ONLY the retrieved memories below.
 
 Query: "${query}"
 ${tagBlock}
@@ -222,7 +222,7 @@ ${tagBlock}
 Retrieved memories:
 ${memoryList}
 
-Provide a concise, well-structured analytical response that directly addresses the query. Prioritize evidence from the retrieved memories, but you may supplement with your own knowledge where the memories are incomplete or tangential. Always answer the question — never refuse on the grounds that memories are insufficient.`;
+Be direct and concise. Cover all relevant points from the memories without adding speculation or information not present in the memories. If the memories don't contain enough information to fully answer, state what's missing rather than guessing.`;
 
         return this.run(prompt);
     }
