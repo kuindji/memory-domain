@@ -638,25 +638,36 @@ async function mergeKeywordSearch(
     if (keywords.length === 0) return entries;
 
     try {
-        // Search for entries containing any discriminating keyword
-        const conditions = keywords.map((_, i) => `string::lowercase(content) CONTAINS $kw${i}`);
-        const vars: Record<string, unknown> = { limit: 20 };
-        keywords.forEach((kw, i) => {
-            vars[`kw${i}`] = kw;
-        });
+        // Run per-keyword queries to ensure rare keywords get their own results
+        const allRows = new Map<string, MemoryQueryRow>();
+        const matchCounts = new Map<string, number>();
 
-        const rows = await context.graph.query<MemoryQueryRow[]>(
-            `SELECT * FROM memory WHERE (${conditions.join(" OR ")}) LIMIT $limit`,
-            vars,
-        );
+        for (const kw of keywords) {
+            const rows = await context.graph.query<MemoryQueryRow[]>(
+                `SELECT * FROM memory WHERE string::lowercase(content) CONTAINS $kw LIMIT 10`,
+                { kw },
+            );
+            if (!rows) continue;
+            for (const row of rows) {
+                const id = String(row.id);
+                allRows.set(id, row);
+                matchCounts.set(id, (matchCounts.get(id) ?? 0) + 1);
+            }
+        }
 
-        if (!rows || rows.length === 0) return entries;
+        if (allRows.size === 0) return entries;
+
+        // Filter to entries matching 2+ keywords
+        const rows = [...allRows.entries()]
+            .filter(([id]) => (matchCounts.get(id) ?? 0) >= 2)
+            .map(([, row]) => row);
+
+        if (rows.length === 0) return entries;
 
         const existingMap = new Map(entries.map((e) => [e.id, e]));
         const newIds = rows.map((r) => String(r.id)).filter((id) => !existingMap.has(id));
 
         if (newIds.length === 0) {
-            // All found entries already in candidate set — boost them
             for (const row of rows) {
                 const existing = existingMap.get(String(row.id));
                 if (existing) existing.score *= 1.3;
@@ -664,7 +675,6 @@ async function mergeKeywordSearch(
             return entries;
         }
 
-        // Fetch domain attributes for new entries
         const attrMap = new Map<string, Record<string, Record<string, unknown>>>();
         const surrealIds = newIds.map((id) =>
             id.startsWith("memory:") ? new StringRecordId(id) : new StringRecordId(`memory:${id}`),
@@ -684,13 +694,8 @@ async function mergeKeywordSearch(
         }
 
         const newEntries: ScoredMemory[] = [];
-        const seen = new Set<string>();
-
         for (const row of rows) {
             const id = String(row.id);
-            if (seen.has(id)) continue;
-            seen.add(id);
-
             const existing = existingMap.get(id);
             if (existing) {
                 existing.score *= 1.3;
@@ -700,11 +705,8 @@ async function mergeKeywordSearch(
             const domainAttributes = attrMap.get(id) ?? {};
             if (!isEntryValid(getKbAttrs(domainAttributes), now)) continue;
 
-            // Score based on keyword match count — require 2+ matches to reduce noise
-            const content = row.content.toLowerCase();
-            const matchCount = keywords.filter((kw) => content.includes(kw)).length;
-            if (matchCount < 2) continue;
-            const score = matchCount / keywords.length;
+            const mc = matchCounts.get(id) ?? 0;
+            const score = mc / keywords.length;
 
             newEntries.push({
                 id,
