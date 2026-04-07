@@ -268,8 +268,8 @@ export function createKbDomain(options?: KbDomainOptions): DomainConfig {
 
             if (entries.length === 0) return empty;
 
-            // Step 4.5: Dual-path search — find additional entries via answers_question fulltext
-            entries = await mergeQuestionSearchResults(entries, text, context);
+            // Step 4.5: Supplemental BM25 search — catches entries the embedding rerank missed
+            entries = await mergeSupplementalSearch(entries, text, context);
 
             // Step 5: Optional LLM rerank
             if (useLlmRerank && context.llm) {
@@ -487,11 +487,13 @@ async function resolveToParents(
 }
 
 /**
- * Searches the answers_question fulltext index and merges results with existing entries.
- * Entries found via question search that aren't already in the candidate set are added.
+ * Runs supplemental BM25 searches on both content and answers_question fields,
+ * merging results with the existing candidate set. This catches entries that the
+ * embedding-reranked search missed (e.g. BM25-matchable terms like "deprecated"
+ * that are semantically distant in embedding space).
  * Entries found in both get a score boost.
  */
-async function mergeQuestionSearchResults(
+async function mergeSupplementalSearch(
     entries: ScoredMemory[],
     queryText: string,
     context: DomainContext,
@@ -499,32 +501,81 @@ async function mergeQuestionSearchResults(
     const now = Date.now();
 
     try {
-        const rows = await context.graph.query<
-            Array<{
-                id: unknown;
-                content: string;
-                score: number;
-                event_time: number | null;
-                created_at: number;
-                token_count?: number;
-            }>
-        >(
-            `SELECT *, search::score(1) AS score FROM memory
-             WHERE answers_question @1@ $text
-             ORDER BY score DESC
-             LIMIT 20`,
-            { text: queryText },
-        );
+        // Run two BM25 searches: one on content, one on answers_question
+        const [contentRows, questionRows] = await Promise.all([
+            context.graph
+                .query<
+                    Array<{
+                        id: unknown;
+                        content: string;
+                        score: number;
+                        event_time: number | null;
+                        created_at: number;
+                        token_count?: number;
+                    }>
+                >(
+                    `SELECT *, search::score(1) AS score FROM memory
+                 WHERE content @1@ $text
+                 ORDER BY score DESC
+                 LIMIT 20`,
+                    { text: queryText },
+                )
+                .catch(
+                    () =>
+                        [] as Array<{
+                            id: unknown;
+                            content: string;
+                            score: number;
+                            event_time: number | null;
+                            created_at: number;
+                            token_count?: number;
+                        }>,
+                ),
+            context.graph
+                .query<
+                    Array<{
+                        id: unknown;
+                        content: string;
+                        score: number;
+                        event_time: number | null;
+                        created_at: number;
+                        token_count?: number;
+                    }>
+                >(
+                    `SELECT *, search::score(1) AS score FROM memory
+                 WHERE answers_question @1@ $text
+                 ORDER BY score DESC
+                 LIMIT 20`,
+                    { text: queryText },
+                )
+                .catch(
+                    () =>
+                        [] as Array<{
+                            id: unknown;
+                            content: string;
+                            score: number;
+                            event_time: number | null;
+                            created_at: number;
+                            token_count?: number;
+                        }>,
+                ),
+        ]);
 
-        if (!rows || rows.length === 0) return entries;
+        const allRows = [...(contentRows ?? []), ...(questionRows ?? [])];
+        if (allRows.length === 0) return entries;
 
         const existingMap = new Map(entries.map((e) => [e.id, e]));
-        const QUESTION_BOOST = 0.3;
-        const newEntries: ScoredMemory[] = [];
+        const BOOST = 0.3;
 
-        // Fetch domain attributes for entries not already in the candidate set
-        const newIds = rows.map((r) => String(r.id)).filter((id) => !existingMap.has(id));
+        // Collect unique new IDs for attribute enrichment
+        const newIdSet = new Set<string>();
+        for (const row of allRows) {
+            const id = String(row.id);
+            if (!existingMap.has(id)) newIdSet.add(id);
+        }
+        const newIds = [...newIdSet];
 
+        // Fetch domain attributes for new entries
         const attrMap = new Map<string, Record<string, Record<string, unknown>>>();
         if (newIds.length > 0) {
             const surrealIds = newIds.map((id) =>
@@ -547,12 +598,17 @@ async function mergeQuestionSearchResults(
             }
         }
 
-        for (const row of rows) {
-            const id = String(row.id);
-            const existing = existingMap.get(id);
+        const newEntries: ScoredMemory[] = [];
+        const seen = new Set<string>();
 
+        for (const row of allRows) {
+            const id = String(row.id);
+            if (seen.has(id)) continue;
+            seen.add(id);
+
+            const existing = existingMap.get(id);
             if (existing) {
-                existing.score *= 1 + QUESTION_BOOST;
+                existing.score *= 1 + BOOST;
             } else {
                 const domainAttributes = attrMap.get(id) ?? {};
                 if (!isEntryValid(getKbAttrs(domainAttributes), now)) continue;
