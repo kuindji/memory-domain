@@ -45,6 +45,7 @@ export interface ArchitectureConfig {
         llmRerank?: boolean;
         useQueryIntent?: boolean;
         mmrLambda?: number;
+        useQuestionSearch?: boolean;
     };
     useOrama?: boolean;
     answerModel?: string;

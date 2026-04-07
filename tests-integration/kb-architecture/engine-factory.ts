@@ -94,6 +94,9 @@ export async function createConfiguredEngine(
         if (config.noiseReduction.mmrLambda !== undefined) {
             overrides.mmrLambda = config.noiseReduction.mmrLambda;
         }
+        if (config.noiseReduction.useQuestionSearch !== undefined) {
+            overrides.useQuestionSearch = config.noiseReduction.useQuestionSearch ? 1 : 0;
+        }
         if (Object.keys(overrides).length > 0) {
             await engine.saveTunableParams("kb", overrides);
         }

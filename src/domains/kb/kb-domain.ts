@@ -151,6 +151,7 @@ export function createKbDomain(options?: KbDomainOptions): DomainConfig {
             { name: "decayFactor", default: 0.95, min: 0.5, max: 1.0, step: 0.05 },
             { name: "importanceBoost", default: 1.5, min: 1.0, max: 3.0, step: 0.25 },
             { name: "mmrLambda", default: 1.0, min: 0.3, max: 1.0, step: 0.05 },
+            { name: "useQuestionSearch", default: 0, min: 0, max: 1, step: 1 },
         ],
 
         async bootstrap(context: DomainContext) {
@@ -247,6 +248,7 @@ export function createKbDomain(options?: KbDomainOptions): DomainConfig {
             const useEmbeddingRerank = (context.getTunableParam("embeddingRerank") ?? 1) > 0;
             const useLlmRerank = (context.getTunableParam("llmRerank") ?? 0) > 0;
             const mmrLambda = context.getTunableParam("mmrLambda") ?? 1.0;
+            const useQuestionSearch = (context.getTunableParam("useQuestionSearch") ?? 0) > 0;
 
             const now = Date.now();
 
@@ -268,7 +270,12 @@ export function createKbDomain(options?: KbDomainOptions): DomainConfig {
 
             if (entries.length === 0) return empty;
 
-            // Step 4.5: Keyword search — catches entries the embedding rerank missed
+            // Step 4.5a: Question search — matches query against LLM-generated questions
+            if (useQuestionSearch) {
+                entries = await mergeQuestionSearch(entries, text, context);
+            }
+
+            // Step 4.5b: Keyword search — catches entries the embedding rerank missed
             entries = await mergeKeywordSearch(entries, text, context);
 
             // Step 5: Optional LLM rerank
@@ -713,6 +720,96 @@ async function mergeKeywordSearch(
                 content: row.content,
                 score,
                 scores: { fulltext: score },
+                tags: [],
+                domainAttributes,
+                eventTime: row.event_time ?? null,
+                createdAt: row.created_at,
+                tokenCount: row.token_count,
+            });
+        }
+
+        return [...entries, ...newEntries];
+    } catch {
+        return entries;
+    }
+}
+
+/**
+ * Searches the answers_question fulltext index to find entries whose
+ * LLM-generated question matches the user's query. Merges results with
+ * existing candidates, boosting dual-matched entries.
+ */
+async function mergeQuestionSearch(
+    entries: ScoredMemory[],
+    queryText: string,
+    context: DomainContext,
+): Promise<ScoredMemory[]> {
+    const now = Date.now();
+
+    try {
+        const rows = await context.graph.query<Array<MemoryQueryRow & { score: number }>>(
+            `SELECT *, search::score(1) AS score FROM memory
+             WHERE answers_question @1@ $text
+             ORDER BY score DESC
+             LIMIT 20`,
+            { text: queryText },
+        );
+
+        if (!rows || rows.length === 0) return entries;
+
+        const existingMap = new Map(entries.map((e) => [e.id, e]));
+        const newIds: string[] = [];
+        const topScore = rows[0].score || 1;
+
+        // Boost existing entries found via question search
+        for (const row of rows) {
+            const id = String(row.id);
+            const existing = existingMap.get(id);
+            if (existing) {
+                existing.score *= 1.5;
+            } else {
+                newIds.push(id);
+            }
+        }
+
+        if (newIds.length === 0) return entries;
+
+        // Fetch domain attributes for new entries
+        const attrMap = new Map<string, Record<string, Record<string, unknown>>>();
+        const surrealIds = newIds.map((id) =>
+            id.startsWith("memory:") ? new StringRecordId(id) : new StringRecordId(`memory:${id}`),
+        );
+        const ownershipEdges = await context.graph.query<
+            Array<{ in: unknown; out: unknown; attributes: Record<string, unknown> }>
+        >("SELECT in, out, attributes FROM owned_by WHERE in IN $ids", {
+            ids: surrealIds,
+        });
+        if (ownershipEdges) {
+            for (const edge of ownershipEdges) {
+                const memId = String(edge.in);
+                const domainId = String(edge.out).replace("domain:", "");
+                if (!attrMap.has(memId)) attrMap.set(memId, {});
+                attrMap.get(memId)![domainId] = edge.attributes ?? {};
+            }
+        }
+
+        const newEntries: ScoredMemory[] = [];
+        for (const row of rows) {
+            const id = String(row.id);
+            if (existingMap.has(id)) continue;
+
+            const domainAttributes = attrMap.get(id) ?? {};
+            if (!isEntryValid(getKbAttrs(domainAttributes), now)) continue;
+
+            // Low base score — question-search entries fill remaining budget
+            // rather than displacing hybrid search results
+            const normalizedScore = 0.2 * ((row.score || 0) / topScore);
+
+            newEntries.push({
+                id,
+                content: row.content,
+                score: normalizedScore,
+                scores: { fulltext: normalizedScore },
                 tags: [],
                 domainAttributes,
                 eventTime: row.event_time ?? null,

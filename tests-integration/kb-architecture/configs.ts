@@ -237,6 +237,23 @@ export const configs: ArchitectureConfig[] = [
         noiseReduction: { tightenFilters: true, embeddingRerank: true, mmrLambda: 0.7 },
     },
     {
+        name: "question-search",
+        pipeline: { ...NO_SUPERSESSION_PIPELINE, generateQuestions: true },
+        search: HYBRID_DEFAULT,
+        consolidate: false,
+        contextBudget: 2000,
+        noiseReduction: { tightenFilters: true, embeddingRerank: true, useQuestionSearch: true },
+    },
+    {
+        name: "question-search-sonnet",
+        pipeline: { ...NO_SUPERSESSION_PIPELINE, generateQuestions: true },
+        search: HYBRID_DEFAULT,
+        consolidate: false,
+        contextBudget: 2000,
+        noiseReduction: { tightenFilters: true, embeddingRerank: true, useQuestionSearch: true },
+        answerModel: "sonnet",
+    },
+    {
         name: "orama-bm25",
         pipeline: NO_SUPERSESSION_PIPELINE,
         search: HYBRID_DEFAULT,
