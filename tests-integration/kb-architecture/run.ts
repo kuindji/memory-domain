@@ -12,7 +12,8 @@ import { runReport } from "./phases/6-report.js";
 import { runTune } from "./phases/7-tune.js";
 import { runBaseline } from "./phases/baseline.js";
 import type { ArchitectureConfig } from "./types.js";
-import { buildOramaIndex, serializeOramaIndex, loadOramaIndex } from "./orama-index.js";
+import { buildOramaIndex, serializeOramaIndex } from "./orama-index.js";
+import { createOramaBuildContext } from "./orama-kb-domain.js";
 import type { OramaDb } from "./orama-index.js";
 
 const { values } = parseArgs({
@@ -76,27 +77,25 @@ async function runConfig(config: ArchitectureConfig, fromPhase: number): Promise
         await runConsolidate(config, engine);
     }
 
-    // For Orama configs: build or load the index if we don't have it yet
+    // For Orama configs: the index must be built from fully-processed data.
+    // If we skipped Phase 2, we can't build a valid index.
     if (config.useOrama && !oramaIndex) {
-        // Need an engine to build the index — re-ingest if we don't have one
-        if (!engine) {
-            const result = await runIngest(config);
-            engine = result.engine;
-        }
-        console.log(`\n[Phase 2.5: Build Orama Index] Config: "${config.name}"`);
-        oramaIndex = await buildOramaIndex(engine);
-        await serializeOramaIndex(oramaIndex, config.name);
+        console.error(
+            `[ERROR] Orama config "${config.name}" requires Phase 1+2 to build index. Re-run without --from-phase.`,
+        );
+        if (engine) await engine.close();
+        return;
     }
 
     // Phase 4: Evaluate
     if (fromPhase <= 4) {
-        if (config.useOrama && oramaIndex) {
-            // Orama buildContext queries its own in-memory index, not SurrealDB search.
-            // But it still needs the engine for parent resolution and access recording.
-            // Re-ingest to populate the DB, then evaluate with Orama domain.
-            if (engine) await engine.close();
-            const result = await runIngest(config, oramaIndex);
-            engine = result.engine;
+        if (config.useOrama && oramaIndex && engine) {
+            // Patch the existing engine's KB domain to use Orama buildContext.
+            // This keeps the same engine with all processed data and matching IDs.
+            const kbDomain = engine.getDomainRegistry().get("kb");
+            if (kbDomain) {
+                kbDomain.buildContext = createOramaBuildContext(oramaIndex);
+            }
         }
         if (engine) {
             await runEvaluate(config, engine);

@@ -116,7 +116,7 @@ export function searchOrama(db: OramaDb, queryText: string, limit: number): Scor
         term: queryText,
         properties: ["content"],
         limit,
-        threshold: 0,
+        threshold: 1,
     });
     // search() on a synchronous in-memory db always returns synchronously
     const results = rawResults as Results<OramaDoc>;
