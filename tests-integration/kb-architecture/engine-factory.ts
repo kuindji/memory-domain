@@ -44,9 +44,10 @@ export async function createConfiguredEngine(
     });
 
     // Create a modified KB domain with configurable pipeline stages
-    const baseDomain = config.useOrama && oramaIndex
-        ? createOramaKbDomain(oramaIndex)
-        : createKbDomain({ consolidateSchedule: { enabled: false } });
+    const baseDomain =
+        config.useOrama && oramaIndex
+            ? createOramaKbDomain(oramaIndex)
+            : createKbDomain({ consolidateSchedule: { enabled: false } });
 
     const configurableProcessor = createConfigurableInboxProcessor(config.pipeline);
 
