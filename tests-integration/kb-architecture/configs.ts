@@ -253,12 +253,4 @@ export const configs: ArchitectureConfig[] = [
         noiseReduction: { tightenFilters: true, embeddingRerank: true, useQuestionSearch: true },
         answerModel: "sonnet",
     },
-    {
-        name: "orama-bm25",
-        pipeline: NO_SUPERSESSION_PIPELINE,
-        search: HYBRID_DEFAULT,
-        consolidate: false,
-        contextBudget: 2000,
-        useOrama: true,
-    },
 ];

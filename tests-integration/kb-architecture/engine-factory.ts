@@ -7,8 +7,6 @@ import { createKbDomain } from "../../src/domains/kb/kb-domain.js";
 import type { ArchitectureConfig } from "./types.js";
 import { createConfigurableInboxProcessor } from "./configurable-inbox.js";
 import type { DomainConfig } from "../../src/core/types.js";
-import { createOramaKbDomain } from "./orama-kb-domain.js";
-import type { OramaDb } from "./orama-index.js";
 
 const defaultLlm = new ClaudeCliAdapter({ model: "haiku", timeout: 180_000 });
 const embedding = new OnnxEmbeddingAdapter();
@@ -25,10 +23,7 @@ export function getEmbedding(): OnnxEmbeddingAdapter {
  * Creates a MemoryEngine configured for a specific architecture variant.
  * The KB domain's processInboxBatch is replaced with a configurable version.
  */
-export async function createConfiguredEngine(
-    config: ArchitectureConfig,
-    oramaIndex?: OramaDb,
-): Promise<MemoryEngine> {
+export async function createConfiguredEngine(config: ArchitectureConfig): Promise<MemoryEngine> {
     const llm = config.answerModel
         ? new ClaudeCliAdapter({
               model: config.answerModel,
@@ -52,10 +47,7 @@ export async function createConfiguredEngine(
     });
 
     // Create a modified KB domain with configurable pipeline stages
-    const baseDomain =
-        config.useOrama && oramaIndex
-            ? createOramaKbDomain(oramaIndex)
-            : createKbDomain({ consolidateSchedule: { enabled: false } });
+    const baseDomain = createKbDomain({ consolidateSchedule: { enabled: false } });
 
     const configurableProcessor = createConfigurableInboxProcessor(config.pipeline);
 

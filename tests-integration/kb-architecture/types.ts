@@ -47,7 +47,6 @@ export interface ArchitectureConfig {
         mmrLambda?: number;
         useQuestionSearch?: boolean;
     };
-    useOrama?: boolean;
     answerModel?: string;
 }
 

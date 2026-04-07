@@ -3,18 +3,16 @@ import { readDataset, writeCheckpoint } from "../checkpoint.js";
 import { createConfiguredEngine } from "../engine-factory.js";
 import { KB_DOMAIN_ID } from "../../../src/domains/kb/types.js";
 import type { MemoryEngine } from "../../../src/core/engine.js";
-import type { OramaDb } from "../orama-index.js";
 
 export async function runIngest(
     config: ArchitectureConfig,
-    oramaIndex?: OramaDb,
 ): Promise<{ engine: MemoryEngine; data: IngestedData }> {
     const dataset = readDataset<Dataset>();
     const start = performance.now();
 
     console.log(`\n[Phase 1: Ingest] Config: "${config.name}", entries: ${dataset.entries.length}`);
 
-    const engine = await createConfiguredEngine(config, oramaIndex);
+    const engine = await createConfiguredEngine(config);
     const memoryIdMap: Record<string, string> = {};
 
     for (const entry of dataset.entries) {
