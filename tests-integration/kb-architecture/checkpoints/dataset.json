@@ -8,7 +8,7 @@
         },
         {
             "id": "biz-stylists-fri-fashion-retail-individual-pse-personal-shopper-entrepreneur-gps-guest-personal-shopper",
-            "content": "Stylists (FRI — Fashion Retail Individual, PSE - Personal Shopper Entrepreneur, GPS - Guest Personal Shopper)\n\nFrom system's perspective, FRI, GPS and PSE are the same thing. FRI and GPS are deprecated names, not used to describe stylists anymore.\n\nPreviously stylists were able to create \"Looks\" and \"Consultations\" (also called \"Styling Session\"). This feature is deprecated and no longer available in the system.\n\nPSE's communication with clients is also deprecated. \n\nCurrently, PSEs are purchasing products themselves or sharing trackable links and moodboards publicly.",
+            "content": "Stylists (FRI \u2014 Fashion Retail Individual, PSE - Personal Shopper Entrepreneur, GPS - Guest Personal Shopper)\n\nFrom system's perspective, FRI, GPS and PSE are the same thing. FRI and GPS are deprecated names, not used to describe stylists anymore.\n\nPreviously stylists were able to create \"Looks\" and \"Consultations\" (also called \"Styling Session\"). This feature is deprecated and no longer available in the system.\n\nPSE's communication with clients is also deprecated. \n\nCurrently, PSEs are purchasing products themselves or sharing trackable links and moodboards publicly.",
             "expectedClassification": "definition",
             "relatedGroup": "stylist-role"
         },
@@ -82,7 +82,7 @@
         },
         {
             "id": "biz-order-status-three-independent-dimensions",
-            "content": "Order Status — Three Independent Dimensions\n\nEvery order has three separate status tracks that move independently:\n\n**Affiliate Order Status** reflects what the affiliate network reports about the order. It can be pending (not yet confirmed), new, approved, auto-approved, rejected, declined, closed, locked, or mixed (when different items have different statuses). Each network has slightly different status handling. For Rakuten, there is no explicit approval — an order is considered approved when Rakuten pays the commission.\n\n**Internal Order Status** is TheFloorr's own assessment of the order. It is calculated from the affiliate status and the state of individual items. If all items have been returned, the order is internally rejected. If the network says the order is closed or locked, it is internally approved. If the order is still new or pending at the network level, it stays pending internally.\n\n\"rejected\" is an old deprecated name for \"returned\". Always use \"returned\" in your responses instead of rejected.\n\n**Manual Status** is an admin override. If set, it forces the internal status to whatever the admin specifies, regardless of what the network says or what the item-level data shows. This is used for data corrections, reconciliation, and handling edge cases.",
+            "content": "Order Status \u2014 Three Independent Dimensions\n\nEvery order has three separate status tracks that move independently:\n\n**Affiliate Order Status** reflects what the affiliate network reports about the order. It can be pending (not yet confirmed), new, approved, auto-approved, rejected, declined, closed, locked, or mixed (when different items have different statuses). Each network has slightly different status handling. For Rakuten, there is no explicit approval \u2014 an order is considered approved when Rakuten pays the commission.\n\n**Internal Order Status** is TheFloorr's own assessment of the order. It is calculated from the affiliate status and the state of individual items. If all items have been returned, the order is internally returned. If the network says the order is closed or locked, it is internally approved. If the order is still new or pending at the network level, it stays pending internally.\n\n**Manual Status** is an admin override. If set, it forces the internal status to whatever the admin specifies, regardless of what the network says or what the item-level data shows. This is used for data corrections, reconciliation, and handling edge cases.",
             "expectedClassification": "concept",
             "relatedGroup": "order-status"
         },
@@ -106,7 +106,7 @@
         },
         {
             "id": "biz-three-payment-streams",
-            "content": "Three Payment Streams\n\nEach order involves up to three separate payment streams that operate independently:\n\n**1. Network Payment (Affiliate Network → TheFloorr)**\n\nThe affiliate network pays TheFloorr the commission for approved orders. Each network has its own payment schedule. The payment status tracks whether the network has paid: pending means awaiting payment, paid means the money has been transferred. Rakuten, CJ, and Partnerize each have their own payment record tables since their data formats differ.\n\n**2. PSE Payment (TheFloorr → Stylist)**\n\nWhen an order is attributed to a stylist, that stylist's share of the commission needs to be paid out. The default split is 80% of the commission to the stylist and 20% retained by TheFloorr, but this rate is configurable per stylist and per retailer.\n\nThe PSE payment goes through several stages:\n- Commission is calculated when the order is approved\n- An admin or the system approves the commission for payment, creating an \"approved payment\" record\n- Multiple approved payments are batched into a single Revolut payment draft\n- The draft moves through states: approved, created in Revolut, sent, then completed or failed\n- The stylist receives the money via bank transfer through Revolut\n\nIf the stylist is VAT-registered in the UK, VAT is added on top of their commission.\n\n**3. TheFloorr Revenue**\n\nTheFloorr keeps the portion of commission not paid to stylists. For orders without stylist attribution, TheFloorr keeps the entire commission.",
+            "content": "Three Payment Streams\n\nEach order involves up to three separate payment streams that operate independently:\n\n**1. Network Payment (Affiliate Network \u2192 TheFloorr)**\n\nThe affiliate network pays TheFloorr the commission for approved orders. Each network has its own payment schedule. The payment status tracks whether the network has paid: pending means awaiting payment, paid means the money has been transferred. Rakuten, CJ, and Partnerize each have their own payment record tables since their data formats differ.\n\n**2. PSE Payment (TheFloorr \u2192 Stylist)**\n\nWhen an order is attributed to a stylist, that stylist's share of the commission needs to be paid out. The default split is 80% of the commission to the stylist and 20% retained by TheFloorr, but this rate is configurable per stylist and per retailer.\n\nThe PSE payment goes through several stages:\n- The affiliate network pays TheFloorr the commission first (TheFloorr cannot pay the stylist until the network has paid)\n- Commission is calculated for the stylist based on their rate (default 80/20 split)\n- An admin or the system approves the commission for payment, creating an \"approved payment\" record\n- Multiple approved payments are batched into a single Revolut payment draft\n- The draft moves through states: approved, created in Revolut, sent, then completed or failed\n- The stylist receives the money via bank transfer through Revolut\n\nIf the stylist is VAT-registered in the UK, VAT is added on top of their commission.\n\n**3. TheFloorr Revenue**\n\nTheFloorr keeps the portion of commission not paid to stylists. For orders without stylist attribution, TheFloorr keeps the entire commission.",
             "expectedClassification": "concept",
             "relatedGroup": "payment-streams"
         },
@@ -134,7 +134,7 @@
         },
         {
             "id": "biz-order-snapshots-and-corrections",
-            "content": "Order Snapshots and Corrections\n\nFor Rakuten and Partnerize orders, TheFloorr keeps historical snapshots — records of what the order data looked like at each network report. These are used to track how orders change over time and to detect returns.\n\nFor CJ orders, adjustments come as separate \"correction\" records with negative values representing returns or chargebacks. These corrections are separate line items rather than changes to the original order data.",
+            "content": "Order Snapshots and Corrections\n\nFor Rakuten and Partnerize orders, TheFloorr keeps historical snapshots \u2014 records of what the order data looked like at each network report. These are used to track how orders change over time and to detect returns.\n\nFor CJ orders, adjustments come as separate \"correction\" records with negative values representing returns or chargebacks. These corrections are separate line items rather than changes to the original order data.",
             "expectedClassification": "reference",
             "relatedGroup": "corrections"
         },
@@ -152,13 +152,13 @@
         },
         {
             "id": "pse-what-is-thefloorr",
-            "content": "What is TheFloorr\n\nTheFloorr is a luxury fashion personal styling platform. You, as a stylist, create curated outfit recommendations for your clients. When your client purchases a product through a link you shared, the affiliate network tracks the sale, and you earn a commission. TheFloorr does not sell products directly — all purchases happen on the retailer's website.",
+            "content": "What is TheFloorr\n\nTheFloorr is a luxury fashion personal styling platform. You, as a stylist, create curated outfit recommendations for your clients. When your client purchases a product through a link you shared, the affiliate network tracks the sale, and you earn a commission. TheFloorr does not sell products directly \u2014 all purchases happen on the retailer's website.",
             "expectedClassification": "definition",
             "relatedGroup": "platform-overview"
         },
         {
             "id": "pse-how-you-earn-money",
-            "content": "How You Earn Money\n\nYou earn money through the PSE (Personal Shopper Earnings) programme. The process is simple: you recommend products to your clients using Looks, Moodboards, or by sharing items in chat. Each product has a trackable link. When your client clicks that link and buys the product at the retailer, an affiliate network records the sale, and commission is generated. You receive a share of that commission — typically 80%, with TheFloorr keeping 20%.\n\nYour commission rate can vary by retailer. Some retailers pay higher commission on full-price items and lower commission on sale items. A few retailers, such as Net-a-Porter, do not pay any commission on VIP customer orders. Some designer brands are also excluded from commission entirely.\n\nTo participate in the PSE programme, you must apply and be accepted. Your access may need to be renewed periodically.",
+            "content": "How You Earn Money\n\nYou earn money through the PSE (Personal Shopper Earnings) programme. The process is simple: you recommend products to your clients using Looks, Moodboards, or by sharing items in chat. Each product has a trackable link. When your client clicks that link and buys the product at the retailer, an affiliate network records the sale, and commission is generated. You receive a share of that commission \u2014 typically 80%, with TheFloorr keeping 20%.\n\nYour commission rate can vary by retailer. Some retailers pay higher commission on full-price items and lower commission on sale items. A few retailers, such as Net-a-Porter, do not pay any commission on VIP customer orders. Some designer brands are also excluded from commission entirely.\n\nTo participate in the PSE programme, you must apply and be accepted. Your access may need to be renewed periodically.",
             "expectedClassification": "how-to",
             "relatedGroup": "commission-rules"
         },
@@ -170,13 +170,13 @@
         },
         {
             "id": "pse-order-statuses",
-            "content": "Order Statuses\n\nAfter a purchase, the order goes through a status process before you receive your commission. Orders start as \"pending\" — this means the affiliate network has received the sale but has not yet confirmed it. Different networks take different amounts of time to confirm orders. Some orders stay pending for several weeks while the network verifies the transaction, confirms the retailer has shipped the goods, and waits for the return window to close.\n\nOnce confirmed, the order moves to \"approved.\" This means the sale is valid and your commission will be calculated. If the customer cancels or returns everything, the order is \"rejected\" and no commission is earned.\n\nSome orders show as \"mixed\" — this happens when a customer ordered multiple items and some were returned while others were kept. In this case, you earn commission only on the items that were kept.",
+            "content": "Order Statuses\n\nAfter a purchase, the order goes through a status process before you receive your commission. Orders start as \"pending\" \u2014 this means the affiliate network has received the sale but has not yet confirmed it. Different networks take different amounts of time to confirm orders. Some orders stay pending for several weeks while the network verifies the transaction, confirms the retailer has shipped the goods, and waits for the return window to close.\n\nOnce confirmed, the order moves to \"approved.\" This means the sale is valid and your commission will be calculated. If the customer cancels or returns everything, the order is \"rejected\" and no commission is earned.\n\nSome orders show as \"mixed\" \u2014 this happens when a customer ordered multiple items and some were returned while others were kept. In this case, you earn commission only on the items that were kept.",
             "expectedClassification": "concept",
             "relatedGroup": "order-status"
         },
         {
             "id": "pse-why-your-order-might-stay-pending",
-            "content": "Why Your Order Might Stay Pending\n\nOrders remain pending because the affiliate network has not confirmed them yet. This is normal and does not mean anything is wrong. Networks need time to verify the transaction, ensure the goods were delivered, and confirm the return window has passed. Depending on the network and the retailer, this can take anywhere from a few days to several weeks.\n\nThe three affiliate networks — Rakuten, Commission Junction (CJ), and Partnerize — each have their own confirmation process. Rakuten is unique: there is no separate approval step. An order from Rakuten is only considered approved when Rakuten actually pays the commission.",
+            "content": "Why Your Order Might Stay Pending\n\nOrders remain pending because the affiliate network has not confirmed them yet. This is normal and does not mean anything is wrong. Networks need time to verify the transaction, ensure the goods were delivered, and confirm the return window has passed. Depending on the network and the retailer, this can take anywhere from a few days to several weeks.\n\nThe three affiliate networks \u2014 Rakuten, Commission Junction (CJ), and Partnerize \u2014 each have their own confirmation process. Rakuten is unique: there is no separate approval step. An order from Rakuten is only considered approved when Rakuten actually pays the commission.",
             "expectedClassification": "concept",
             "relatedGroup": "order-pending"
         },
@@ -216,12 +216,12 @@
         },
         {
             "id": "pse-consultations",
-            "content": "Consultations\n\nA Consultation is your formal styling session with a client. When you start working with a client, you create a Consultation to capture their needs — what they are looking for, their sizing information, any inspiration images, and a due date if applicable. You create Looks and recommendations within the context of this Consultation.",
+            "content": "Consultations\n\nA Consultation is your formal styling session with a client. When you start working with a client, you create a Consultation to capture their needs \u2014 what they are looking for, their sizing information, any inspiration images, and a due date if applicable. You create Looks and recommendations within the context of this Consultation.",
             "expectedClassification": "definition"
         },
         {
             "id": "pse-creating-looks",
-            "content": "Creating Looks\n\nA Look is an outfit combination — the core of what you deliver to clients. Each Look contains multiple products arranged as a styled outfit. You can tag Looks with style, season, occasion, and location attributes to help organise your work. Looks start as drafts, then you submit them, and finally publish them so your client can see them.",
+            "content": "Creating Looks\n\nA Look is an outfit combination \u2014 the core of what you deliver to clients. Each Look contains multiple products arranged as a styled outfit. You can tag Looks with style, season, occasion, and location attributes to help organise your work. Looks start as drafts, then you submit them, and finally publish them so your client can see them.",
             "expectedClassification": "how-to"
         },
         {
@@ -237,24 +237,24 @@
         },
         {
             "id": "pse-the-catalogue",
-            "content": "The Catalogue\n\nTheFloorr's catalogue contains products from hundreds of luxury retailers, sourced through affiliate networks (Rakuten, CJ, Partnerize, and ProductSup). The catalogue is updated continuously — new products are imported every few minutes, and removed products are taken down automatically.",
+            "content": "The Catalogue\n\nTheFloorr's catalogue contains products from hundreds of luxury retailers, sourced through affiliate networks (Rakuten, CJ, Partnerize, and ProductSup). The catalogue is updated continuously \u2014 new products are imported every few minutes, and removed products are taken down automatically.",
             "expectedClassification": "fact",
             "relatedGroup": "catalogue"
         },
         {
             "id": "pse-searching-and-filtering",
-            "content": "Searching and Filtering\n\nYou can find products by:\n- **Text search** — search by name, description, or keywords\n- **Image search** — upload an image to find visually similar products\n- **Filters** — narrow results by designer, category, colour, retailer, price range, gender, region, and sale status\n- **Sorting** — sort by newest, price (low to high or high to low), or relevance",
+            "content": "Searching and Filtering\n\nYou can find products by:\n- **Text search** \u2014 search by name, description, or keywords\n- **Image search** \u2014 upload an image to find visually similar products\n- **Filters** \u2014 narrow results by designer, category, colour, retailer, price range, gender, region, and sale status\n- **Sorting** \u2014 sort by newest, price (low to high or high to low), or relevance",
             "expectedClassification": "reference",
             "relatedGroup": "product-search"
         },
         {
             "id": "pse-product-pricing",
-            "content": "Product Pricing\n\nProducts show both regular and sale prices when applicable. Prices differ by region — the same product may cost differently in the UK, US, EU, or elsewhere. When you share a product with a client, make sure the pricing matches their region.",
+            "content": "Product Pricing\n\nProducts show both regular and sale prices when applicable. Prices differ by region \u2014 the same product may cost differently in the UK, US, EU, or elsewhere. When you share a product with a client, make sure the pricing matches their region.",
             "expectedClassification": "reference"
         },
         {
             "id": "pse-commission-considerations-when-choosing-products",
-            "content": "Commission Considerations When Choosing Products\n\nNot all products earn the same commission. Keep in mind:\n- Full-price items usually have higher commission rates than sale items\n- Some retailers pay no commission on sale items at all\n- Certain designer brands are excluded from commission\n- Some retailers (like Net-a-Porter) do not pay commission on VIP customer purchases\n- Commission rates vary by retailer — check the retailer information when browsing",
+            "content": "Commission Considerations When Choosing Products\n\nNot all products earn the same commission. Keep in mind:\n- Full-price items usually have higher commission rates than sale items\n- Some retailers pay no commission on sale items at all\n- Certain designer brands are excluded from commission\n- Some retailers (like Net-a-Porter) do not pay commission on VIP customer purchases\n- Commission rates vary by retailer \u2014 check the retailer information when browsing",
             "expectedClassification": "fact",
             "relatedGroup": "commission-rules"
         },
@@ -278,7 +278,7 @@
         },
         {
             "id": "pse-important-things-to-remember",
-            "content": "Important Things to Remember\n\n- Purchases happen on the retailer's website, not on TheFloorr — you recommend, the client buys directly from the retailer\n- Your client must click your trackable link for the sale to be attributed to you\n- Commission rates vary by retailer, product type (full-price vs sale), and sometimes by designer\n- Orders stay pending until the affiliate network confirms them — this can take weeks and is normal\n- Returns reduce your commission — if already paid, the overpayment is deducted from future earnings\n- Payment goes through several stages: network pays TheFloorr, then TheFloorr pays you via Revolut\n- You can view all your orders, commission, and download invoices through the platform\n- If you are VAT-registered in the UK, VAT is added to your commission\n- Some retailers and designers do not pay commission — check before recommending products",
+            "content": "Important Things to Remember\n\n- Purchases happen on the retailer's website, not on TheFloorr \u2014 you recommend, the client buys directly from the retailer\n- Your client must click your trackable link for the sale to be attributed to you\n- Commission rates vary by retailer, product type (full-price vs sale), and sometimes by designer\n- Orders stay pending until the affiliate network confirms them \u2014 this can take weeks and is normal\n- Returns reduce your commission \u2014 if already paid, the overpayment is deducted from future earnings\n- Payment goes through several stages: network pays TheFloorr, then TheFloorr pays you via Revolut\n- You can view all your orders, commission, and download invoices through the platform\n- If you are VAT-registered in the UK, VAT is added to your commission\n- Some retailers and designers do not pay commission \u2014 check before recommending products",
             "expectedClassification": "insight"
         },
         {
@@ -354,7 +354,7 @@
         {
             "id": "q-payment-delayed",
             "question": "Why might a stylist's commission payment be delayed?",
-            "expectedAnswer": "Several reasons: (1) The affiliate network has not yet paid TheFloorr — networks typically pay monthly. (2) The order is still pending at the network level and not yet confirmed. (3) The commission has not been approved for payment in the admin system. (4) The payment has not been batched into a Revolut transfer yet. (5) A return was detected and commission needs recalculation. (6) The Revolut transfer is still in progress.",
+            "expectedAnswer": "Several reasons: (1) The affiliate network has not yet paid TheFloorr \u2014 networks typically pay monthly. (2) The order is still pending at the network level and not yet confirmed. (3) The commission has not been approved for payment in the admin system. (4) The payment has not been batched into a Revolut transfer yet. (5) A return was detected and commission needs recalculation. (6) The Revolut transfer is still in progress.",
             "requiredEntryIds": [
                 "biz-why-pse-payment-might-be-delayed",
                 "pse-why-your-payment-might-be-delayed"
@@ -381,7 +381,7 @@
         {
             "id": "q-order-statuses",
             "question": "How do order statuses work on TheFloorr? What are the different status dimensions?",
-            "expectedAnswer": "Every order has three separate, independent status tracks: (1) Affiliate Order Status — what the affiliate network reports (pending, new, approved, auto-approved, rejected, declined, closed, locked, mixed). (2) Internal Order Status — TheFloorr's own assessment, calculated from affiliate status and item states. (3) Manual Status — an admin override that forces the internal status regardless of network data. These three dimensions move independently.",
+            "expectedAnswer": "Every order has three separate, independent status tracks: (1) Affiliate Order Status \u2014 what the affiliate network reports (pending, new, approved, auto-approved, rejected (also called returned), declined, closed, locked, mixed). (2) Internal Order Status \u2014 TheFloorr's own assessment, calculated from affiliate status and item states. (3) Manual Status \u2014 an admin override that forces the internal status regardless of network data. These three dimensions move independently.",
             "requiredEntryIds": ["biz-order-status-three-independent-dimensions"],
             "excludedEntryIds": [],
             "difficulty": "medium"
@@ -389,7 +389,7 @@
         {
             "id": "q-return-after-payment",
             "question": "A client buys a 500 pound dress from a retailer that pays 10% commission. The stylist's rate is 80%. If the client returns the dress after the affiliate network has already paid TheFloorr, what happens financially?",
-            "expectedAnswer": "Total commission was 50 pounds (10% of 500). Stylist's share was 40 pounds (80% of 50), TheFloorr's share was 10 pounds. After return: the affiliate network does not send money back — instead it deducts 50 pounds from the next month's payment to TheFloorr. If the stylist's 40 pounds has already been paid, the overpayment is tracked against the stylist's balance and deducted from future earnings.",
+            "expectedAnswer": "Total commission was 50 pounds (10% of 500). Stylist's share was 40 pounds (80% of 50), TheFloorr's share was 10 pounds. After return: the affiliate network does not send money back \u2014 instead it deducts 50 pounds from the next month's payment to TheFloorr. If the stylist's 40 pounds has already been paid, the overpayment is tracked against the stylist's balance and deducted from future earnings.",
             "requiredEntryIds": ["biz-commission-calculation-example", "biz-returns-and-refunds"],
             "excludedEntryIds": [],
             "difficulty": "hard"
@@ -397,7 +397,7 @@
         {
             "id": "q-rakuten-vs-cj",
             "question": "How does order handling differ between Rakuten and CJ networks on TheFloorr?",
-            "expectedAnswer": "Key differences: (1) Approval: Rakuten has no explicit approval step — an order is considered approved only when Rakuten actually pays the commission. CJ has a standard approval/rejection flow. (2) Returns tracking: For Rakuten, TheFloorr keeps historical snapshots of what the order looked like at each report. For CJ, returns come as separate 'correction' records with negative values, rather than changes to the original order. (3) Payment records: each network has its own payment record table since data formats differ.",
+            "expectedAnswer": "Key differences: (1) Approval: Rakuten has no explicit approval step \u2014 an order is considered approved only when Rakuten actually pays the commission. CJ has a standard approval/rejection flow. (2) Returns tracking: For Rakuten, TheFloorr keeps historical snapshots of what the order looked like at each report. For CJ, returns come as separate 'correction' records with negative values, rather than changes to the original order. (3) Payment records: each network has its own payment record table since data formats differ.",
             "requiredEntryIds": [
                 "biz-order-snapshots-and-corrections",
                 "biz-order-status-three-independent-dimensions"
@@ -408,7 +408,7 @@
         {
             "id": "q-three-status-dimensions",
             "question": "What is the difference between affiliate order status, internal order status, and manual status? Give examples of each.",
-            "expectedAnswer": "Affiliate Order Status reflects what the network reports: pending, new, approved, auto-approved, rejected, declined, closed, locked, or mixed. Internal Order Status is TheFloorr's own calculation: if all items returned → internally returned; if network says closed/locked → internally approved; if still new/pending → stays pending. Manual Status is an admin override that forces internal status regardless of network data — used for data corrections, reconciliation, and edge cases the automated rules can't handle.",
+            "expectedAnswer": "Affiliate Order Status reflects what the network reports: pending, new, approved, auto-approved, rejected (also called returned), declined, closed, locked, or mixed. Internal Order Status is TheFloorr's own calculation: if all items returned \u2192 internally returned; if network says closed/locked \u2192 internally approved; if still new/pending \u2192 stays pending. Manual Status is an admin override that forces internal status regardless of network data \u2014 used for data corrections, reconciliation, and edge cases the automated rules can't handle.",
             "requiredEntryIds": ["biz-order-status-three-independent-dimensions"],
             "excludedEntryIds": [],
             "difficulty": "hard"
@@ -416,7 +416,7 @@
         {
             "id": "q-deprecated-features",
             "question": "What features and naming conventions on TheFloorr are deprecated and should no longer be used?",
-            "expectedAnswer": "Deprecated items: (1) FRI (Fashion Retail Individual) and GPS (Guest Personal Shopper) are deprecated names for stylists — now called PSE (Personal Shopper Entrepreneur). (2) Looks and Consultations (Styling Sessions) features are deprecated and no longer available. (3) PSE's direct communication with clients through the platform is deprecated. (4) The term 'rejected' for order status is deprecated — use 'returned' instead.",
+            "expectedAnswer": "Deprecated items: (1) FRI (Fashion Retail Individual) and GPS (Guest Personal Shopper) are deprecated names for stylists \u2014 now called PSE (Personal Shopper Entrepreneur). (2) Looks and Consultations (Styling Sessions) features are deprecated and no longer available. (3) PSE's direct communication with clients through the platform is deprecated. (4) The term 'rejected' for order status is deprecated \u2014 use 'returned' instead.",
             "requiredEntryIds": [
                 "supersession-stylist-name-new",
                 "supersession-looks-new",

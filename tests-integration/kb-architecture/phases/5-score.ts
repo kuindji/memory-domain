@@ -27,9 +27,15 @@ Scoring rubric:
 0 = completely wrong or hallucinated
 1 = vaguely related but incorrect specifics
 2 = partially correct, missing key details
-3 = mostly correct, minor inaccuracies
-4 = correct with good detail
-5 = correct and comprehensive
+3 = mostly correct but has factual errors or wrong sequencing
+4 = correct, covers all key points from expected answer
+5 = correct, covers all key points from expected answer, no factual errors
+
+Important:
+- Adding extra correct detail beyond the expected answer is fine and should NOT reduce the score.
+- Treat synonyms and equivalent terminology as correct (e.g., "rejected" and "returned" are interchangeable).
+- Focus on whether the actual answer contains all key facts from the expected answer and has no factual errors.
+- Wrong sequencing of steps or processes counts as a factual error.
 
 Respond with ONLY a JSON object: {"score": <0-5>, "reasoning": "<one sentence>"}`;
 

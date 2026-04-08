@@ -34,19 +34,13 @@ async function runConfig(config: ArchitectureConfig, fromPhase: number): Promise
     console.log(`Running config: "${config.name}"`);
     console.log(`${"=".repeat(60)}`);
 
-    // Phase 1: Ingest (always needed — creates the engine)
-    let engine;
-    if (fromPhase <= 1) {
-        const result = await runIngest(config);
-        engine = result.engine;
-    }
+    // Engine is always needed for phases 1-4 (in-memory SurrealDB)
+    // Even when resuming from a later phase, we must re-ingest and re-process
+    // to rebuild the engine state
+    if (fromPhase <= 4) {
+        const { engine } = await runIngest(config);
 
-    // Phase 2: Process
-    if (fromPhase <= 2) {
-        if (!engine) {
-            const result = await runIngest(config);
-            engine = result.engine;
-        }
+        // Phase 2: Process (always run to rebuild state)
         const processed = await runProcess(config, engine);
 
         // Fail-fast: classification check
@@ -61,20 +55,14 @@ async function runConfig(config: ArchitectureConfig, fromPhase: number): Promise
             await engine.close();
             return;
         }
-    }
 
-    // Phase 3: Consolidate
-    if (fromPhase <= 3 && engine) {
-        await runConsolidate(config, engine);
-    }
+        // Phase 3: Consolidate
+        if (fromPhase <= 3) {
+            await runConsolidate(config, engine);
+        }
 
-    // Phase 4: Evaluate
-    if (fromPhase <= 4 && engine) {
+        // Phase 4: Evaluate
         await runEvaluate(config, engine);
-    }
-
-    // Close engine before scoring
-    if (engine) {
         await engine.close();
     }
 

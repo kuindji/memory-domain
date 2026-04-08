@@ -17,6 +17,8 @@ interface ClaudeCliConfig {
 const DEFAULT_COMMAND = "claude";
 const DEFAULT_TIMEOUT = 120_000;
 const ERROR_OUTPUT_PREVIEW_LIMIT = 500;
+const MAX_RETRIES = 3;
+const RETRY_BASE_DELAY_MS = 30_000;
 
 function compactOutput(text: string): string {
     return text.replace(/\s+/g, " ").trim();
@@ -53,7 +55,42 @@ class ClaudeCliAdapter implements LLMAdapter {
         return new ClaudeCliAdapter({ ...this.originalConfig, model });
     }
 
+    private isRetryable(errorMessage: string): boolean {
+        return (
+            errorMessage.includes("overloaded") ||
+            errorMessage.includes("529") ||
+            errorMessage.includes("timed out") ||
+            errorMessage.includes("rate_limit") ||
+            errorMessage.includes("503")
+        );
+    }
+
     private async run(prompt: string): Promise<string> {
+        let lastError: Error | undefined;
+
+        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+            if (attempt > 0) {
+                const delay = RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1);
+                console.log(
+                    `[Claude CLI] Retry ${attempt}/${MAX_RETRIES} after ${delay / 1000}s...`,
+                );
+                await new Promise((resolve) => setTimeout(resolve, delay));
+            }
+
+            try {
+                return await this.runOnce(prompt);
+            } catch (err) {
+                lastError = err as Error;
+                if (!this.isRetryable(lastError.message) || attempt === MAX_RETRIES) {
+                    throw lastError;
+                }
+            }
+        }
+
+        throw lastError ?? new Error("Claude CLI failed after retries");
+    }
+
+    private async runOnce(prompt: string): Promise<string> {
         const args = ["--print"];
         if (this.model) {
             args.push("--model", this.model);

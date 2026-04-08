@@ -8,7 +8,7 @@ import type { ArchitectureConfig } from "./types.js";
 import { createConfigurableInboxProcessor } from "./configurable-inbox.js";
 import type { DomainConfig } from "../../src/core/types.js";
 
-const defaultLlm = new ClaudeCliAdapter({ model: "haiku", timeout: 180_000 });
+const defaultLlm = new ClaudeCliAdapter({ model: "haiku", timeout: 300_000 });
 const embedding = new OnnxEmbeddingAdapter();
 
 export function getLlm(): ClaudeCliAdapter {
@@ -28,7 +28,7 @@ export async function createConfiguredEngine(config: ArchitectureConfig): Promis
         ? new ClaudeCliAdapter({
               model: config.answerModel,
               modelLevels: { low: "haiku" },
-              timeout: 180_000,
+              timeout: 300_000,
           })
         : defaultLlm;
 

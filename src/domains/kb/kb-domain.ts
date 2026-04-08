@@ -634,6 +634,26 @@ async function mergeKeywordSearch(
         "already",
         "longer",
         "no longer",
+        "exist",
+        "exists",
+        "give",
+        "gives",
+        "given",
+        "take",
+        "takes",
+        "taken",
+        "make",
+        "makes",
+        "made",
+        "work",
+        "works",
+        "different",
+        "like",
+        "know",
+        "get",
+        "got",
+        "tell",
+        "walk",
     ]);
 
     const keywords = queryText
@@ -651,7 +671,7 @@ async function mergeKeywordSearch(
 
         for (const kw of keywords) {
             const rows = await context.graph.query<MemoryQueryRow[]>(
-                `SELECT * FROM memory WHERE string::lowercase(content) CONTAINS $kw LIMIT 10`,
+                `SELECT * FROM memory WHERE string::contains(string::lowercase(content), $kw) LIMIT 20`,
                 { kw },
             );
             if (!rows) continue;
@@ -664,9 +684,11 @@ async function mergeKeywordSearch(
 
         if (allRows.size === 0) return entries;
 
-        // Filter to entries matching 2+ keywords
+        // Filter to entries matching enough keywords
+        // For short queries (≤3 keywords), 1 match suffices; otherwise require 2+
+        const minMatches = keywords.length <= 3 ? 1 : 2;
         const rows = [...allRows.entries()]
-            .filter(([id]) => (matchCounts.get(id) ?? 0) >= 2)
+            .filter(([id]) => (matchCounts.get(id) ?? 0) >= minMatches)
             .map(([, row]) => row);
 
         if (rows.length === 0) return entries;
