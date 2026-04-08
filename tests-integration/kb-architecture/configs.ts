@@ -251,6 +251,7 @@ export const configs: ArchitectureConfig[] = [
         consolidate: false,
         contextBudget: 2000,
         noiseReduction: { tightenFilters: true, embeddingRerank: true, useQuestionSearch: true },
+        answerModel: "sonnet",
         prompts: {
             "kb/ask":
                 'When describing order status, always use "returned" instead of the deprecated term "rejected".',

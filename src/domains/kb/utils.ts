@@ -404,15 +404,15 @@ export async function batchGenerateQuestions(
                     result.set(entries[item.index].memory.id, item.questions.trim());
                 }
             }
-            return result;
         } catch (error) {
             logKbWarning("kb.inbox.questionGeneration.extractStructured", error);
         }
     }
 
-    // Fallback: generate individually
+    // Retry entries that the batch call skipped, individually
     if (llm.generate) {
-        for (const entry of entries) {
+        const missing = entries.filter((e) => !result.has(e.memory.id));
+        for (const entry of missing) {
             try {
                 const response = await llm.generate(
                     questionPrompt +
