@@ -341,7 +341,12 @@ export interface LLMAdapter {
     consolidate(memories: string[]): Promise<string>;
     assess?(content: string, existingContext: string[]): Promise<number>;
     rerank?(query: string, candidates: { id: string; content: string }[]): Promise<string[]>;
-    synthesize?(query: string, memories: ScoredMemory[], tagContext?: string[]): Promise<string>;
+    synthesize?(
+        query: string,
+        memories: ScoredMemory[],
+        tagContext?: string[],
+        instructions?: string,
+    ): Promise<string>;
     generate?(prompt: string): Promise<string>;
     withLevel?(level: ModelLevel): LLMAdapter;
 }

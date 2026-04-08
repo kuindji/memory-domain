@@ -1159,7 +1159,24 @@ class MemoryEngine {
         if (!this.llm.synthesize) {
             throw new Error("LLM adapter must implement synthesize() to use ask()");
         }
-        const answer = await this.llm.synthesize(question, contextResult.memories);
+
+        // Load domain-specific ask instructions when targeting a single domain
+        let instructions: string | undefined;
+        if (options?.domains?.length === 1) {
+            try {
+                const ctx = this.createDomainContext(options.domains[0], options?.context);
+                instructions = await ctx.loadPrompt("ask");
+            } catch {
+                // Domain has no ask.md skill — use adapter default
+            }
+        }
+
+        const answer = await this.llm.synthesize(
+            question,
+            contextResult.memories,
+            undefined,
+            instructions,
+        );
 
         return { answer, memories: contextResult.memories, rounds: 1 };
     }

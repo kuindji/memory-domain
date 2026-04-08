@@ -116,10 +116,11 @@ function wrapLLMAdapter(adapter: LLMAdapter, debug: DebugTools, scope: string): 
             query: string,
             memories: ScoredMemory[],
             tagContext?: string[],
+            instructions?: string,
         ): Promise<string> =>
             debug.time(
                 `${scope}.synthesize`,
-                () => adapter.synthesize!(query, memories, tagContext),
+                () => adapter.synthesize!(query, memories, tagContext, instructions),
                 {
                     chars: query.length,
                     memories: memories.length,

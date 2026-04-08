@@ -48,6 +48,7 @@ export interface ArchitectureConfig {
         useQuestionSearch?: boolean;
     };
     answerModel?: string;
+    prompts?: Record<string, string>;
 }
 
 export interface Checkpoint<T = unknown> {

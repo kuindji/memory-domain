@@ -44,6 +44,7 @@ export async function createConfiguredEngine(config: ArchitectureConfig): Promis
             defaultWeights: config.search.weights,
         },
         debug: { timing: true },
+        prompts: config.prompts,
     });
 
     // Create a modified KB domain with configurable pipeline stages

@@ -245,6 +245,18 @@ export const configs: ArchitectureConfig[] = [
         noiseReduction: { tightenFilters: true, embeddingRerank: true, useQuestionSearch: true },
     },
     {
+        name: "question-search-prompted",
+        pipeline: { ...NO_SUPERSESSION_PIPELINE, generateQuestions: true },
+        search: HYBRID_DEFAULT,
+        consolidate: false,
+        contextBudget: 2000,
+        noiseReduction: { tightenFilters: true, embeddingRerank: true, useQuestionSearch: true },
+        prompts: {
+            "kb/ask":
+                'When describing order status, always use "returned" instead of the deprecated term "rejected".',
+        },
+    },
+    {
         name: "question-search-sonnet",
         pipeline: { ...NO_SUPERSESSION_PIPELINE, generateQuestions: true },
         search: HYBRID_DEFAULT,

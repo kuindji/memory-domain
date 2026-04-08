@@ -242,6 +242,7 @@ Return ONLY the consolidated text (no JSON, no markdown).`;
         query: string,
         memories: ScoredMemory[],
         tagContext?: string[],
+        instructions?: string,
     ): Promise<string> {
         const memoryList = memories
             .map((m, i) => `[${i + 1}] (score: ${m.score.toFixed(3)}) ${m.content}`)
@@ -251,15 +252,17 @@ Return ONLY the consolidated text (no JSON, no markdown).`;
             ? `\nRelevant context tags: ${tagContext.join(", ")}`
             : "";
 
-        const prompt = `Answer the following query using ONLY the retrieved memories below.
+        const baseInstructions =
+            instructions ??
+            "Answer the following query using ONLY the retrieved memories below.\nBe direct and concise. Cover all relevant points from the memories without adding speculation or information not present in the memories.\nIf the memories don't contain enough information to fully answer, state what's missing rather than guessing.";
+
+        const prompt = `${baseInstructions}
 
 Query: "${query}"
 ${tagBlock}
 
 Retrieved memories:
-${memoryList}
-
-Be direct and concise. Cover all relevant points from the memories without adding speculation or information not present in the memories. If the memories don't contain enough information to fully answer, state what's missing rather than guessing.`;
+${memoryList}`;
 
         return this.run(prompt);
     }
