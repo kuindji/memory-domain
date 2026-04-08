@@ -1,4 +1,7 @@
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { OwnedMemory, DomainContext, ScoredMemory } from "../../core/types.js";
+import { loadPrompt } from "../../core/prompt-loader.js";
 import {
     CODE_REPO_TAG,
     CODE_REPO_DOMAIN_ID,
@@ -7,6 +10,8 @@ import {
 } from "./types.js";
 import type { MemoryClassification, Audience } from "./types.js";
 import { ensureTag, findOrCreateEntity, linkToTopicsBatch, classificationToTag } from "./utils.js";
+
+const BASE_DIR = dirname(fileURLToPath(import.meta.url));
 
 function logCodeRepoInboxWarning(scope: string, error: unknown): void {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -55,23 +60,6 @@ const BATCH_ENTITY_EXTRACTION_SCHEMA = JSON.stringify({
         required: ["index", "entities"],
     },
 });
-
-const BATCH_ENTITY_EXTRACTION_PROMPT =
-    "Extract architectural entities referenced in each numbered code repo knowledge item below. " +
-    "Return only entities explicitly mentioned or clearly implied. " +
-    "Types: module (code packages, services, lambdas), data_entity (domain objects like Order, Payment), " +
-    "concept (business concepts like reconciliation, return flow), pattern (architectural patterns in use). " +
-    "Only extract proper nouns in the project context — specific module names, domain objects, named patterns. " +
-    'Do not extract generic programming terms like "function", "class", "service", "database", "API".';
-
-const BATCH_CLASSIFICATION_PROMPT =
-    "Classify each numbered item below into exactly one category:\n" +
-    '- decision: a choice that was made ("we chose X because Y")\n' +
-    "- rationale: explanation of why something works a certain way\n" +
-    "- clarification: corrects a potential misunderstanding about naming or meaning\n" +
-    "- direction: describes where the project is heading\n" +
-    "- observation: notes a factual state or change\n" +
-    "- question: flags a gap needing human input\n\n";
 
 const BATCH_CONTRADICTION_SCHEMA = JSON.stringify({
     type: "array",
@@ -253,13 +241,14 @@ async function batchClassify(
         return result;
     }
 
+    const classificationPrompt = await loadPrompt(BASE_DIR, "classification");
     const numberedItems = needsClassification
         .map((item, i) => `${i + 1}. ${item.entry.memory.content}`)
         .join("\n\n");
 
     const prompt =
-        BATCH_CLASSIFICATION_PROMPT +
-        `Items:\n${numberedItems}\n\n` +
+        classificationPrompt +
+        `\n\nItems:\n${numberedItems}\n\n` +
         "Respond with ONLY one category per line, matching the item number:\n" +
         needsClassification.map((_, i) => `${i + 1}. <category>`).join("\n");
 
@@ -297,13 +286,14 @@ async function batchExtractEntities(
 
     if (!entityLlm.extractStructured) return result;
 
+    const entityPrompt = await loadPrompt(BASE_DIR, "entity-extraction");
     const numberedItems = entries.map((e, i) => `${i}. ${e.memory.content}`).join("\n\n");
 
     try {
         const raw = (await entityLlm.extractStructured(
             numberedItems,
             BATCH_ENTITY_EXTRACTION_SCHEMA,
-            BATCH_ENTITY_EXTRACTION_PROMPT,
+            entityPrompt,
         )) as Array<{ index: number; entities: EntityResult[] }>;
 
         for (const item of raw) {
@@ -407,14 +397,15 @@ async function processContradictionBatch(
     const llm = context.llmAt("low");
     if (!llm.extractStructured) return;
 
+    const contradictionPrompt = await loadPrompt(BASE_DIR, "contradiction");
+
     const newItems = newDecisions.map((d, i) => `${i}. ${d.memory.content}`).join("\n");
 
     const existingItems = existingDecisions.map((d) => `[${d.id}] ${d.content}`).join("\n");
 
     const prompt =
-        "For each new decision, identify which existing decisions it contradicts (if any). " +
-        "A contradiction means the new decision reverses, overrides, or is incompatible with the existing one.\n\n" +
-        `New decisions:\n${newItems}\n\n` +
+        contradictionPrompt +
+        `\n\nNew decisions:\n${newItems}\n\n` +
         `Existing decisions:\n${existingItems}\n\n` +
         "Return only actual contradictions. If none exist, return an empty array.";
 

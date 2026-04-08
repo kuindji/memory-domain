@@ -1,0 +1,1 @@
+Extract key topics from each numbered message below. Return topics as short noun phrases (1-4 words). Only extract meaningful, specific topics — not generic words.

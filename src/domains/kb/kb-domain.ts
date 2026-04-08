@@ -11,6 +11,7 @@ import type {
     ContextResult,
     LLMAdapter,
 } from "../../core/types.js";
+import { loadPrompt } from "../../core/prompt-loader.js";
 import { countTokens, cosineSimilarity } from "../../core/scoring.js";
 import { TOPIC_TAG } from "../topic/types.js";
 import { KB_DOMAIN_ID, KB_TAG, DEFAULT_CONSOLIDATE_INTERVAL_MS } from "./types.js";
@@ -62,6 +63,8 @@ function buildSchedules(options?: KbDomainOptions): DomainSchedule[] {
     return schedules;
 }
 
+const KB_BASE_DIR = dirname(fileURLToPath(import.meta.url));
+
 async function llmRerankMemories(
     query: string,
     memories: ScoredMemory[],
@@ -70,17 +73,10 @@ async function llmRerankMemories(
     if (memories.length === 0) return memories;
     if (!llm.generate) return memories;
 
+    const rerankPrompt = await loadPrompt(KB_BASE_DIR, "rerank");
     const numbered = memories.map((m, i) => `[${i}] ${m.content.substring(0, 200)}`).join("\n");
 
-    const prompt = `Given the query: "${query}"
-
-Score each memory's relevance (0-5). Only include memories scoring 3+.
-
-Memories:
-${numbered}
-
-Respond with ONLY a JSON array of objects: [{"index": 0, "score": 5}, ...]
-Include only memories with score >= 3.`;
+    const prompt = `Given the query: "${query}"\n\n${rerankPrompt}\n\nMemories:\n${numbered}`;
 
     try {
         const response = await llm.generate(prompt);
@@ -109,7 +105,7 @@ export function createKbDomain(options?: KbDomainOptions): DomainConfig {
     return {
         id: KB_DOMAIN_ID,
         name: "Knowledge Base",
-        baseDir: dirname(fileURLToPath(import.meta.url)),
+        baseDir: KB_BASE_DIR,
         schema: {
             nodes: [
                 {

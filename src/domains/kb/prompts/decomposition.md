@@ -1,0 +1,1 @@
+Decompose the following text into atomic, self-contained claims. Each claim should be a single fact, definition, or instruction that stands on its own without requiring the other claims for context. Preserve specific details, numbers, names, and technical terms. Do NOT generalize or summarize — keep the original specificity.

@@ -1,5 +1,8 @@
 import { StringRecordId } from "surrealdb";
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { OwnedMemory, DomainContext, ScoredMemory } from "../../core/types.js";
+import { loadPrompt } from "../../core/prompt-loader.js";
 import { KB_TAG, KB_DOMAIN_ID, DECOMPOSITION_TOKEN_THRESHOLD } from "./types.js";
 import type { KbClassification } from "./types.js";
 import {
@@ -10,6 +13,8 @@ import {
     batchGenerateQuestions,
 } from "./utils.js";
 import { countTokens } from "../../core/scoring.js";
+
+const BASE_DIR = dirname(fileURLToPath(import.meta.url));
 
 interface DecomposeResult {
     processable: OwnedMemory[];
@@ -29,26 +34,6 @@ const VALID_CLASSIFICATIONS = new Set<string>([
     "concept",
     "insight",
 ]);
-
-const BATCH_CLASSIFICATION_PROMPT =
-    "Classify each numbered item into exactly one knowledge category.\n\n" +
-    "Categories:\n" +
-    "- fact: A specific, verifiable data point or business rule. " +
-    'Example: "TheFloorr uses Rakuten, CJ, Partnerize, and ProductsUp as affiliate networks."\n' +
-    "- definition: Explains WHAT something IS — defines a term, role, or entity. Answers 'what is X?' " +
-    'Example: "A PSE (Personal Shopper Entrepreneur) is a stylist who curates fashion for clients."\n' +
-    "- how-to: Step-by-step process, procedure, or recipe. Answers 'how do I do X?' " +
-    'Example: "To place an order: 1) select products, 2) generate a trackable link, 3) share with client."\n' +
-    "- reference: Describes how a system, feature, or specification WORKS — its structure, rules, " +
-    "configuration, or operational details. Answers 'how does X work?' " +
-    'Example: "Products are partitioned into 16 search indices by gender, region, and price type."\n' +
-    "- concept: An abstract principle, mental model, or framework for understanding. " +
-    'Example: "Attribution connects a purchase back to the stylist who generated the trackable link."\n' +
-    "- insight: A personal conclusion, learned lesson, or practical recommendation. " +
-    'Example: "In practice, most payment delays are caused by pending network approvals."\n\n' +
-    "KEY DISTINCTION: 'definition' answers 'what IS this thing?' while 'reference' answers " +
-    "'how does this thing WORK?' If the text describes system behavior, feature specs, rules, " +
-    "or configuration details, choose 'reference' not 'definition'.\n\n";
 
 const BATCH_CLASSIFICATION_SCHEMA = JSON.stringify({
     type: "array",
@@ -309,6 +294,7 @@ async function batchClassify(
     if (needsClassification.length === 0) return result;
 
     const classifyLlm = context.llmAt("low");
+    const classificationPrompt = await loadPrompt(BASE_DIR, "classification");
 
     const numberedItems = needsClassification
         .map((item, i) => `${i}. ${item.entry.memory.content}`)
@@ -319,7 +305,7 @@ async function batchClassify(
             const raw = (await classifyLlm.extractStructured(
                 `Items:\n${numberedItems}`,
                 BATCH_CLASSIFICATION_SCHEMA,
-                BATCH_CLASSIFICATION_PROMPT,
+                classificationPrompt,
             )) as Array<{ index: number; classification: string }>;
 
             for (const item of raw) {
@@ -336,8 +322,8 @@ async function batchClassify(
     } else if (classifyLlm.generate) {
         try {
             const prompt =
-                BATCH_CLASSIFICATION_PROMPT +
-                `Items:\n${numberedItems}\n\n` +
+                classificationPrompt +
+                `\n\nItems:\n${numberedItems}\n\n` +
                 "Respond with ONLY one category per line, matching the item number:\n" +
                 needsClassification.map((_, i) => `${i}. <category>`).join("\n");
 
@@ -456,15 +442,15 @@ async function processSupersessionBatch(
     const llm = context.llmAt("low");
     if (!llm.extractStructured) return;
 
+    const supersessionPrompt = await loadPrompt(BASE_DIR, "supersession");
+
     const newItems = newEntries.map((e, i) => `${i}. ${e.memory.content}`).join("\n");
 
     const existingItems = existingEntries.map((e) => `[${e.id}] ${e.content}`).join("\n");
 
     const prompt =
-        "For each new knowledge entry, identify which existing entries it supersedes (if any). " +
-        "An entry is superseded when the new entry corrects, updates, or replaces the existing one. " +
-        "Only flag true supersession — not mere similarity or overlap.\n\n" +
-        `New entries:\n${newItems}\n\n` +
+        supersessionPrompt +
+        `\n\nNew entries:\n${newItems}\n\n` +
         `Existing entries:\n${existingItems}\n\n` +
         "Return only actual supersessions. If none exist, return an empty array.";
 
@@ -524,6 +510,8 @@ async function batchLinkRelated(
     const relatedEntries = [...relatedMap.values()];
     if (relatedEntries.length === 0) return;
 
+    const relatedPrompt = await loadPrompt(BASE_DIR, "related-knowledge");
+
     const newItems = entries
         .map(
             (e, i) => `${i}. [${classificationMap.get(e.memory.id) ?? "fact"}] ${e.memory.content}`,
@@ -533,10 +521,8 @@ async function batchLinkRelated(
     const existingItems = relatedEntries.map((e) => `[${e.id}] ${e.content}`).join("\n");
 
     const prompt =
-        "For each new knowledge entry, identify which existing entries are directly related (but NOT superseded). " +
-        "Describe the relationship type: prerequisite (must understand this first), example-of (illustrates a concept), " +
-        "contrast (presents an opposing or alternative view), elaboration (adds detail to existing knowledge).\n\n" +
-        `New entries:\n${newItems}\n\n` +
+        relatedPrompt +
+        `\n\nNew entries:\n${newItems}\n\n` +
         `Existing entries:\n${existingItems}\n\n` +
         "Return only meaningful relationships. If none exist, return an empty array.";
 

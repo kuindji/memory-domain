@@ -1,0 +1,1 @@
+For each new decision, identify which existing decisions it contradicts (if any). A contradiction means the new decision reverses, overrides, or is incompatible with the existing one.

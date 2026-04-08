@@ -1,7 +1,12 @@
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { OwnedMemory, DomainContext } from "../../core/types.js";
+import { loadPrompt } from "../../core/prompt-loader.js";
 import { CHAT_TAG, CHAT_MESSAGE_TAG } from "./types.js";
 import { TOPIC_TAG, TOPIC_DOMAIN_ID } from "../topic/types.js";
 import { ensureTag } from "./utils.js";
+
+const BASE_DIR = dirname(fileURLToPath(import.meta.url));
 
 function logInboxWarning(scope: string, error: unknown): void {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -23,11 +28,6 @@ const BATCH_TOPIC_EXTRACTION_SCHEMA = JSON.stringify({
         required: ["index", "topics"],
     },
 });
-
-const BATCH_TOPIC_EXTRACTION_PROMPT =
-    "Extract key topics from each numbered message below. " +
-    "Return topics as short noun phrases (1-4 words). " +
-    "Only extract meaningful, specific topics — not generic words.";
 
 export async function processInboxBatch(
     entries: OwnedMemory[],
@@ -108,6 +108,7 @@ async function batchExtractTopics(
 ): Promise<Map<string, string[]>> {
     const result = new Map<string, string[]>();
     const llm = context.llmAt("low");
+    const topicPrompt = await loadPrompt(BASE_DIR, "topic-extraction");
 
     // Build numbered content list
     const numberedItems = entries.map((e, i) => `${i}. ${e.memory.content}`).join("\n\n");
@@ -117,7 +118,7 @@ async function batchExtractTopics(
             const raw = (await llm.extractStructured(
                 numberedItems,
                 BATCH_TOPIC_EXTRACTION_SCHEMA,
-                BATCH_TOPIC_EXTRACTION_PROMPT,
+                topicPrompt,
             )) as Array<{ index: number; topics: string[] }>;
 
             for (const item of raw) {

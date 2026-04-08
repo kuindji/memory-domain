@@ -1,5 +1,8 @@
 import { StringRecordId } from "surrealdb";
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { DomainContext, LLMAdapter, OwnedMemory } from "../../core/types.js";
+import { loadPrompt } from "../../core/prompt-loader.js";
 import { TOPIC_TAG, TOPIC_DOMAIN_ID } from "../topic/types.js";
 import type { KbClassification, QueryIntent } from "./types.js";
 import {
@@ -8,6 +11,8 @@ import {
     DEFAULT_IMPORTANCE,
     MAX_ATOMIC_FACTS,
 } from "./types.js";
+
+const BASE_DIR = dirname(fileURLToPath(import.meta.url));
 
 const VALID_CLASSIFICATIONS = new Set<string>([
     "fact",
@@ -90,13 +95,6 @@ const ATOMIC_DECOMPOSITION_SCHEMA = JSON.stringify({
     },
 });
 
-const DECOMPOSITION_PROMPT =
-    "Decompose the following text into atomic, self-contained claims. " +
-    "Each claim should be a single fact, definition, or instruction that stands on its own " +
-    "without requiring the other claims for context. " +
-    "Preserve specific details, numbers, names, and technical terms. " +
-    "Do NOT generalize or summarize — keep the original specificity.";
-
 /**
  * Decomposes a long content string into atomic facts using LLM extraction.
  * Returns null if decomposition is not worthwhile (<=1 fact or extraction fails).
@@ -109,10 +107,11 @@ export async function decomposeToAtomicFacts(
     if (!llm.extractStructured) return null;
 
     try {
+        const decompositionPrompt = await loadPrompt(BASE_DIR, "decomposition");
         const results = (await llm.extractStructured(
             content,
             ATOMIC_DECOMPOSITION_SCHEMA,
-            DECOMPOSITION_PROMPT,
+            decompositionPrompt,
         )) as Array<{ claim: string; classification?: string }>;
 
         if (!Array.isArray(results) || results.length <= 1) return null;
@@ -169,11 +168,6 @@ const BATCH_TOPIC_EXTRACTION_SCHEMA = JSON.stringify({
     },
 });
 
-const BATCH_TOPIC_EXTRACTION_PROMPT =
-    "Extract key topics from each numbered item below. " +
-    "Return topics as short noun phrases (1-4 words). " +
-    "Only extract meaningful, specific topics — not generic words.";
-
 /**
  * Batch extracts topics from multiple entries in a single LLM call,
  * then links each entry to its extracted topics.
@@ -214,6 +208,7 @@ async function batchExtractTopics(
 ): Promise<Map<string, string[]>> {
     const result = new Map<string, string[]>();
     const llm = context.llmAt("low");
+    const topicPrompt = await loadPrompt(BASE_DIR, "topic-extraction");
 
     const numberedItems = entries.map((e, i) => `${i}. ${e.memory.content}`).join("\n\n");
 
@@ -222,7 +217,7 @@ async function batchExtractTopics(
             const raw = (await llm.extractStructured(
                 numberedItems,
                 BATCH_TOPIC_EXTRACTION_SCHEMA,
-                BATCH_TOPIC_EXTRACTION_PROMPT,
+                topicPrompt,
             )) as Array<{ index: number; topics: string[] }>;
 
             for (const item of raw) {
@@ -260,18 +255,6 @@ export const ALL_CLASSIFICATIONS: KbClassification[] = [
     "insight",
 ];
 
-const QUERY_INTENT_PROMPT =
-    "Classify what type of knowledge best answers this query.\n\n" +
-    "Categories:\n" +
-    "- fact: Asks for a specific data point or verifiable statement\n" +
-    "- definition: Asks 'what IS something?' — wants a term or entity explained\n" +
-    "- how-to: Asks 'how do I do X?' — wants a step-by-step process\n" +
-    "- reference: Asks 'how does X work?' — wants system behavior, specs, or configuration details\n" +
-    "- concept: Asks about an abstract principle or mental model\n" +
-    "- insight: Asks for practical recommendations or lessons learned\n\n" +
-    "Return 1-3 most relevant categories, key search keywords, and an optional topic.\n\n" +
-    "Query: ";
-
 const QUERY_INTENT_SCHEMA = JSON.stringify({
     type: "object",
     properties: {
@@ -305,10 +288,12 @@ export async function classifyQueryIntent(text: string, llm: LLMAdapter): Promis
             .filter((w) => w.length > 2),
     };
 
+    const queryIntentPrompt = await loadPrompt(BASE_DIR, "query-intent");
+
     if (llm.extractStructured) {
         try {
             const parsed = (await llm.extractStructured(
-                QUERY_INTENT_PROMPT + text,
+                queryIntentPrompt + text,
                 QUERY_INTENT_SCHEMA,
                 "Classify the query intent.",
             )) as unknown as {
@@ -340,7 +325,7 @@ export async function classifyQueryIntent(text: string, llm: LLMAdapter): Promis
 
     try {
         const response = await llm.generate(
-            QUERY_INTENT_PROMPT +
+            queryIntentPrompt +
                 text +
                 '\n\nReturn JSON: {"classifications": [...], "keywords": [...], "topic": "..."}',
         );
@@ -387,13 +372,6 @@ const BATCH_QUESTION_GENERATION_SCHEMA = JSON.stringify({
     },
 });
 
-const BATCH_QUESTION_GENERATION_PROMPT =
-    "For each numbered knowledge entry below, generate 1-2 specific questions that this entry directly answers. " +
-    "Be precise and discriminating — the questions should distinguish this entry from other entries about the same broad topic. " +
-    "For example, if the entry is about 'commission split ratios', write 'What is the default commission split ratio?' " +
-    "NOT 'What is the commission system?' which is too vague. " +
-    "Return the questions as a single string (space-separated if multiple).";
-
 /**
  * Batch generates answersQuestion text for multiple entries in a single LLM call.
  * Returns a map from memory ID to generated question text.
@@ -406,6 +384,7 @@ export async function batchGenerateQuestions(
     if (entries.length === 0) return result;
 
     const llm = context.llmAt("low");
+    const questionPrompt = await loadPrompt(BASE_DIR, "question-generation");
     const numberedItems = entries.map((e, i) => `${i}. ${e.memory.content}`).join("\n\n");
 
     if (llm.extractStructured) {
@@ -413,7 +392,7 @@ export async function batchGenerateQuestions(
             const raw = (await llm.extractStructured(
                 numberedItems,
                 BATCH_QUESTION_GENERATION_SCHEMA,
-                BATCH_QUESTION_GENERATION_PROMPT,
+                questionPrompt,
             )) as Array<{ index: number; questions: string }>;
 
             for (const item of raw) {
@@ -437,9 +416,8 @@ export async function batchGenerateQuestions(
         for (const entry of entries) {
             try {
                 const response = await llm.generate(
-                    "Generate 1-2 specific questions that this knowledge entry directly answers. " +
-                        "Be precise — distinguish from other entries on the same broad topic.\n\n" +
-                        `Entry: ${entry.memory.content}\n\nReturn only the question(s), nothing else.`,
+                    questionPrompt +
+                        `\n\nEntry: ${entry.memory.content}\n\nReturn only the question(s), nothing else.`,
                 );
                 const trimmed = response.trim();
                 if (trimmed) {
