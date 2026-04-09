@@ -62,6 +62,7 @@ export type {
     ModelLevel,
     ConnectionAdapter,
     S3AdapterConfig,
+    CoreMemory,
 } from "./core/types.js";
 export type { TopicAttributes, TopicDomainOptions, TopicStatus } from "./domains/topic/types.js";
 export type { UserDomainOptions } from "./domains/user/types.js";

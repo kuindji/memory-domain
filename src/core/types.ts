@@ -158,6 +158,14 @@ export interface ScoredMemory {
     };
 }
 
+// --- Core memory types ---
+
+export interface CoreMemory {
+    id: string;
+    content: string;
+    createdAt: number;
+}
+
 // --- Model level types ---
 
 export type ModelLevel = "low" | "medium" | "high";
@@ -220,6 +228,7 @@ export interface DomainContext {
     getMemoryTags(memoryId: string): Promise<string[]>;
     getNodeEdges(nodeId: string, direction?: "in" | "out" | "both"): Promise<Edge[]>;
     loadPrompt(name: string): Promise<string>;
+    getCoreMemories(): Promise<CoreMemory[]>;
 }
 
 export interface DomainSchedule {

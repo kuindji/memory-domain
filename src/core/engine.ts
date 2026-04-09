@@ -45,6 +45,7 @@ import type {
     ConnectionAdapter,
     TuneOptions,
     TuneResult,
+    CoreMemory,
 } from "./types.js";
 
 class MemoryEngine {
@@ -396,6 +397,49 @@ class MemoryEngine {
         }
 
         return results;
+    }
+
+    // --- Core memory API ---
+
+    private async loadCoreMemories(domainId: string): Promise<CoreMemory[]> {
+        const metaId = `meta:${domainId}_core_memories`;
+        const node = await this.graph.getNode(metaId);
+        if (!node?.value) return [];
+        try {
+            return JSON.parse(node.value as string) as CoreMemory[];
+        } catch {
+            return [];
+        }
+    }
+
+    private async saveCoreMemories(domainId: string, memories: CoreMemory[]): Promise<void> {
+        const metaId = `meta:${domainId}_core_memories`;
+        const value = JSON.stringify(memories);
+        try {
+            await this.graph.createNodeWithId(metaId, { value });
+        } catch {
+            await this.graph.updateNode(metaId, { value });
+        }
+    }
+
+    async addCoreMemory(domainId: string, content: string): Promise<string> {
+        const domain = this.domainRegistry.get(domainId);
+        if (!domain) throw new Error(`Domain "${domainId}" not found`);
+        const id = crypto.randomUUID();
+        const memories = await this.loadCoreMemories(domainId);
+        memories.push({ id, content, createdAt: Date.now() });
+        await this.saveCoreMemories(domainId, memories);
+        return id;
+    }
+
+    async listCoreMemories(domainId: string): Promise<CoreMemory[]> {
+        return this.loadCoreMemories(domainId);
+    }
+
+    async removeCoreMemory(domainId: string, id: string): Promise<void> {
+        const memories = await this.loadCoreMemories(domainId);
+        const filtered = memories.filter((m) => m.id !== id);
+        await this.saveCoreMemories(domainId, filtered);
     }
 
     listSchedules(domainId?: string): ScheduleInfo[] {
@@ -763,6 +807,8 @@ class MemoryEngine {
         const domainRegistry = this.domainRegistry;
         const tunableParams = this.tunableParams;
         const promptExtras = this.promptExtras;
+        const loadCoreMems = this.loadCoreMemories.bind(this);
+        let cachedCoreMemories: CoreMemory[] | null = null;
         const debug = createDebugTools(`domain:${domainId}`, this.debugConfig);
         const llm = wrapLLMAdapter(baseLlm, debug, "llm");
 
@@ -1105,8 +1151,20 @@ class MemoryEngine {
                     );
                 }
                 const base = await loadPromptFromFile(domain.baseDir, name);
+                const core = await this.getCoreMemories();
+                const coreBlock = core.length > 0 ? core.map((m) => m.content).join("\n") : "";
                 const extra = promptExtras[`${domainId}/${name}`];
-                return extra ? `${base}\n\n${extra}` : base;
+                const parts = [base];
+                if (coreBlock) parts.push(coreBlock);
+                if (extra) parts.push(extra);
+                return parts.join("\n\n");
+            },
+
+            async getCoreMemories(): Promise<CoreMemory[]> {
+                if (cachedCoreMemories === null) {
+                    cachedCoreMemories = await loadCoreMems(domainId);
+                }
+                return cachedCoreMemories;
             },
         };
     }
@@ -1138,8 +1196,20 @@ class MemoryEngine {
         );
 
         // Format as numbered plain text
-        const context = fitted.map((m, i) => `[${i + 1}] ${m.content}`).join("\n\n");
+        const sections: string[] = [];
 
+        // Prepend core memories if targeting a single domain
+        if (options?.domains?.length === 1) {
+            const ctx = this.createDomainContext(options.domains[0], options?.context);
+            const core = await ctx.getCoreMemories();
+            if (core.length > 0) {
+                sections.push(`[Instructions]\n${core.map((m) => m.content).join("\n")}`);
+            }
+        }
+
+        sections.push(fitted.map((m, i) => `[${i + 1}] ${m.content}`).join("\n\n"));
+
+        const context = sections.join("\n\n");
         const totalTokens = countTokens(context);
 
         return { context, memories: fitted, totalTokens };

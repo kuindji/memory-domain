@@ -331,6 +331,12 @@ export function createKbDomain(options?: KbDomainOptions): DomainConfig {
                 allMemories.push(...howtoInsight);
             }
 
+            // Prepend core memories
+            const core = await context.getCoreMemories();
+            if (core.length > 0) {
+                sections.unshift(`[Instructions]\n${core.map((m) => m.content).join("\n")}`);
+            }
+
             const finalContext = sections.join("\n\n");
 
             // Include dedup aliases — entries whose content is represented by a surviving entry

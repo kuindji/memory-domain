@@ -175,6 +175,12 @@ export function createChatDomain(options?: ChatDomainOptions): DomainConfig {
                 }
             }
 
+            // Prepend core memories
+            const core = await context.getCoreMemories();
+            if (core.length > 0) {
+                sections.unshift(`[Instructions]\n${core.map((m) => m.content).join("\n")}`);
+            }
+
             const finalContext = sections.join("\n\n");
             const totalTokens = countTokens(finalContext);
 
