@@ -36,7 +36,8 @@
         "format": "prettier --write .",
         "format:check": "prettier --check .",
         "memory-domain": "bun run src/cli/cli.ts",
-        "tui": "bun run src/tui/tui.ts"
+        "tui": "bun run src/tui/tui.ts",
+        "publish": "npm publish --access public"
     },
     "dependencies": {
         "@aws-sdk/client-s3": "^3.1023.0",

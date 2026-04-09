@@ -8,3 +8,4 @@ bun.lock
 memory-domain.config.ts
 memory-domain.config.js
 datasets/
+.worktrees/
