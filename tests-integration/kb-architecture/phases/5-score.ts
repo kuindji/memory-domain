@@ -7,13 +7,17 @@ import type {
 } from "../types.js";
 import { readCheckpoint, writeCheckpoint } from "../checkpoint.js";
 import { getLlm } from "../engine-factory.js";
+import { ClaudeCliAdapter } from "../../../src/adapters/llm/claude-cli.js";
 
 async function scoreAnswer(
     question: string,
     expectedAnswer: string,
     actualAnswer: string,
+    scorerModel?: string,
 ): Promise<{ score: number; reasoning: string }> {
-    const llm = getLlm();
+    const llm = scorerModel
+        ? new ClaudeCliAdapter({ model: scorerModel, timeout: 300_000 })
+        : getLlm();
 
     const prompt = `You are a strict grader. Score the following answer on a 0-5 scale.
 
@@ -72,6 +76,7 @@ export async function runScore(config: ArchitectureConfig): Promise<ScoresData> 
             evalEntry.question,
             evalEntry.expectedAnswer,
             evalEntry.answer,
+            config.scorerModel,
         );
 
         const requiredFound = evalEntry.requiredEntryIds.filter((id) =>

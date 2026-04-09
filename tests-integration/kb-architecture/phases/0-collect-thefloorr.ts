@@ -236,7 +236,7 @@ function getVerificationQuestions(entryIds: string[]): VerificationQuestion[] {
             id: "q-affiliate-networks",
             question: "What affiliate networks does TheFloorr use for its product catalogue?",
             expectedAnswer:
-                "TheFloorr uses four affiliate networks: Rakuten, Commission Junction (CJ), Partnerize, and ProductsUp. These networks provide product data feeds from hundreds of retailers, which are downloaded multiple times a day through an automated pipeline.",
+                "TheFloorr uses three affiliate networks: Rakuten, Commission Junction (CJ), and Partnerize. These networks provide product data feeds from hundreds of retailers, which are downloaded multiple times a day through an automated pipeline.",
             requiredEntryIds: findBySlug("biz-", "where-products-come-from"),
             excludedEntryIds: [],
             difficulty: "easy",
@@ -246,10 +246,7 @@ function getVerificationQuestions(entryIds: string[]): VerificationQuestion[] {
             question: "What is a Moodboard on TheFloorr?",
             expectedAnswer:
                 "A Moodboard is a curated product collection used for inspiration. Stylists create them to organise ideas for clients. Moodboards can be public or private, shared with specific users, and used as templates for teams. They contain products from the catalogue along with notes and inspiration.",
-            requiredEntryIds: [
-                ...findBySlug("biz-", "moodboards"),
-                ...findBySlug("pse-", "moodboards"),
-            ],
+            requiredEntryIds: findBySlug("biz-", "moodboards"),
             excludedEntryIds: [],
             difficulty: "easy",
         },
@@ -261,10 +258,7 @@ function getVerificationQuestions(entryIds: string[]): VerificationQuestion[] {
                 "How does a stylist earn commission on TheFloorr? Walk me through the process.",
             expectedAnswer:
                 "A stylist recommends products to clients using Moodboards or by sharing trackable links. When a client clicks a trackable link and purchases the product at the retailer's website, the affiliate network records the sale. Commission is generated and attributed to the stylist. The default split is 80% to the stylist and 20% to TheFloorr. Commission rates vary by retailer and can differ for full-price versus sale items.",
-            requiredEntryIds: [
-                ...findBySlug("pse-", "how-you-earn-money"),
-                ...findBySlug("pse-", "the-purchase-flow"),
-            ],
+            requiredEntryIds: findBySlug("biz-", "how-an-order-happens"),
             excludedEntryIds: [],
             difficulty: "medium",
         },
@@ -272,8 +266,8 @@ function getVerificationQuestions(entryIds: string[]): VerificationQuestion[] {
             id: "q-payment-delayed",
             question: "Why might a stylist's commission payment be delayed?",
             expectedAnswer:
-                "Several reasons: (1) The affiliate network has not yet paid TheFloorr — networks typically pay monthly. (2) The order is still pending at the network level and not yet confirmed. (3) The commission has not been approved for payment in the admin system. (4) The payment has not been batched into a Revolut transfer yet. (5) A return was detected and commission needs recalculation. (6) The Revolut transfer is still in progress.",
-            requiredEntryIds: findBySlug("", "payment-might-be-delayed"),
+                "Several reasons: (1) The affiliate network has not yet paid TheFloorr — the order's affiliate payment status is still pending. (2) The order is still pending approval at the network level. (3) The commission has not yet been approved for payment in the admin system. (4) The Revolut payment draft has not been created or sent yet.",
+            requiredEntryIds: findBySlug("biz-", "payment-might-be-delayed"),
             excludedEntryIds: [],
             difficulty: "medium",
         },
@@ -300,7 +294,7 @@ function getVerificationQuestions(entryIds: string[]): VerificationQuestion[] {
             question:
                 "How do order statuses work on TheFloorr? What are the different status dimensions?",
             expectedAnswer:
-                "Every order has three separate, independent status tracks: (1) Affiliate Order Status — what the affiliate network reports (pending, new, approved, auto-approved, rejected, declined, closed, locked, mixed). (2) Internal Order Status — TheFloorr's own assessment, calculated from affiliate status and item states. (3) Manual Status — an admin override that forces the internal status regardless of network data. These three dimensions move independently.",
+                "Every order has three separate, independent status tracks: (1) Affiliate Order Status — what the affiliate network reports (pending, new, approved, auto-approved, returned, declined, closed, locked, mixed). (2) Internal Order Status — TheFloorr's own assessment, calculated from affiliate status and item states. (3) Manual Status — an admin override that forces the internal status regardless of network data. These three dimensions move independently.",
             requiredEntryIds: findBySlug("biz-", "order-status"),
             excludedEntryIds: [],
             difficulty: "medium",
@@ -338,7 +332,7 @@ function getVerificationQuestions(entryIds: string[]): VerificationQuestion[] {
             question:
                 "What is the difference between affiliate order status, internal order status, and manual status? Give examples of each.",
             expectedAnswer:
-                "Affiliate Order Status reflects what the network reports: pending, new, approved, auto-approved, rejected, declined, closed, locked, or mixed. Internal Order Status is TheFloorr's own calculation: if all items returned → internally returned; if network says closed/locked → internally approved; if still new/pending → stays pending. Manual Status is an admin override that forces internal status regardless of network data — used for data corrections, reconciliation, and edge cases the automated rules can't handle.",
+                "Affiliate Order Status reflects what the network reports: pending, new, approved, auto-approved, returned, declined, closed, locked, or mixed. Internal Order Status is TheFloorr's own calculation: if all items returned → internally returned; if network says closed/locked → internally approved; if still new/pending → stays pending. Manual Status is an admin override that forces internal status regardless of network data — used for data corrections, reconciliation, and edge cases the automated rules can't handle.",
             requiredEntryIds: findBySlug("biz-", "order-status"),
             excludedEntryIds: [],
             difficulty: "hard",
@@ -407,10 +401,8 @@ export function collectTheFloorrData(): Dataset {
     console.log("[Phase 0] Collecting TheFloorr business dataset from markdown files...\n");
 
     const businessMd = readFileSync(join(DATASETS_DIR, "thefloorr-business.md"), "utf-8");
-    const pseMd = readFileSync(join(DATASETS_DIR, "thefloorr-pse.md"), "utf-8");
 
     const businessSections = parseMarkdownSections(businessMd);
-    const pseSections = parseMarkdownSections(pseMd);
 
     const entries: DatasetEntry[] = [];
 
@@ -419,20 +411,6 @@ export function collectTheFloorrData(): Dataset {
         const slug = slugify(section.heading);
         const meta = BUSINESS_ENTRY_META[slug];
         const id = `biz-${slug}`;
-
-        entries.push({
-            id,
-            content: `${section.heading}\n\n${section.content}`,
-            expectedClassification: meta?.classification ?? "fact",
-            ...(meta?.relatedGroup ? { relatedGroup: meta.relatedGroup } : {}),
-        });
-    }
-
-    // Process PSE sections
-    for (const section of pseSections) {
-        const slug = slugify(section.heading);
-        const meta = PSE_ENTRY_META[slug];
-        const id = `pse-${slug}`;
 
         entries.push({
             id,
@@ -451,7 +429,6 @@ export function collectTheFloorrData(): Dataset {
     const questions = getVerificationQuestions(entryIds);
 
     console.log(`  Business sections: ${businessSections.length}`);
-    console.log(`  PSE sections: ${pseSections.length}`);
     console.log(`  Manual entries: ${manualEntries.length}`);
     console.log(
         `\n[Phase 0] Collected ${entries.length} entries, ${questions.length} verification questions`,

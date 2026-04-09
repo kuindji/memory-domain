@@ -48,7 +48,9 @@ export interface ArchitectureConfig {
         useQuestionSearch?: boolean;
     };
     answerModel?: string;
+    scorerModel?: string;
     prompts?: Record<string, string>;
+    coreMemories?: Record<string, string[]>;
 }
 
 export interface Checkpoint<T = unknown> {

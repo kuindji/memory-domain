@@ -27,7 +27,6 @@ export async function createConfiguredEngine(config: ArchitectureConfig): Promis
     const llm = config.answerModel
         ? new ClaudeCliAdapter({
               model: config.answerModel,
-              modelLevels: { low: "haiku" },
               timeout: 300_000,
           })
         : defaultLlm;
@@ -96,6 +95,15 @@ export async function createConfiguredEngine(config: ArchitectureConfig): Promis
     } else {
         // Existing configs without noiseReduction: disable rerank
         await engine.saveTunableParams("kb", { embeddingRerank: 0 });
+    }
+
+    // Register core memories
+    if (config.coreMemories) {
+        for (const [domainId, memories] of Object.entries(config.coreMemories)) {
+            for (const content of memories) {
+                await engine.addCoreMemory(domainId, content);
+            }
+        }
     }
 
     return engine;

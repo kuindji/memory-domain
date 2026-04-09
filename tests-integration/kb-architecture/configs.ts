@@ -265,5 +265,12 @@ export const configs: ArchitectureConfig[] = [
         contextBudget: 2000,
         noiseReduction: { tightenFilters: true, embeddingRerank: true, useQuestionSearch: true },
         answerModel: "sonnet",
+        scorerModel: "sonnet",
+        coreMemories: {
+            kb: [
+                'Always use "returned" instead of the deprecated term "rejected" in your responses.',
+                "PSE is Personal Shopper Entrepreneur.",
+            ],
+        },
     },
 ];

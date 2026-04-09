@@ -1,1 +1,1 @@
-For each new knowledge entry, identify which existing entries it supersedes (if any). An entry is superseded when the new entry corrects, updates, or replaces the existing one. Only flag true supersession — not mere similarity or overlap.
+In the text below for each new knowledge entry, identify which existing entries it supersedes (if any). An entry is superseded when the new entry corrects, updates, or replaces the existing one. Only flag true supersession — not mere similarity or overlap.
