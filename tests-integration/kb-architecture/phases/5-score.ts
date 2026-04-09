@@ -38,8 +38,10 @@ Scoring rubric:
 Important:
 - Adding extra correct detail beyond the expected answer is fine and should NOT reduce the score.
 - Treat synonyms and equivalent terminology as correct (e.g., "rejected" and "returned" are interchangeable).
+- Expressing the same value in different but mathematically equivalent forms is NOT an error (e.g., "20%" and "£10" when 10 is 20% of 50).
 - Focus on whether the actual answer contains all key facts from the expected answer and has no factual errors.
 - Wrong sequencing of steps or processes counts as a factual error.
+- A "factual error" means stating something that contradicts the expected answer or is objectively false. Rephrasing, reordering non-sequential information, or adding correct context is NOT a factual error.
 
 Respond with ONLY a JSON object: {"score": <0-5>, "reasoning": "<one sentence>"}`;
 
