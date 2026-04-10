@@ -1,6 +1,6 @@
 {
     "name": "@kuindji/memory-domain",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "type": "module",
     "description": "Domain-driven memory engine with graph storage, embeddings, and semantic search",
     "license": "MIT",
@@ -40,6 +40,7 @@
         "publish": "npm publish --access public"
     },
     "dependencies": {
+        "@anthropic-ai/bedrock-sdk": "^0.28.1",
         "@aws-sdk/client-s3": "^3.1023.0",
         "@aws-sdk/credential-providers": "^3.1023.0",
         "@clack/prompts": "^1.2.0",

@@ -5,6 +5,7 @@
 
 import { spawn } from "node:child_process";
 import type { LLMAdapter, ScoredMemory, ModelLevel } from "../../core/types.js";
+import { parseJsonResponse } from "./json-response.js";
 
 interface ClaudeCliConfig {
     command?: string;
@@ -163,18 +164,12 @@ class ClaudeCliAdapter implements LLMAdapter {
         }
     }
 
-    private parseJsonResponse<T>(text: string): T {
-        const jsonMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
-        const jsonStr = jsonMatch ? jsonMatch[1] : text;
-        return JSON.parse(jsonStr) as T;
-    }
-
     async extractStructured(text: string, schema: string, prompt?: string): Promise<unknown[]> {
         const systemPrompt = prompt ?? "Extract structured information from the following text.";
 
         const fullPrompt = `${systemPrompt}\n\nExpected output schema for each item:\n${schema}\n\n<text>\n${text}\n</text>\n\nReturn ONLY a JSON array of objects matching the schema.`;
         const response = await this.run(fullPrompt);
-        return this.parseJsonResponse<unknown[]>(response);
+        return parseJsonResponse<unknown[]>(response);
     }
 
     async extract(text: string, prompt?: string): Promise<string[]> {
@@ -184,7 +179,7 @@ class ClaudeCliAdapter implements LLMAdapter {
 
         const fullPrompt = `${systemPrompt}\n\n<text>\n${text}\n</text>\n\nReturn ONLY a JSON array of strings.`;
         const response = await this.run(fullPrompt);
-        return this.parseJsonResponse<string[]>(response);
+        return parseJsonResponse<string[]>(response);
     }
 
     async assess(content: string, existingContext: string[]): Promise<number> {
@@ -219,7 +214,7 @@ ${candidateList}
 Return ONLY a JSON array of ID strings.`;
 
         const response = await this.run(prompt);
-        return this.parseJsonResponse<string[]>(response);
+        return parseJsonResponse<string[]>(response);
     }
 
     async consolidate(memories: string[]): Promise<string> {

@@ -84,6 +84,8 @@ export { createKbDomain, kbDomain } from "./domains/kb/index.js";
 
 // Adapters
 export { ClaudeCliAdapter } from "./adapters/llm/claude-cli.js";
+export { BedrockAdapter } from "./adapters/llm/bedrock.js";
+export type { BedrockAdapterConfig } from "./core/types.js";
 export { OnnxEmbeddingAdapter } from "./adapters/onnx-embedding.js";
 export type { OnnxEmbeddingConfig } from "./adapters/onnx-embedding.js";
 export { PassthroughAdapter } from "./adapters/connection/passthrough.js";

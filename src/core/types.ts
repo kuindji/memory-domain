@@ -388,6 +388,20 @@ export interface S3AdapterConfig {
     };
 }
 
+export interface BedrockAdapterConfig {
+    modelId: string;
+    region: string;
+    modelLevels?: Partial<Record<ModelLevel, string>>;
+    maxTokens?: number;
+    timeout?: number;
+    profile?: string;
+    credentials?: {
+        accessKeyId: string;
+        secretAccessKey: string;
+        sessionToken?: string;
+    };
+}
+
 // --- Config types ---
 
 export interface EngineConfig {
