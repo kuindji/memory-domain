@@ -10,7 +10,8 @@ export { Scheduler } from "./core/scheduler.js";
 export { EventEmitter } from "./core/events.js";
 
 // Scoring utilities
-export { computeDecay, countTokens, mergeScores, applyTokenBudget } from "./core/scoring.js";
+export { computeDecay, countTokens, mergeScores, applyTokenBudget, cosineSimilarity } from "./core/scoring.js";
+export type { TunableParamDefinition } from "./core/tunable-params.js";
 
 // Types
 export type {
