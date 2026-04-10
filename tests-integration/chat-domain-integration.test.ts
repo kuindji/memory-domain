@@ -20,7 +20,7 @@ import {
     CHAT_EPISODIC_TAG,
     CHAT_SEMANTIC_TAG,
 } from "../src/domains/chat/types.js";
-import { TOPIC_DOMAIN_ID } from "../src/domains/topic/types.js";
+import { TOPIC_DOMAIN_ID, TOPIC_TAG } from "../src/domains/topic/types.js";
 import { USER_DOMAIN_ID, USER_TAG } from "../src/domains/user/types.js";
 import {
     promoteWorkingMemory,
@@ -348,9 +348,21 @@ describe("Full chat lifecycle (real)", () => {
         );
 
         // --- Phase 5: Verify domain-scoped search isolation ---
-        const chatSearch = await engine.search({ mode: "graph", domains: [CHAT_DOMAIN_ID] });
-        const userSearch = await engine.search({ mode: "graph", domains: [USER_DOMAIN_ID] });
-        const topicSearch = await engine.search({ mode: "graph", domains: [TOPIC_DOMAIN_ID] });
+        const chatSearch = await engine.search({
+            mode: "graph",
+            tags: [CHAT_MESSAGE_TAG, CHAT_EPISODIC_TAG, CHAT_SEMANTIC_TAG],
+            domains: [CHAT_DOMAIN_ID],
+        });
+        const userSearch = await engine.search({
+            mode: "graph",
+            tags: [`${USER_TAG}/role`],
+            domains: [USER_DOMAIN_ID],
+        });
+        const topicSearch = await engine.search({
+            mode: "graph",
+            tags: [TOPIC_TAG],
+            domains: [TOPIC_DOMAIN_ID],
+        });
 
         // Chat and user memories should not overlap
         const chatIds = new Set(chatSearch.entries.map((e) => e.id));

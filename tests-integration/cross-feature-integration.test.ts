@@ -164,8 +164,20 @@ describe("Topic + User domain coexistence (real)", () => {
     });
 
     test("domain-scoped search returns only domain-owned memories", async () => {
-        const userOnly = await engine.search({ mode: "graph", domains: [USER_DOMAIN_ID] });
-        const topicOnly = await engine.search({ mode: "graph", domains: [TOPIC_DOMAIN_ID] });
+        const userOnly = await engine.search({
+            mode: "graph",
+            tags: [
+                `${USER_TAG}/expertise`,
+                `${USER_TAG}/preference`,
+                `${USER_TAG}/profile-summary`,
+            ],
+            domains: [USER_DOMAIN_ID],
+        });
+        const topicOnly = await engine.search({
+            mode: "graph",
+            tags: [TOPIC_TAG],
+            domains: [TOPIC_DOMAIN_ID],
+        });
 
         // User domain should have user facts + consolidation summary
         expect(userOnly.entries.length).toBeGreaterThanOrEqual(2);
