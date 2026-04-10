@@ -88,6 +88,8 @@ export { OnnxEmbeddingAdapter } from "./adapters/onnx-embedding.js";
 export type { OnnxEmbeddingConfig } from "./adapters/onnx-embedding.js";
 export { PassthroughAdapter } from "./adapters/connection/passthrough.js";
 export { S3ConnectionAdapter } from "./adapters/connection/s3.js";
+export { FileConnectionAdapter } from "./adapters/connection/file.js";
+export type { FileAdapterConfig } from "./adapters/connection/file.js";
 
 // Config
 export { resolveConfigPath, loadConfig } from "./config-loader.js";
