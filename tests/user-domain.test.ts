@@ -1,4 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
+import { StringRecordId } from "surrealdb";
 import { MemoryEngine } from "../src/core/engine.js";
 import { MockLLMAdapter, MockEmbeddingAdapter } from "./helpers.js";
 import { consolidateUserProfile } from "../src/domains/user/schedules.js";
@@ -28,20 +29,29 @@ describe("User domain - config", () => {
         expect(skillIds).toContain("user-profile");
     });
 
-    test("schema has 1 node (user with userId field + unique index) and 1 edge (about_user)", () => {
+    test("schema declares user node (with userId unique index), memory classification field, about_user and supersedes edges", () => {
         const domain = createUserDomain();
         const nodes = domain.schema!.nodes;
-        expect(nodes).toHaveLength(1);
-        expect(nodes[0].name).toBe("user");
-        expect(nodes[0].fields).toEqual([{ name: "userId", type: "string", required: true }]);
-        expect(nodes[0].indexes).toHaveLength(1);
-        expect(nodes[0].indexes![0].type).toBe("unique");
+        const userNode = nodes.find((n) => n.name === "user");
+        expect(userNode).toBeDefined();
+        expect(userNode!.fields).toEqual([{ name: "userId", type: "string", required: true }]);
+        expect(userNode!.indexes).toHaveLength(1);
+        expect(userNode!.indexes![0].type).toBe("unique");
+
+        const memoryNode = nodes.find((n) => n.name === "memory");
+        expect(memoryNode).toBeDefined();
+        expect(memoryNode!.fields.some((f) => f.name === "classification")).toBe(true);
 
         const edges = domain.schema!.edges;
-        expect(edges).toHaveLength(1);
-        expect(edges[0].name).toBe("about_user");
-        expect(edges[0].from).toBe("memory");
-        expect(edges[0].to).toBe("user");
+        const aboutUser = edges.find((e) => e.name === "about_user");
+        expect(aboutUser).toBeDefined();
+        expect(aboutUser!.from).toBe("memory");
+        expect(aboutUser!.to).toBe("user");
+
+        const supersedes = edges.find((e) => e.name === "supersedes");
+        expect(supersedes).toBeDefined();
+        expect(supersedes!.from).toBe("memory");
+        expect(supersedes!.to).toBe("memory");
     });
 
     test("default options include consolidation schedule", () => {
@@ -62,26 +72,9 @@ describe("User domain - config", () => {
         expect(domain.schedules![0].intervalMs).toBe(5000);
     });
 
-    test("processInboxBatch is a no-op (returns undefined)", async () => {
+    test("processInboxBatch is defined (user domain now processes facts)", () => {
         const domain = createUserDomain();
-        const result = await domain.processInboxBatch(
-            [
-                {
-                    memory: {
-                        id: "test",
-                        content: "",
-                        embedding: [],
-                        eventTime: null,
-                        createdAt: 0,
-                        tokenCount: 0,
-                    },
-                    domainAttributes: {},
-                    tags: [],
-                },
-            ],
-            {} as DomainContext,
-        );
-        expect(result).toBeUndefined();
+        expect(typeof domain.processInboxBatch).toBe("function");
     });
 
     test("describe() returns a non-empty string", () => {
@@ -210,6 +203,78 @@ describe("User domain - integration", () => {
     });
 });
 
+describe("User domain - inbox processing (kb-style attributes and supersession)", () => {
+    let engine: MemoryEngine;
+    let llm: MockLLMAdapter;
+
+    beforeEach(async () => {
+        llm = new MockLLMAdapter();
+        // Used for question-generation fallback path (no extractStructured on MockLLMAdapter)
+        llm.generateResult = "What is the user's preference?";
+        engine = new MemoryEngine();
+        await engine.initialize({
+            connection: "mem://",
+            namespace: "test",
+            database: `test_user_inbox_${Date.now()}`,
+            context: { userId: "user-A" },
+            llm,
+            embedding: new MockEmbeddingAdapter(),
+        });
+        await engine.registerDomain(userDomain);
+    });
+
+    afterEach(async () => {
+        await engine.close();
+    });
+
+    test("processInboxBatch populates classification, validFrom, importance, answersQuestion", async () => {
+        await engine.ingest("User prefers concise responses without bullet lists", {
+            domains: [USER_DOMAIN_ID],
+            metadata: { classification: "preference", userId: "user-A" },
+        });
+        await engine.processInbox();
+
+        const ctx = engine.createDomainContext(USER_DOMAIN_ID);
+        const memories = await ctx.getMemories({ tags: [USER_TAG] });
+        expect(memories.length).toBeGreaterThanOrEqual(1);
+
+        const target = memories.find((m) => m.content.includes("concise"));
+        expect(target).toBeDefined();
+
+        const attrRows = await engine
+            .getGraph()
+            .query<
+                Array<{ attributes: Record<string, unknown> }>
+            >("SELECT attributes FROM owned_by WHERE in = $memId AND out = $domainId LIMIT 1", {
+                memId: new StringRecordId(target!.id),
+                domainId: new StringRecordId(`domain:${USER_DOMAIN_ID}`),
+            });
+        const attrs = attrRows?.[0]?.attributes;
+        expect(attrs).toBeDefined();
+        expect(attrs.classification).toBe("preference");
+        expect(attrs.superseded).toBe(false);
+        expect(typeof attrs.validFrom).toBe("number");
+        expect(attrs.confidence).toBe(1.0);
+        expect(typeof attrs.importance).toBe("number");
+        expect(attrs.userId).toBe("user-A");
+        expect(attrs.answersQuestion).toBeTypeOf("string");
+        expect((attrs.answersQuestion as string).length).toBeGreaterThan(0);
+    });
+
+    test("processInboxBatch creates about_user edge when userId is provided", async () => {
+        await engine.ingest("User is based in Berlin", {
+            domains: [USER_DOMAIN_ID],
+            metadata: { classification: "identity", userId: "user-A" },
+        });
+        await engine.processInbox();
+
+        const ctx = engine.createDomainContext(USER_DOMAIN_ID);
+        const edges = await ctx.getNodeEdges("user:user-A", "in");
+        const sourceIds = edges.map((e) => String(e.in));
+        expect(sourceIds.length).toBeGreaterThanOrEqual(1);
+    });
+});
+
 describe("User domain - consolidation schedule", () => {
     let engine: MemoryEngine;
     let llm: MockLLMAdapter;
@@ -273,6 +338,67 @@ describe("User domain - consolidation schedule", () => {
 
         const allMemories = await ctx.getMemories({ domains: [USER_DOMAIN_ID] });
         expect(allMemories.length).toBe(0);
+    });
+
+    test("consolidation skips superseded memories", async () => {
+        // Replace the engine's LLM with a spy-enabled mock so we can inspect
+        // the contents passed to consolidate().
+        const spyLlm = new (class extends MockLLMAdapter {
+            calls: string[][] = [];
+            consolidate(memories?: string[]): Promise<string> {
+                this.calls.push(memories ?? []);
+                return Promise.resolve(this.consolidateResult);
+            }
+        })();
+        spyLlm.consolidateResult = "Test user prefers tea.";
+        const spyEngine = new MemoryEngine();
+        await spyEngine.initialize({
+            connection: "mem://",
+            namespace: "test",
+            database: `test_user_cons_skip_${Date.now()}`,
+            context: { userId: "test-user" },
+            llm: spyLlm,
+            embedding: new MockEmbeddingAdapter(),
+        });
+        await spyEngine.registerDomain(userDomain);
+
+        const ctx = spyEngine.createDomainContext(USER_DOMAIN_ID);
+        await ctx.graph.createNodeWithId("user:test-user", { userId: "test-user" });
+
+        // Live fact
+        const live = await ctx.writeMemory({
+            content: "User prefers tea",
+            tags: ["fact"],
+            ownership: {
+                domain: USER_DOMAIN_ID,
+                attributes: { classification: "preference", superseded: false },
+            },
+        });
+        await ctx.graph.relate(live, "about_user", "user:test-user", { domain: USER_DOMAIN_ID });
+
+        // Superseded fact (should be skipped)
+        const stale = await ctx.writeMemory({
+            content: "User prefers coffee",
+            tags: ["fact"],
+            ownership: {
+                domain: USER_DOMAIN_ID,
+                attributes: {
+                    classification: "preference",
+                    superseded: true,
+                    validUntil: Date.now() - 1000,
+                },
+            },
+        });
+        await ctx.graph.relate(stale, "about_user", "user:test-user", { domain: USER_DOMAIN_ID });
+
+        await consolidateUserProfile(ctx);
+
+        expect(spyLlm.calls.length).toBeGreaterThanOrEqual(1);
+        const consolidated = spyLlm.calls[0];
+        expect(consolidated.some((c) => c.includes("tea"))).toBe(true);
+        expect(consolidated.some((c) => c.includes("coffee"))).toBe(false);
+
+        await spyEngine.close();
     });
 
     test("consolidation updates existing summary instead of creating duplicate", async () => {

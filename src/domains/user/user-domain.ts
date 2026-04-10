@@ -2,8 +2,8 @@ import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
 import type {
     DomainConfig,
-    OwnedMemory,
     DomainContext,
+    ScoredMemory,
     SearchQuery,
     DomainSchedule,
 } from "../../core/types.js";
@@ -11,6 +11,8 @@ import { USER_DOMAIN_ID, DEFAULT_CONSOLIDATE_INTERVAL_MS } from "./types.js";
 import type { UserDomainOptions } from "./types.js";
 import { userSkills } from "./skills.js";
 import { consolidateUserProfile } from "./schedules.js";
+import { processInboxBatch } from "./inbox.js";
+import { isEntryValid, getUserAttrs, computeImportance } from "./utils.js";
 
 function buildSchedules(options?: UserDomainOptions): DomainSchedule[] {
     if (options?.consolidateSchedule?.enabled === false) return [];
@@ -39,6 +41,10 @@ export function createUserDomain(options?: UserDomainOptions): DomainConfig {
                     fields: [{ name: "userId", type: "string", required: true }],
                     indexes: [{ name: "user_userId_unique", fields: ["userId"], type: "unique" }],
                 },
+                {
+                    name: "memory",
+                    fields: [{ name: "classification", type: "option<string>" }],
+                },
             ],
             edges: [
                 {
@@ -47,12 +53,11 @@ export function createUserDomain(options?: UserDomainOptions): DomainConfig {
                     to: "user",
                     fields: [{ name: "domain", type: "string" }],
                 },
+                { name: "supersedes", from: "memory", to: "memory" },
             ],
         },
         skills: userSkills,
-        async processInboxBatch(_entries: OwnedMemory[], _context: DomainContext): Promise<void> {
-            // User domain does not process inbox items
-        },
+        processInboxBatch,
         schedules: buildSchedules(options),
         describe() {
             return "Built-in primitive for tracking facts about individual users. Manages user identity, preferences, expertise, goals, and automatic profile consolidation.";
@@ -62,13 +67,28 @@ export function createUserDomain(options?: UserDomainOptions): DomainConfig {
                 const userId = context.requestContext.userId as string | undefined;
                 if (!userId) return query;
 
-                // Check if user node exists
                 const userNodeId = `user:${userId}`;
                 const userNode = await context.graph.getNode(userNodeId);
                 if (!userNode) return query;
 
-                // User exists — future enhancement: augment query with user preferences/expertise
                 return query;
+            },
+
+            rank(_query: SearchQuery, candidates: ScoredMemory[]): ScoredMemory[] {
+                const now = Date.now();
+                return candidates
+                    .map((c) => {
+                        const attrs = getUserAttrs(c.domainAttributes);
+                        let score = c.score;
+                        if (!isEntryValid(attrs, now)) {
+                            score *= 0.05;
+                        } else {
+                            const imp = computeImportance(attrs, 0.95);
+                            score *= 1 + (imp - 0.5) * 0.5;
+                        }
+                        return { ...c, score };
+                    })
+                    .sort((a, b) => b.score - a.score);
             },
         },
     };
