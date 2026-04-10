@@ -18,6 +18,18 @@ A domain-driven memory engine with graph storage, embeddings, and semantic searc
 npm install @kuindji/memory-domain
 ```
 
+### First-time setup: download the embedding model
+
+`OnnxEmbeddingAdapter` needs the all-MiniLM-L6-v2 ONNX model (~86 MB) and its vocab file. Fetch them with:
+
+```bash
+npx memory-domain-download-model
+# or to a custom location:
+npx memory-domain-download-model --dir ./my-models
+```
+
+By default this writes to `./.memory-domain/model/` relative to the current directory, which is where `new OnnxEmbeddingAdapter()` looks. If you download elsewhere, pass the same path to the adapter via `new OnnxEmbeddingAdapter({ modelDir: "./my-models" })`.
+
 ## Quick Start
 
 ```typescript

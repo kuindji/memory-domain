@@ -18,7 +18,8 @@
     },
     "bin": {
         "memory-domain": "dist/cli/cli.js",
-        "memory-domain-tui": "dist/tui/tui.js"
+        "memory-domain-tui": "dist/tui/tui.js",
+        "memory-domain-download-model": "dist/bin/download-model.js"
     },
     "files": [
         "dist",
