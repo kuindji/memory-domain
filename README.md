@@ -129,6 +129,7 @@ export default engine;
 - **`PassthroughAdapter(connectionString)`** — just returns the string you gave it. Use when you already have a SurrealDB URL (remote server, file path, in-memory).
 - **`FileConnectionAdapter({ file, localDir?, save? })`** — extracts a local `.tar.gz` archive to a working directory and exposes it as `surrealkv://<dir>/db`. Set `save: true` to recompress on close. Ideal for shipping prebuilt KBs alongside your code.
 - **`S3ConnectionAdapter({ bucket, key, region, profile?, credentials?, save? })`** — same shape but fetches/uploads the archive from S3.
+- **`DirectoryConnectionAdapter({ path })`** — opens a pre-extracted `path/db/` directory in place. Read-intended; `save()` is a no-op. Use when a container image bakes the DB alongside the code and you want to skip tar extraction on cold start. Do not open the same path twice in one process — SurrealKV expects exclusive access.
 
 ```typescript
 import { MemoryEngine, FileConnectionAdapter, BedrockAdapter } from "@kuindji/memory-domain";
@@ -145,6 +146,51 @@ await engine.initialize({
     }),
 });
 ```
+
+## Programmatic usage
+
+The CLI is one of several transports over a shared command dispatcher. You can use memory-domain as a library to serve the same command surface over a Lambda, HTTP server, or any other runtime without shelling out.
+
+### Lambda with a baked-in knowledge base
+
+```typescript
+import {
+    MemoryEngine,
+    DirectoryConnectionAdapter,
+    BedrockAdapter,
+    OnnxEmbeddingAdapter,
+    createKbDomain,
+    createLambdaAdapter,
+} from "@kuindji/memory-domain";
+
+// Construct once at module scope; reused across warm invocations.
+const handlerPromise = (async () => {
+    const engine = new MemoryEngine();
+    await engine.initialize({
+        adapter: new DirectoryConnectionAdapter({ path: "/var/task/kb" }),
+        namespace: "my_app",
+        database: "business",
+        llm: new BedrockAdapter({
+            modelId: "eu.anthropic.claude-sonnet-4-6",
+            region: "eu-west-2",
+        }),
+        embedding: new OnnxEmbeddingAdapter({ modelDir: "/var/task/kb/model" }),
+    });
+    await engine.registerDomain(createKbDomain());
+    return createLambdaAdapter(engine); // defaults to the read-only profile
+})();
+
+export const handler = async (event: { command: string; args: string[] }) => {
+    const lambdaHandler = await handlerPromise;
+    return lambdaHandler(event);
+};
+```
+
+The default profile exposes the read-side commands: `search`, `build-context`, `memory`, `graph`, `skill`, `domains`, `domain`. Pass `{ profile: "full" }` to expose every command, or `{ profile: [...] }` for a custom allow list. The returned `DispatchResult` carries both the raw `output` (structured data) and `rendered` (a pre-rendered JSON or pretty string), so callers can use whichever form they need.
+
+**Invocation shape:** `event.args` is the argv tail *including flags*, e.g. `{ command: "search", args: ["query text", "--limit", "5"] }`. Flags must be encoded as argv strings, matching the CLI's input contract.
+
+**Lifecycle:** `createLambdaAdapter` never calls `engine.close()`. Construct the engine once at module scope and rely on Lambda's execution-environment reuse. Cold-start engine-init errors propagate out of `engine.initialize()` so Lambda marks the container as failed; per-invocation errors resolve as `{ ok: false, error: { code, message } }`.
 
 ## Built-in Domains
 
