@@ -2,7 +2,6 @@ import { StringRecordId } from "surrealdb";
 import type { OwnedMemory, DomainContext, ScoredMemory } from "../../core/types.js";
 import {
     CODE_REPO_TAG,
-    CODE_REPO_DOMAIN_ID,
     CODE_REPO_DECISION_TAG,
     AUDIENCE_TAGS,
     DEFAULT_IMPORTANCE,
@@ -12,7 +11,6 @@ import type { MemoryClassification, Audience } from "./types.js";
 import {
     ensureTag,
     findOrCreateEntity,
-    linkToTopicsBatch,
     classificationToTag,
     decomposeToAtomicFacts,
     batchGenerateQuestions,
@@ -283,14 +281,7 @@ export async function processInboxBatch(
                 { entries: processableEntries.length },
             );
 
-            // Stage 4: Topic linking (with denormalization)
-            await context.debug.time(
-                "code-repo.inbox.topicLinking",
-                () => linkToTopicsBatch(context, processableEntries),
-                { entries: processableEntries.length },
-            );
-
-            // Stage 5: Supersession detection (decisions only — preserves existing scope)
+            // Stage 4: Supersession detection (decisions only — preserves existing scope)
             const decisions = processableEntries.filter(
                 (e) => classificationMap.get(e.memory.id) === "decision",
             );
@@ -347,7 +338,7 @@ async function decomposeEntries(
                 content: fact.claim,
                 tags: [CODE_REPO_TAG],
                 ownership: {
-                    domain: CODE_REPO_DOMAIN_ID,
+                    domain: context.domain,
                     attributes: {
                         source: "decomposed",
                         parentMemoryId: entry.memory.id,
@@ -491,7 +482,7 @@ async function batchDetectSupersession(
 
         for (const existing of searchResult.entries) {
             if (newDecisionIds.has(existing.id)) continue;
-            const attrs = existing.domainAttributes[CODE_REPO_DOMAIN_ID] as
+            const attrs = existing.domainAttributes[context.domain] as
                 | Record<string, unknown>
                 | undefined;
             if (attrs && !attrs.superseded) {
@@ -581,7 +572,7 @@ async function processSupersessionBatch(
 
             await context.graph.relate(newMemoryId, "supersedes", existing.id);
             await context.updateAttributes(existing.id, {
-                ...existing.domainAttributes[CODE_REPO_DOMAIN_ID],
+                ...existing.domainAttributes[context.domain],
                 superseded: true,
                 validUntil: Date.now(),
             });
@@ -611,7 +602,7 @@ async function batchLinkRelated(
 
         for (const candidate of searchResult.entries) {
             if (newEntryIds.has(candidate.id)) continue;
-            const attrs = candidate.domainAttributes[CODE_REPO_DOMAIN_ID] as
+            const attrs = candidate.domainAttributes[context.domain] as
                 | Record<string, unknown>
                 | undefined;
             if (attrs?.superseded) continue;

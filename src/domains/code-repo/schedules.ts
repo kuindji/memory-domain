@@ -2,12 +2,7 @@ import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join, dirname, basename } from "node:path";
 import type { DomainContext } from "../../core/types.js";
-import {
-    CODE_REPO_DOMAIN_ID,
-    CODE_REPO_TAG,
-    CODE_REPO_TECHNICAL_TAG,
-    CODE_REPO_QUESTION_TAG,
-} from "./types.js";
+import { CODE_REPO_TAG, CODE_REPO_TECHNICAL_TAG, CODE_REPO_QUESTION_TAG } from "./types.js";
 import type { CodeRepoDomainOptions } from "./types.js";
 import { ensureTag, findOrCreateEntity } from "./utils.js";
 
@@ -190,7 +185,7 @@ export async function scanCommits(
             content,
             tags: [CODE_REPO_TAG, CODE_REPO_TECHNICAL_TAG],
             ownership: {
-                domain: CODE_REPO_DOMAIN_ID,
+                domain: context.domain,
                 attributes: {
                     classification: "observation",
                     audience: ["technical"],
@@ -209,7 +204,7 @@ export async function scanCommits(
             content,
             tags: [CODE_REPO_TAG, CODE_REPO_TECHNICAL_TAG],
             ownership: {
-                domain: CODE_REPO_DOMAIN_ID,
+                domain: context.domain,
                 attributes: {
                     classification: "observation",
                     audience: ["technical"],
@@ -248,7 +243,7 @@ export async function scanCommits(
             content: `New files with potential business logic significance: ${fileList}. What do these represent?`,
             tags: [CODE_REPO_TAG, CODE_REPO_QUESTION_TAG],
             ownership: {
-                domain: CODE_REPO_DOMAIN_ID,
+                domain: context.domain,
                 attributes: {
                     classification: "question",
                     audience: ["technical", "business"],
@@ -309,7 +304,7 @@ export async function detectDrift(
                     content: `Structural drift detected: module "${entityName}" at path "${entityPath}" no longer exists, but is referenced in decision: "${decision.content.substring(0, 100)}..."`,
                     tags: [CODE_REPO_TAG, CODE_REPO_TECHNICAL_TAG],
                     ownership: {
-                        domain: CODE_REPO_DOMAIN_ID,
+                        domain: context.domain,
                         attributes: {
                             classification: "observation",
                             audience: ["technical"],

@@ -12,9 +12,9 @@ import {
 
 describe("Code repo domain - config", () => {
     test("declares 7 tunable params matching kb parity", () => {
-        const domain = createCodeRepoDomain();
-        expect(domain.tunableParams).toBeDefined();
-        const names = domain.tunableParams!.map((p) => p.name).sort();
+        const reg = createCodeRepoDomain();
+        expect(reg.domain.tunableParams).toBeDefined();
+        const names = reg.domain.tunableParams!.map((p: { name: string }) => p.name).sort();
         expect(names).toEqual(
             [
                 "decayFactor",
@@ -29,15 +29,31 @@ describe("Code repo domain - config", () => {
     });
 
     test("declares memory schema fields + related_knowledge edge", () => {
-        const domain = createCodeRepoDomain();
-        const memoryNode = domain.schema!.nodes.find((n) => n.name === "memory");
+        const reg = createCodeRepoDomain();
+        const memoryNode = reg.domain.schema!.nodes.find(
+            (n: { name: string }) => n.name === "memory",
+        );
         expect(memoryNode).toBeDefined();
-        const fieldNames = memoryNode!.fields.map((f) => f.name);
+        const fieldNames = memoryNode!.fields.map((f: { name: string }) => f.name);
         expect(fieldNames).toContain("classification");
         expect(fieldNames).toContain("topics");
 
-        const relatedEdge = domain.schema!.edges.find((e) => e.name === "related_knowledge");
+        const relatedEdge = reg.domain.schema!.edges.find(
+            (e: { name: string }) => e.name === "related_knowledge",
+        );
         expect(relatedEdge).toBeDefined();
+    });
+
+    test("returns DomainRegistration with plugins and requires", () => {
+        const reg = createCodeRepoDomain();
+        expect(reg.plugins).toBeDefined();
+        expect(reg.plugins!.length).toBeGreaterThan(0);
+        expect(reg.requires).toContain("topic-linking");
+    });
+
+    test("supports custom domain id", () => {
+        const reg = createCodeRepoDomain({ id: "my_code" });
+        expect(reg.domain.id).toBe("my_code");
     });
 });
 

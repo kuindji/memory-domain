@@ -39,6 +39,7 @@ export const DECOMPOSITION_TOKEN_THRESHOLD = 200;
 export const MAX_ATOMIC_FACTS = 10;
 
 export interface CodeRepoDomainOptions {
+    id?: string;
     projectRoot?: string;
     commitScanner?: {
         enabled?: boolean;

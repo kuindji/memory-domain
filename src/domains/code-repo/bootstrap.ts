@@ -2,12 +2,7 @@ import { readdir, stat, readFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { join, relative } from "node:path";
 import type { DomainContext } from "../../core/types.js";
-import {
-    CODE_REPO_DOMAIN_ID,
-    CODE_REPO_TAG,
-    CODE_REPO_TECHNICAL_TAG,
-    CODE_REPO_OBSERVATION_TAG,
-} from "./types.js";
+import { CODE_REPO_TAG, CODE_REPO_TECHNICAL_TAG, CODE_REPO_OBSERVATION_TAG } from "./types.js";
 import type { CodeRepoDomainOptions, DirEntry, TriageResult, AnalysisResult } from "./types.js";
 import { ensureTag, findOrCreateEntity } from "./utils.js";
 import {
@@ -316,7 +311,7 @@ export async function bootstrapCodeRepo(
         content: summary,
         tags: [CODE_REPO_TAG, CODE_REPO_TECHNICAL_TAG, CODE_REPO_OBSERVATION_TAG],
         ownership: {
-            domain: CODE_REPO_DOMAIN_ID,
+            domain: context.domain,
             attributes: {
                 classification: "observation",
                 audience: ["technical"],

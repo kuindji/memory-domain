@@ -3,6 +3,7 @@ import { dirname } from "node:path";
 import { StringRecordId } from "surrealdb";
 import type {
     DomainConfig,
+    DomainRegistration,
     DomainSchedule,
     DomainContext,
     GraphApi,
@@ -11,6 +12,7 @@ import type {
     ContextResult,
 } from "../../core/types.js";
 import { countTokens, cosineSimilarity } from "../../core/scoring.js";
+import { createTopicLinkingPlugin } from "../../plugins/topic-linking.js";
 import {
     CODE_REPO_DOMAIN_ID,
     CODE_REPO_TAG,
@@ -84,9 +86,11 @@ function buildSchedules(options?: CodeRepoDomainOptions): DomainSchedule[] {
     return schedules;
 }
 
-export function createCodeRepoDomain(options?: CodeRepoDomainOptions): DomainConfig {
-    return {
-        id: CODE_REPO_DOMAIN_ID,
+export function createCodeRepoDomain(options?: CodeRepoDomainOptions): DomainRegistration {
+    const domainId = options?.id ?? CODE_REPO_DOMAIN_ID;
+
+    const domain: DomainConfig = {
+        id: domainId,
         name: "Code Repo Knowledge",
         baseDir: dirname(fileURLToPath(import.meta.url)),
         schema: {
@@ -235,7 +239,7 @@ export function createCodeRepoDomain(options?: CodeRepoDomainOptions): DomainCon
                 const now = Date.now();
                 return candidates
                     .map((c) => {
-                        const attrs = getCodeRepoAttrs(c.domainAttributes);
+                        const attrs = getCodeRepoAttrs(c.domainAttributes, domainId);
                         let score = c.score;
                         if (!isEntryValid(attrs, now)) {
                             score *= 0.05;
@@ -277,7 +281,7 @@ export function createCodeRepoDomain(options?: CodeRepoDomainOptions): DomainCon
             });
 
             let entries = results.entries.filter((e) => {
-                const attrs = getCodeRepoAttrs(e.domainAttributes);
+                const attrs = getCodeRepoAttrs(e.domainAttributes, domainId);
                 if (!isEntryValid(attrs, now)) return false;
                 return matchesAudience(attrs, audience);
             });
@@ -286,11 +290,11 @@ export function createCodeRepoDomain(options?: CodeRepoDomainOptions): DomainCon
 
             // Step 1: Question search
             if (useQuestionSearch) {
-                entries = await mergeQuestionSearch(entries, text, context, audience);
+                entries = await mergeQuestionSearch(entries, text, context, audience, domainId);
             }
 
             // Step 2: Keyword search — catches entries embedding rerank dropped
-            entries = await mergeKeywordSearch(entries, text, context, audience);
+            entries = await mergeKeywordSearch(entries, text, context, audience, domainId);
 
             // Step 3: Optional LLM rerank
             if (useLlmRerank && context.llm) {
@@ -298,13 +302,19 @@ export function createCodeRepoDomain(options?: CodeRepoDomainOptions): DomainCon
             }
 
             // Step 4: Resolve decomposed children to parents
-            const resolved = await resolveToParents(entries, context, now);
+            const resolved = await resolveToParents(entries, context, now, domainId);
 
             // Step 5: Deduplicate near-duplicate content
             const { entries: deduped, aliases: dedupAliases } = deduplicateByContent(resolved, 0.5);
 
             // Step 6: MMR-based budget fill
-            const selected = await mmrBudgetFill(deduped, budgetTokens, mmrLambda, context.graph);
+            const selected = await mmrBudgetFill(
+                deduped,
+                budgetTokens,
+                mmrLambda,
+                context.graph,
+                domainId,
+            );
 
             if (selected.length === 0) return empty;
 
@@ -373,9 +383,11 @@ export function createCodeRepoDomain(options?: CodeRepoDomainOptions): DomainCon
             // Fire-and-forget access tracking
             Promise.all(
                 allMemories.map((m) =>
-                    recordAccess(context, m.id, getCodeRepoAttrs(m.domainAttributes)).catch(
-                        () => {},
-                    ),
+                    recordAccess(
+                        context,
+                        m.id,
+                        getCodeRepoAttrs(m.domainAttributes, domainId),
+                    ).catch(() => {}),
                 ),
             ).catch(() => {});
 
@@ -385,6 +397,12 @@ export function createCodeRepoDomain(options?: CodeRepoDomainOptions): DomainCon
                 totalTokens: countTokens(finalContext),
             };
         },
+    };
+
+    return {
+        domain,
+        plugins: [createTopicLinkingPlugin()],
+        requires: ["topic-linking"],
     };
 }
 
@@ -454,6 +472,7 @@ async function resolveToParents(
     entries: ScoredMemory[],
     context: DomainContext,
     now: number,
+    domainId: string,
 ): Promise<ScoredMemory[]> {
     const parentMap = new Map<string, { mem: ScoredMemory; bestScore: number }>();
     const standalone: ScoredMemory[] = [];
@@ -482,7 +501,7 @@ async function resolveToParents(
             continue;
         }
 
-        const parentDomainRef = new StringRecordId(`domain:${CODE_REPO_DOMAIN_ID}`);
+        const parentDomainRef = new StringRecordId(`domain:${domainId}`);
         const parentMemRef = new StringRecordId(parentId);
         const attrRows = await context.graph.query<Array<{ attributes: Record<string, unknown> }>>(
             "SELECT attributes FROM owned_by WHERE in = $memId AND out = $domainId LIMIT 1",
@@ -502,7 +521,7 @@ async function resolveToParents(
             score: entry.score,
             scores: {},
             tags: [],
-            domainAttributes: { [CODE_REPO_DOMAIN_ID]: parentAttrs },
+            domainAttributes: { [domainId]: parentAttrs },
             eventTime: parentMemory.eventTime,
             createdAt: parentMemory.createdAt,
             tokenCount: parentMemory.tokenCount,
@@ -651,6 +670,7 @@ async function mergeKeywordSearch(
     queryText: string,
     context: DomainContext,
     audience: string | undefined,
+    domainId: string,
 ): Promise<ScoredMemory[]> {
     const now = Date.now();
 
@@ -728,9 +748,7 @@ async function mergeKeywordSearch(
             }
 
             const domainAttributes = attrMap.get(id) ?? {};
-            const codeRepoAttrs = domainAttributes[CODE_REPO_DOMAIN_ID] as
-                | Record<string, unknown>
-                | undefined;
+            const codeRepoAttrs = domainAttributes[domainId] as Record<string, unknown> | undefined;
             // Only include memories owned by code-repo
             if (!codeRepoAttrs) continue;
             if (!isEntryValid(codeRepoAttrs, now)) continue;
@@ -763,6 +781,7 @@ async function mergeQuestionSearch(
     queryText: string,
     context: DomainContext,
     audience: string | undefined,
+    domainId: string,
 ): Promise<ScoredMemory[]> {
     const now = Date.now();
 
@@ -817,9 +836,7 @@ async function mergeQuestionSearch(
             if (existingMap.has(id)) continue;
 
             const domainAttributes = attrMap.get(id) ?? {};
-            const codeRepoAttrs = domainAttributes[CODE_REPO_DOMAIN_ID] as
-                | Record<string, unknown>
-                | undefined;
+            const codeRepoAttrs = domainAttributes[domainId] as Record<string, unknown> | undefined;
             if (!codeRepoAttrs) continue;
             if (!isEntryValid(codeRepoAttrs, now)) continue;
             if (!matchesAudience(codeRepoAttrs, audience)) continue;
@@ -850,11 +867,12 @@ async function mmrBudgetFill(
     budgetTokens: number,
     lambda: number,
     graph: GraphApi,
+    domainId: string,
 ): Promise<Array<{ mem: ScoredMemory; classification: MemoryClassification }>> {
     if (candidates.length === 0) return [];
 
     const classify = (mem: ScoredMemory): MemoryClassification => {
-        const attrs = getCodeRepoAttrs(mem.domainAttributes);
+        const attrs = getCodeRepoAttrs(mem.domainAttributes, domainId);
         return (attrs?.classification as MemoryClassification) ?? "observation";
     };
 
@@ -955,4 +973,5 @@ async function fetchEmbeddings(ids: string[], graph: GraphApi): Promise<Map<stri
     return map;
 }
 
-export const codeRepoDomain = createCodeRepoDomain();
+const codeRepoRegistration = createCodeRepoDomain();
+export const codeRepoDomain = codeRepoRegistration.domain;
