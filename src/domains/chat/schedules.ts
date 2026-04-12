@@ -188,23 +188,122 @@ export async function consolidateEpisodic(
         }
 
         for (const cluster of clusters) {
-            const contents: string[] = [];
+            const clusterEntries: { id: string; content: string }[] = [];
             for (const memId of cluster) {
                 const memory = await context.getMemory(memId);
                 if (memory) {
-                    contents.push(memory.content);
+                    clusterEntries.push({ id: memId, content: memory.content });
                 }
             }
 
-            if (contents.length === 0) continue;
+            if (clusterEntries.length === 0) continue;
 
-            const summary = await context.debug.time(
-                "chat.schedule.consolidate.summary",
-                () => context.llmAt("medium").consolidate(contents),
-                { memories: contents.length },
-            );
+            const contents = clusterEntries.map((e) => e.content);
+            let summary: string | undefined;
+            let contradictions: { newerIndex: number; olderIndex: number }[] = [];
+
+            const llm = context.llmAt("medium");
+
+            if (llm.extractStructured) {
+                const schema = JSON.stringify({
+                    type: "object",
+                    properties: {
+                        summary: {
+                            type: "string",
+                            description:
+                                "A consolidated summary of the non-contradicted facts, preserving all important details",
+                        },
+                        contradictions: {
+                            type: "array",
+                            items: {
+                                type: "object",
+                                properties: {
+                                    newerIndex: {
+                                        type: "number",
+                                        description:
+                                            "0-based index of the newer fact that supersedes",
+                                    },
+                                    olderIndex: {
+                                        type: "number",
+                                        description:
+                                            "0-based index of the older fact being contradicted",
+                                    },
+                                },
+                                required: ["newerIndex", "olderIndex"],
+                            },
+                            description:
+                                "Pairs where a newer fact contradicts or supersedes an older one about the same topic",
+                        },
+                    },
+                    required: ["summary", "contradictions"],
+                });
+
+                const prompt = `Analyze the following numbered facts. Identify any where a newer fact (higher index) contradicts or supersedes an older fact (lower index) about the same topic. Then consolidate the non-contradicted facts into a single summary.\n\n${contents.map((c, i) => `${i}. ${c}`).join("\n")}`;
+
+                try {
+                    const result = await context.debug.time(
+                        "chat.schedule.consolidate.structured",
+                        () => llm.extractStructured!(prompt, schema),
+                        { memories: contents.length },
+                    );
+
+                    if (result && result.length > 0) {
+                        const parsed = result[0] as {
+                            summary?: string;
+                            contradictions?: { newerIndex: number; olderIndex: number }[];
+                        };
+                        summary = parsed.summary;
+                        contradictions = parsed.contradictions ?? [];
+                    }
+                } catch {
+                    // extractStructured failed — fall through to consolidate()
+                }
+            }
+
+            // Fallback to plain consolidate if extractStructured unavailable or returned nothing
+            if (!summary) {
+                summary = await context.debug.time(
+                    "chat.schedule.consolidate.summary",
+                    () => context.llmAt("medium").consolidate(contents),
+                    { memories: contents.length },
+                );
+            }
+
             if (!summary) continue;
 
+            // Process contradictions — invalidate older memories
+            const invalidatedIds = new Set<string>();
+            const now = Date.now();
+
+            for (const { newerIndex, olderIndex } of contradictions) {
+                const older = clusterEntries[olderIndex];
+                const newer = clusterEntries[newerIndex];
+                if (!older || !newer) continue;
+
+                // Read existing attributes and add invalidAt
+                const attrRows = await context.graph.query<
+                    { attributes: Record<string, unknown> }[]
+                >("SELECT attributes FROM owned_by WHERE in = $memId AND out = $domainId", {
+                    memId: new StringRecordId(older.id),
+                    domainId: new StringRecordId(`domain:${CHAT_DOMAIN_ID}`),
+                });
+                if (attrRows && attrRows.length > 0) {
+                    await context.updateAttributes(older.id, {
+                        ...attrRows[0].attributes,
+                        invalidAt: now,
+                    });
+                }
+
+                // Create contradicts edge
+                await context.graph.relate(newer.id, "contradicts", older.id, {
+                    strength: 1.0,
+                    detected_at: now,
+                });
+
+                invalidatedIds.add(older.id);
+            }
+
+            // Create semantic memory
             const chatTagId = await ensureTag(context, CHAT_TAG);
             const semanticTagId = await ensureTag(context, CHAT_SEMANTIC_TAG);
             try {
@@ -221,12 +320,16 @@ export async function consolidateEpisodic(
                     attributes: {
                         layer: "semantic",
                         weight: 0.8,
+                        validFrom: now,
                     },
                 },
             });
 
-            for (const memId of cluster) {
-                await context.graph.relate(semanticId, "summarizes", memId);
+            // Create summarizes edges only from non-invalidated cluster members
+            for (const entry of clusterEntries) {
+                if (!invalidatedIds.has(entry.id)) {
+                    await context.graph.relate(semanticId, "summarizes", entry.id);
+                }
             }
         }
     });

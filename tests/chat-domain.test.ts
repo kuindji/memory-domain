@@ -998,3 +998,202 @@ describe("Chat domain - prune decayed", () => {
         expect(remaining[0].content).toBe("Semantic knowledge");
     });
 });
+
+describe("Chat domain - consolidate with contradiction detection", () => {
+    let engine: MemoryEngine;
+    let llm: MockLLMAdapter;
+
+    beforeEach(async () => {
+        llm = new MockLLMAdapter();
+        engine = new MemoryEngine();
+        await engine.initialize({
+            connection: "mem://",
+            namespace: "test",
+            database: `test_${Date.now()}`,
+            context: { userId: "test-user" },
+            llm,
+            embedding: new MockEmbeddingAdapter(),
+        });
+        await engine.registerDomain(
+            createChatDomain({
+                promoteSchedule: { enabled: false },
+                consolidateSchedule: { enabled: false },
+                pruneSchedule: { enabled: false },
+            }),
+        );
+    });
+
+    afterEach(async () => {
+        await engine.close();
+    });
+
+    test("detects contradictions and sets invalidAt on older memory", async () => {
+        const ctx = engine.createDomainContext(CHAT_DOMAIN_ID);
+
+        const ids: string[] = [];
+        for (let i = 0; i < 3; i++) {
+            const id = await ctx.writeMemory({
+                content: "TypeScript programming fact",
+                tags: [CHAT_TAG, CHAT_EPISODIC_TAG],
+                ownership: {
+                    domain: CHAT_DOMAIN_ID,
+                    attributes: {
+                        layer: "episodic",
+                        userId: "test-user",
+                        weight: 0.5,
+                        validFrom: Date.now() - (3 - i) * 1000,
+                    },
+                },
+            });
+            ids.push(id);
+        }
+
+        llm.extractStructuredResult = [
+            {
+                summary: "Consolidated TypeScript fact",
+                contradictions: [{ newerIndex: 2, olderIndex: 0 }],
+            },
+        ];
+
+        await consolidateEpisodic(ctx, {
+            consolidation: { similarityThreshold: 0.1, minClusterSize: 2 },
+        });
+
+        // Exactly one of the 3 episodic memories should have invalidAt set
+        let invalidCount = 0;
+        let validCount = 0;
+        for (const id of ids) {
+            const rows = await ctx.graph.query<{ attributes: Record<string, unknown> }[]>(
+                "SELECT attributes FROM owned_by WHERE in = $memId AND out = $domainId",
+                {
+                    memId: new StringRecordId(id),
+                    domainId: new StringRecordId(`domain:${CHAT_DOMAIN_ID}`),
+                },
+            );
+            expect(rows).toHaveLength(1);
+            if (rows[0].attributes.invalidAt !== undefined) {
+                expect(rows[0].attributes.invalidAt).toBeTypeOf("number");
+                invalidCount++;
+            } else {
+                validCount++;
+            }
+        }
+        expect(invalidCount).toBe(1);
+        expect(validCount).toBe(2);
+    });
+
+    test("creates contradicts edge from newer to older memory", async () => {
+        const ctx = engine.createDomainContext(CHAT_DOMAIN_ID);
+
+        const ids: string[] = [];
+        for (let i = 0; i < 3; i++) {
+            const id = await ctx.writeMemory({
+                content: "TypeScript programming fact",
+                tags: [CHAT_TAG, CHAT_EPISODIC_TAG],
+                ownership: {
+                    domain: CHAT_DOMAIN_ID,
+                    attributes: {
+                        layer: "episodic",
+                        userId: "test-user",
+                        weight: 0.5,
+                        validFrom: Date.now() - (3 - i) * 1000,
+                    },
+                },
+            });
+            ids.push(id);
+        }
+
+        llm.extractStructuredResult = [
+            {
+                summary: "Consolidated fact",
+                contradictions: [{ newerIndex: 2, olderIndex: 0 }],
+            },
+        ];
+
+        await consolidateEpisodic(ctx, {
+            consolidation: { similarityThreshold: 0.1, minClusterSize: 2 },
+        });
+
+        // One of the memories should have an outgoing contradicts edge
+        let totalContradictsEdges = 0;
+        for (const id of ids) {
+            const edges = await ctx.getNodeEdges(id, "out");
+            totalContradictsEdges += edges.filter((e) =>
+                String(e.id).startsWith("contradicts:"),
+            ).length;
+        }
+        expect(totalContradictsEdges).toBe(1);
+    });
+
+    test("falls back to consolidate() when extractStructured rejects", async () => {
+        const ctx = engine.createDomainContext(CHAT_DOMAIN_ID);
+
+        for (let i = 0; i < 3; i++) {
+            await ctx.writeMemory({
+                content: "TypeScript programming fact",
+                tags: [CHAT_TAG, CHAT_EPISODIC_TAG],
+                ownership: {
+                    domain: CHAT_DOMAIN_ID,
+                    attributes: { layer: "episodic", userId: "test-user", weight: 0.5 },
+                },
+            });
+        }
+
+        // Don't set extractStructuredResult — mock will reject, triggering fallback
+        llm.consolidateResult = "Fallback consolidated summary";
+
+        await consolidateEpisodic(ctx, {
+            consolidation: { similarityThreshold: 0.1, minClusterSize: 2 },
+        });
+
+        const semanticMemories = await ctx.getMemories({
+            tags: [CHAT_SEMANTIC_TAG],
+            attributes: { layer: "semantic" },
+        });
+        expect(semanticMemories.length).toBeGreaterThanOrEqual(1);
+        expect(semanticMemories[0].content).toBe("Fallback consolidated summary");
+    });
+
+    test("semantic memory created from consolidation has validFrom set", async () => {
+        const ctx = engine.createDomainContext(CHAT_DOMAIN_ID);
+
+        for (let i = 0; i < 3; i++) {
+            await ctx.writeMemory({
+                content: "TypeScript programming fact",
+                tags: [CHAT_TAG, CHAT_EPISODIC_TAG],
+                ownership: {
+                    domain: CHAT_DOMAIN_ID,
+                    attributes: {
+                        layer: "episodic",
+                        userId: "test-user",
+                        weight: 0.5,
+                        validFrom: Date.now(),
+                    },
+                },
+            });
+        }
+
+        llm.extractStructuredResult = [{ summary: "Summary with validFrom", contradictions: [] }];
+
+        const beforeConsolidate = Date.now();
+        await consolidateEpisodic(ctx, {
+            consolidation: { similarityThreshold: 0.1, minClusterSize: 2 },
+        });
+
+        const semanticMemories = await ctx.getMemories({
+            tags: [CHAT_SEMANTIC_TAG],
+            attributes: { layer: "semantic" },
+        });
+        expect(semanticMemories.length).toBeGreaterThanOrEqual(1);
+
+        const rows = await ctx.graph.query<{ attributes: Record<string, unknown> }[]>(
+            "SELECT attributes FROM owned_by WHERE in = $memId AND out = $domainId",
+            {
+                memId: new StringRecordId(semanticMemories[0].id),
+                domainId: new StringRecordId(`domain:${CHAT_DOMAIN_ID}`),
+            },
+        );
+        expect(rows[0].attributes.validFrom).toBeTypeOf("number");
+        expect(rows[0].attributes.validFrom as number).toBeGreaterThanOrEqual(beforeConsolidate);
+    });
+});
