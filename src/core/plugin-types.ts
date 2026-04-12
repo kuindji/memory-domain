@@ -44,7 +44,9 @@ interface DomainRegistration {
 function isDomainRegistration(
     input: DomainConfig | DomainRegistration,
 ): input is DomainRegistration {
-    return "domain" in input && typeof (input as DomainRegistration).domain?.id === "string";
+    return (
+        "domain" in input && typeof (input as { domain?: { id?: unknown } }).domain?.id === "string"
+    );
 }
 
 export type { DomainPlugin, DomainPluginHooks, DomainRegistration };

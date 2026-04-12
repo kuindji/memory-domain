@@ -72,7 +72,7 @@ describe("Plugin registration", () => {
             domain: createTestDomain("plugged"),
             plugins: [plugin],
         };
-        await expect(engine.registerDomain(reg)).resolves.toBeUndefined();
+        await engine.registerDomain(reg);
     });
 
     test("getPlugins returns registered plugins for a domain", async () => {
@@ -173,9 +173,10 @@ describe("afterInboxProcess hook", () => {
         const plugin: DomainPlugin = {
             type: "spy-plugin",
             hooks: {
-                async afterInboxProcess(entries: OwnedMemory[]) {
+                afterInboxProcess(entries: OwnedMemory[]) {
                     hookCalled = true;
                     hookEntries = entries;
+                    return Promise.resolve();
                 },
             },
         };
@@ -204,8 +205,9 @@ describe("afterInboxProcess hook", () => {
         const plugin: DomainPlugin = {
             type: "ctx-spy",
             hooks: {
-                async afterInboxProcess(_entries: OwnedMemory[], context: DomainContext) {
+                afterInboxProcess(_entries: OwnedMemory[], context: DomainContext) {
                     hookDomain = context.domain;
+                    return Promise.resolve();
                 },
             },
         };
@@ -253,9 +255,9 @@ describe("expandSearch hook", () => {
         const plugin: DomainPlugin = {
             type: "search-expander",
             hooks: {
-                async expandSearch(query: SearchQuery): Promise<SearchQuery> {
+                expandSearch(query: SearchQuery): Promise<SearchQuery> {
                     capturedQuery = query;
-                    return { ...query, text: `${query.text ?? ""} expanded` };
+                    return Promise.resolve({ ...query, text: `${query.text ?? ""} expanded` });
                 },
             },
         };
@@ -280,8 +282,8 @@ describe("expandSearch hook", () => {
         const plugin: DomainPlugin = {
             type: "expand-to-tag",
             hooks: {
-                async expandSearch(query: SearchQuery): Promise<SearchQuery> {
-                    return { ...query, limit: 42 };
+                expandSearch(query: SearchQuery): Promise<SearchQuery> {
+                    return Promise.resolve({ ...query, limit: 42 });
                 },
             },
         };
@@ -359,8 +361,9 @@ describe("Multi-instance domains", () => {
         const pluginA: DomainPlugin = {
             type: "shared-type",
             hooks: {
-                async afterInboxProcess() {
+                afterInboxProcess() {
                     callLog.push("a");
+                    return Promise.resolve();
                 },
             },
         };
@@ -368,8 +371,9 @@ describe("Multi-instance domains", () => {
         const pluginB: DomainPlugin = {
             type: "shared-type",
             hooks: {
-                async afterInboxProcess() {
+                afterInboxProcess() {
                     callLog.push("b");
+                    return Promise.resolve();
                 },
             },
         };

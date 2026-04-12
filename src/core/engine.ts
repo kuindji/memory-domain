@@ -46,6 +46,7 @@ import type {
     TuneOptions,
     TuneResult,
     CoreMemory,
+    OwnedMemory,
     DomainPlugin,
     DomainRegistration,
 } from "./types.js";
@@ -201,8 +202,9 @@ class MemoryEngine {
         // Register plugins
         if (plugins && plugins.length > 0) {
             // Wrap processInboxBatch if any plugin has afterInboxProcess
-            if (plugins.some((p) => p.hooks.afterInboxProcess)) {
-                const original = domain.processInboxBatch.bind(domain);
+            if (plugins.some((p) => "afterInboxProcess" in p.hooks)) {
+                const original = (entries: OwnedMemory[], context: DomainContext) =>
+                    domain.processInboxBatch(entries, context);
                 domainToRegister = Object.create(domain) as DomainConfig;
                 domainToRegister.processInboxBatch = async (entries, context) => {
                     await original(entries, context);
