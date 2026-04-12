@@ -13,6 +13,7 @@ export interface ChatAttributes {
 }
 
 export interface ChatDomainOptions {
+    id?: string;
     workingMemoryCapacity?: number;
     workingMemoryMaxAge?: number;
     promoteSchedule?: {

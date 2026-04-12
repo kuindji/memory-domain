@@ -2,7 +2,6 @@ import { StringRecordId } from "surrealdb";
 import type { DomainContext } from "../../core/types.js";
 import type { ChatDomainOptions } from "./types.js";
 import {
-    CHAT_DOMAIN_ID,
     CHAT_TAG,
     CHAT_EPISODIC_TAG,
     CHAT_SEMANTIC_TAG,
@@ -32,7 +31,7 @@ export async function promoteWorkingMemory(
 
         const rows = await context.graph.query<WorkingMemoryRow[]>(
             'SELECT in, attributes FROM owned_by WHERE out = $domainId AND attributes.layer = "working"',
-            { domainId: new StringRecordId(`domain:${CHAT_DOMAIN_ID}`) },
+            { domainId: new StringRecordId(`domain:${context.domain}`) },
         );
         if (!rows || rows.length === 0) return;
 
@@ -101,7 +100,7 @@ export async function promoteWorkingMemory(
             );
             if (!facts || facts.length === 0) {
                 for (const memId of promotedIds) {
-                    await context.releaseOwnership(memId, CHAT_DOMAIN_ID);
+                    await context.releaseOwnership(memId, context.domain);
                 }
                 continue;
             }
@@ -124,7 +123,7 @@ export async function promoteWorkingMemory(
                     content: fact,
                     tags: [CHAT_TAG, CHAT_EPISODIC_TAG],
                     ownership: {
-                        domain: CHAT_DOMAIN_ID,
+                        domain: context.domain,
                         attributes: {
                             layer: "episodic",
                             userId,
@@ -141,7 +140,7 @@ export async function promoteWorkingMemory(
             }
 
             for (const memId of promotedIds) {
-                await context.releaseOwnership(memId, CHAT_DOMAIN_ID);
+                await context.releaseOwnership(memId, context.domain);
             }
         }
     });
@@ -287,7 +286,7 @@ export async function consolidateEpisodic(
                     { attributes: Record<string, unknown> }[]
                 >("SELECT attributes FROM owned_by WHERE in = $memId AND out = $domainId", {
                     memId: new StringRecordId(older.id),
-                    domainId: new StringRecordId(`domain:${CHAT_DOMAIN_ID}`),
+                    domainId: new StringRecordId(`domain:${context.domain}`),
                 });
                 if (attrRows && attrRows.length > 0) {
                     await context.updateAttributes(older.id, {
@@ -318,7 +317,7 @@ export async function consolidateEpisodic(
                 content: summary,
                 tags: [CHAT_TAG, CHAT_SEMANTIC_TAG],
                 ownership: {
-                    domain: CHAT_DOMAIN_ID,
+                    domain: context.domain,
                     attributes: {
                         layer: "semantic",
                         weight: 0.8,
@@ -349,7 +348,7 @@ export async function consolidateEpisodic(
             // and any already-invalidated ones
             const dedupCandidates = existingSemantics.entries.filter((e) => {
                 if (e.id === semanticId) return false;
-                const attrs = e.domainAttributes[CHAT_DOMAIN_ID];
+                const attrs = e.domainAttributes[context.domain];
                 if (!attrs || attrs.layer !== "semantic") return false;
                 if (attrs.invalidAt != null) return false;
                 return true;
@@ -377,7 +376,7 @@ export async function consolidateEpisodic(
                         { attributes: Record<string, unknown> }[]
                     >("SELECT attributes FROM owned_by WHERE in = $memId AND out = $domainId", {
                         memId: new StringRecordId(dupTarget.id),
-                        domainId: new StringRecordId(`domain:${CHAT_DOMAIN_ID}`),
+                        domainId: new StringRecordId(`domain:${context.domain}`),
                     });
                     if (oldAttrRows && oldAttrRows.length > 0) {
                         await context.updateAttributes(dupTarget.id, {
@@ -404,7 +403,7 @@ export async function pruneDecayed(
 
         const rows = await context.graph.query<WorkingMemoryRow[]>(
             'SELECT in, attributes FROM owned_by WHERE out = $domainId AND attributes.layer = "episodic"',
-            { domainId: new StringRecordId(`domain:${CHAT_DOMAIN_ID}`) },
+            { domainId: new StringRecordId(`domain:${context.domain}`) },
         );
         if (!rows || rows.length === 0) return;
 
@@ -424,7 +423,7 @@ export async function pruneDecayed(
             const decayedWeight = weight * Math.exp(-lambda * hoursSinceCreation);
 
             if (decayedWeight < threshold) {
-                await context.releaseOwnership(memId, CHAT_DOMAIN_ID);
+                await context.releaseOwnership(memId, context.domain);
             }
         }
     });

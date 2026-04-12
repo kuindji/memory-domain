@@ -2,12 +2,14 @@ import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
 import type {
     DomainConfig,
+    DomainRegistration,
     DomainSchedule,
     SearchQuery,
     DomainContext,
     ContextResult,
     ScoredMemory,
 } from "../../core/types.js";
+import { createTopicLinkingPlugin } from "../../plugins/topic-linking.js";
 import { countTokens } from "../../core/scoring.js";
 import {
     CHAT_DOMAIN_ID,
@@ -56,9 +58,10 @@ function buildSchedules(options?: ChatDomainOptions): DomainSchedule[] {
     return schedules;
 }
 
-export function createChatDomain(options?: ChatDomainOptions): DomainConfig {
-    return {
-        id: CHAT_DOMAIN_ID,
+export function createChatDomain(options?: ChatDomainOptions): DomainRegistration {
+    const domainId = options?.id ?? CHAT_DOMAIN_ID;
+    const domain: DomainConfig = {
+        id: domainId,
         name: "Chat",
         baseDir: dirname(fileURLToPath(import.meta.url)),
         schema: {
@@ -144,7 +147,7 @@ export function createChatDomain(options?: ChatDomainOptions): DomainConfig {
                 });
 
                 const episodicEntries = episodicResult.entries.filter((e) => {
-                    const attrs = e.domainAttributes[CHAT_DOMAIN_ID];
+                    const attrs = e.domainAttributes[domainId];
                     return (
                         attrs &&
                         attrs.userId === userId &&
@@ -169,7 +172,7 @@ export function createChatDomain(options?: ChatDomainOptions): DomainConfig {
                 });
 
                 const semanticEntries = semanticResult.entries.filter((e) => {
-                    const attrs = e.domainAttributes[CHAT_DOMAIN_ID];
+                    const attrs = e.domainAttributes[domainId];
                     return (
                         attrs &&
                         attrs.userId === userId &&
@@ -201,6 +204,13 @@ export function createChatDomain(options?: ChatDomainOptions): DomainConfig {
             };
         },
     };
+
+    return {
+        domain,
+        plugins: [createTopicLinkingPlugin()],
+        requires: ["topic-linking"],
+    };
 }
 
-export const chatDomain = createChatDomain();
+const chatRegistration = createChatDomain();
+export const chatDomain = chatRegistration.domain;

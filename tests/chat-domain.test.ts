@@ -24,13 +24,13 @@ import {
 import { TOPIC_TAG } from "../src/domains/topic/types.js";
 describe("Chat domain - config", () => {
     test("has correct id and name", () => {
-        const domain = createChatDomain();
+        const { domain } = createChatDomain();
         expect(domain.id).toBe("chat");
         expect(domain.name).toBe("Chat");
     });
 
     test("has baseDir and 4 skills", () => {
-        const domain = createChatDomain();
+        const { domain } = createChatDomain();
         expect(domain.baseDir).toBeTypeOf("string");
         expect(domain.baseDir!.length).toBeGreaterThan(0);
         expect(domain.skills).toHaveLength(4);
@@ -42,7 +42,7 @@ describe("Chat domain - config", () => {
     });
 
     test("schema has 1 edge (summarizes)", () => {
-        const domain = createChatDomain();
+        const { domain } = createChatDomain();
         const edges = domain.schema!.edges;
         expect(edges).toHaveLength(1);
         expect(edges[0].name).toBe("summarizes");
@@ -51,7 +51,7 @@ describe("Chat domain - config", () => {
     });
 
     test("default options include all three schedules", () => {
-        const domain = createChatDomain();
+        const { domain } = createChatDomain();
         expect(domain.schedules).toHaveLength(3);
         const scheduleIds = domain.schedules!.map((s) => s.id);
         expect(scheduleIds).toContain("promote-working-memory");
@@ -60,7 +60,7 @@ describe("Chat domain - config", () => {
     });
 
     test("schedules use default intervals", () => {
-        const domain = createChatDomain();
+        const { domain } = createChatDomain();
         const promote = domain.schedules!.find((s) => s.id === "promote-working-memory")!;
         const consolidate = domain.schedules!.find((s) => s.id === "consolidate-episodic")!;
         const prune = domain.schedules!.find((s) => s.id === "prune-decayed")!;
@@ -70,7 +70,7 @@ describe("Chat domain - config", () => {
     });
 
     test("individual schedules can be disabled", () => {
-        const domain = createChatDomain({
+        const { domain } = createChatDomain({
             promoteSchedule: { enabled: false },
             consolidateSchedule: { enabled: false },
         });
@@ -79,7 +79,7 @@ describe("Chat domain - config", () => {
     });
 
     test("schedules accept custom intervals", () => {
-        const domain = createChatDomain({
+        const { domain } = createChatDomain({
             promoteSchedule: { intervalMs: 5000 },
         });
         const promote = domain.schedules!.find((s) => s.id === "promote-working-memory")!;
@@ -87,7 +87,7 @@ describe("Chat domain - config", () => {
     });
 
     test("describe() returns a non-empty string", () => {
-        const domain = createChatDomain();
+        const { domain } = createChatDomain();
         const describeFn = domain.describe?.bind(domain);
         expect(describeFn).toBeTypeOf("function");
         expect(describeFn!().length).toBeGreaterThan(0);
@@ -462,7 +462,7 @@ describe("Chat domain - inbox processing", () => {
 
 describe("Chat domain - search", () => {
     test("search.expand returns empty ids when userId is missing", () => {
-        const domain = createChatDomain();
+        const { domain } = createChatDomain();
         const result = domain.search!.expand!({ text: "test" }, {
             requestContext: {},
         } as unknown as DomainContext);
@@ -472,7 +472,7 @@ describe("Chat domain - search", () => {
     });
 
     test("search.expand passes through query when userId is present", () => {
-        const domain = createChatDomain();
+        const { domain } = createChatDomain();
         const query = { text: "test", tags: ["chat"] };
         const result = domain.search!.expand!(query, {
             requestContext: { userId: "test-user" },
