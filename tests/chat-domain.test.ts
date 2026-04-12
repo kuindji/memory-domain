@@ -18,6 +18,7 @@ import {
     DEFAULT_PROMOTE_INTERVAL_MS,
     DEFAULT_CONSOLIDATE_INTERVAL_MS,
     DEFAULT_PRUNE_INTERVAL_MS,
+    type ChatAttributes,
 } from "../src/domains/chat/types.js";
 import { TOPIC_TAG } from "../src/domains/topic/types.js";
 describe("Chat domain - config", () => {
@@ -94,6 +95,21 @@ describe("Chat domain - config", () => {
     test("default chatDomain instance is valid", () => {
         expect(chatDomain.id).toBe(CHAT_DOMAIN_ID);
         expect(chatDomain.schedules).toHaveLength(3);
+    });
+
+    test("ChatAttributes type accepts validFrom and invalidAt", () => {
+        const attrs: ChatAttributes = {
+            role: "user",
+            layer: "episodic",
+            chatSessionId: "s1",
+            userId: "u1",
+            messageIndex: 0,
+            weight: 1.0,
+            validFrom: Date.now(),
+            invalidAt: Date.now(),
+        };
+        expect(attrs.validFrom).toBeTypeOf("number");
+        expect(attrs.invalidAt).toBeTypeOf("number");
     });
 });
 

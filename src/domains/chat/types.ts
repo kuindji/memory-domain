@@ -8,6 +8,8 @@ export interface ChatAttributes {
     userId: string;
     messageIndex: number;
     weight?: number;
+    validFrom?: number;
+    invalidAt?: number;
 }
 
 export interface ChatDomainOptions {
@@ -33,6 +35,7 @@ export interface ChatDomainOptions {
     consolidation?: {
         similarityThreshold?: number;
         minClusterSize?: number;
+        semanticDedupThreshold?: number;
     };
 }
 
@@ -52,3 +55,4 @@ export const DEFAULT_SEMANTIC_LAMBDA = 0.001;
 export const DEFAULT_PRUNE_THRESHOLD = 0.05;
 export const DEFAULT_CONSOLIDATION_SIMILARITY = 0.7;
 export const DEFAULT_CONSOLIDATION_MIN_CLUSTER = 3;
+export const DEFAULT_SEMANTIC_DEDUP_THRESHOLD = 0.85;
