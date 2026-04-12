@@ -997,6 +997,36 @@ describe("Chat domain - prune decayed", () => {
         expect(remaining).toHaveLength(1);
         expect(remaining[0].content).toBe("Semantic knowledge");
     });
+
+    test("skips already-invalidated episodic memories", async () => {
+        const ctx = engine.createDomainContext(CHAT_DOMAIN_ID);
+
+        // Create an invalidated memory with low weight
+        await ctx.writeMemory({
+            content: "Invalidated fact",
+            tags: [CHAT_TAG, CHAT_EPISODIC_TAG],
+            ownership: {
+                domain: CHAT_DOMAIN_ID,
+                attributes: {
+                    layer: "episodic",
+                    userId: "test-user",
+                    weight: 0.01,
+                    invalidAt: Date.now() - 1000,
+                },
+            },
+        });
+
+        // Prune with high threshold — would normally delete it
+        await pruneDecayed(ctx, { decay: { pruneThreshold: 0.5 } });
+
+        // Should still exist because it was skipped (already invalidated)
+        const remaining = await ctx.getMemories({
+            tags: [CHAT_EPISODIC_TAG],
+            attributes: { layer: "episodic" },
+        });
+        expect(remaining).toHaveLength(1);
+        expect(remaining[0].content).toBe("Invalidated fact");
+    });
 });
 
 describe("Chat domain - consolidate with contradiction detection", () => {

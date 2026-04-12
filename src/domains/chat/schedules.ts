@@ -414,6 +414,9 @@ export async function pruneDecayed(
             const memId = String(row.in);
             const weight = typeof row.attributes.weight === "number" ? row.attributes.weight : 1.0;
 
+            // Skip already-invalidated memories
+            if (row.attributes.invalidAt != null) continue;
+
             const memory = await context.getMemory(memId);
             if (!memory) continue;
 
