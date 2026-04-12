@@ -145,7 +145,12 @@ export function createChatDomain(options?: ChatDomainOptions): DomainConfig {
 
                 const episodicEntries = episodicResult.entries.filter((e) => {
                     const attrs = e.domainAttributes[CHAT_DOMAIN_ID];
-                    return attrs && attrs.userId === userId && attrs.layer === "episodic";
+                    return (
+                        attrs &&
+                        attrs.userId === userId &&
+                        attrs.layer === "episodic" &&
+                        attrs.invalidAt == null
+                    );
                 });
 
                 if (episodicEntries.length > 0) {
@@ -165,7 +170,12 @@ export function createChatDomain(options?: ChatDomainOptions): DomainConfig {
 
                 const semanticEntries = semanticResult.entries.filter((e) => {
                     const attrs = e.domainAttributes[CHAT_DOMAIN_ID];
-                    return attrs && attrs.userId === userId && attrs.layer === "semantic";
+                    return (
+                        attrs &&
+                        attrs.userId === userId &&
+                        attrs.layer === "semantic" &&
+                        attrs.invalidAt == null
+                    );
                 });
 
                 if (semanticEntries.length > 0) {

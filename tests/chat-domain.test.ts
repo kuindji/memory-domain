@@ -626,6 +626,88 @@ describe("Chat domain - buildContext", () => {
         expect(result.context).toContain("Session 1 message");
         expect(result.context).not.toContain("Session 2 message");
     });
+
+    test("excludes invalidated episodic memories from context", async () => {
+        const ctx = engine.createDomainContext(CHAT_DOMAIN_ID);
+
+        await ctx.writeMemory({
+            content: "Valid episodic fact about testing",
+            tags: [CHAT_EPISODIC_TAG],
+            ownership: {
+                domain: CHAT_DOMAIN_ID,
+                attributes: {
+                    layer: "episodic",
+                    userId: "test-user",
+                    weight: 0.5,
+                    validFrom: Date.now(),
+                },
+            },
+        });
+
+        await ctx.writeMemory({
+            content: "Invalidated episodic fact should not appear",
+            tags: [CHAT_EPISODIC_TAG],
+            ownership: {
+                domain: CHAT_DOMAIN_ID,
+                attributes: {
+                    layer: "episodic",
+                    userId: "test-user",
+                    weight: 0.5,
+                    validFrom: Date.now() - 10000,
+                    invalidAt: Date.now() - 5000,
+                },
+            },
+        });
+
+        const result = await engine.buildContext("testing", {
+            domains: ["chat"],
+            context: { userId: "test-user", chatSessionId: "session-1" },
+        });
+
+        expect(result.context).toContain("Valid episodic fact about testing");
+        expect(result.context).not.toContain("Invalidated episodic fact should not appear");
+    });
+
+    test("excludes invalidated semantic memories from context", async () => {
+        const ctx = engine.createDomainContext(CHAT_DOMAIN_ID);
+
+        await ctx.writeMemory({
+            content: "Valid semantic knowledge about testing",
+            tags: [CHAT_SEMANTIC_TAG],
+            ownership: {
+                domain: CHAT_DOMAIN_ID,
+                attributes: {
+                    layer: "semantic",
+                    userId: "test-user",
+                    weight: 0.8,
+                    validFrom: Date.now(),
+                },
+            },
+        });
+
+        await ctx.writeMemory({
+            content: "Invalidated semantic should not appear",
+            tags: [CHAT_SEMANTIC_TAG],
+            ownership: {
+                domain: CHAT_DOMAIN_ID,
+                attributes: {
+                    layer: "semantic",
+                    userId: "test-user",
+                    weight: 0.8,
+                    validFrom: Date.now() - 10000,
+                    invalidAt: Date.now() - 5000,
+                },
+            },
+        });
+
+        const result = await engine.buildContext("testing", {
+            domains: ["chat"],
+            context: { userId: "test-user", chatSessionId: "session-1" },
+        });
+
+        expect(result.context).toContain("Valid semantic knowledge about testing");
+        expect(result.context).not.toContain("Invalidated semantic should not appear");
+    });
 });
 
 describe("Chat domain - promote working memory", () => {
