@@ -1154,6 +1154,111 @@ describe("Chat domain - consolidate with contradiction detection", () => {
         expect(semanticMemories[0].content).toBe("Fallback consolidated summary");
     });
 
+    test("deduplicates semantic memories by merging similar ones", async () => {
+        const ctx = engine.createDomainContext(CHAT_DOMAIN_ID);
+
+        // Create an existing semantic memory
+        const existingId = await ctx.writeMemory({
+            content: "User prefers TypeScript for web development",
+            tags: [CHAT_TAG, CHAT_SEMANTIC_TAG],
+            ownership: {
+                domain: CHAT_DOMAIN_ID,
+                attributes: {
+                    layer: "semantic",
+                    userId: "test-user",
+                    weight: 0.8,
+                    validFrom: Date.now() - 10000,
+                },
+            },
+        });
+
+        // Create 3 episodic memories that will produce a similar semantic
+        for (let i = 0; i < 3; i++) {
+            await ctx.writeMemory({
+                content: "User prefers TypeScript for web development",
+                tags: [CHAT_TAG, CHAT_EPISODIC_TAG],
+                ownership: {
+                    domain: CHAT_DOMAIN_ID,
+                    attributes: {
+                        layer: "episodic",
+                        userId: "test-user",
+                        weight: 0.5,
+                        validFrom: Date.now(),
+                    },
+                },
+            });
+        }
+
+        // extractStructured returns summary with same text so mock embeddings match
+        llm.extractStructuredResult = [
+            {
+                summary: "User prefers TypeScript for web development",
+                contradictions: [],
+            },
+        ];
+        // consolidate will be called for the merge step
+        llm.consolidateResult = "Merged: User strongly prefers TypeScript for web projects";
+
+        await consolidateEpisodic(ctx, {
+            consolidation: {
+                similarityThreshold: 0.1,
+                minClusterSize: 2,
+                semanticDedupThreshold: 0.1, // low threshold so mock embeddings match
+            },
+        });
+
+        // The old semantic should be invalidated
+        const oldRows = await ctx.graph.query<{ attributes: Record<string, unknown> }[]>(
+            "SELECT attributes FROM owned_by WHERE in = $memId AND out = $domainId",
+            {
+                memId: new StringRecordId(existingId),
+                domainId: new StringRecordId(`domain:${CHAT_DOMAIN_ID}`),
+            },
+        );
+        expect(oldRows).toHaveLength(1);
+        expect(oldRows[0].attributes.invalidAt).toBeTypeOf("number");
+    });
+
+    test("skips semantic dedup when no similar semantic exists", async () => {
+        const ctx = engine.createDomainContext(CHAT_DOMAIN_ID);
+
+        // Create 3 episodic memories — no existing semantics
+        for (let i = 0; i < 3; i++) {
+            await ctx.writeMemory({
+                content: "Unique topic about cooking pasta",
+                tags: [CHAT_TAG, CHAT_EPISODIC_TAG],
+                ownership: {
+                    domain: CHAT_DOMAIN_ID,
+                    attributes: {
+                        layer: "episodic",
+                        userId: "test-user",
+                        weight: 0.5,
+                        validFrom: Date.now(),
+                    },
+                },
+            });
+        }
+
+        llm.extractStructuredResult = [
+            { summary: "User discusses cooking pasta", contradictions: [] },
+        ];
+
+        await consolidateEpisodic(ctx, {
+            consolidation: {
+                similarityThreshold: 0.1,
+                minClusterSize: 2,
+                semanticDedupThreshold: 0.99, // very high — nothing should match
+            },
+        });
+
+        const semanticMemories = await ctx.getMemories({
+            tags: [CHAT_SEMANTIC_TAG],
+            attributes: { layer: "semantic" },
+        });
+        expect(semanticMemories).toHaveLength(1);
+        expect(semanticMemories[0].content).toBe("User discusses cooking pasta");
+    });
+
     test("semantic memory created from consolidation has validFrom set", async () => {
         const ctx = engine.createDomainContext(CHAT_DOMAIN_ID);
 

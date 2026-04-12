@@ -10,9 +10,11 @@ import {
     DEFAULT_WORKING_MAX_AGE,
     DEFAULT_CONSOLIDATION_SIMILARITY,
     DEFAULT_CONSOLIDATION_MIN_CLUSTER,
+    DEFAULT_SEMANTIC_DEDUP_THRESHOLD,
     DEFAULT_EPISODIC_LAMBDA,
     DEFAULT_PRUNE_THRESHOLD,
 } from "./types.js";
+import { countTokens } from "../../core/scoring.js";
 import { ensureTag } from "./utils.js";
 
 interface WorkingMemoryRow {
@@ -329,6 +331,63 @@ export async function consolidateEpisodic(
             for (const entry of clusterEntries) {
                 if (!invalidatedIds.has(entry.id)) {
                     await context.graph.relate(semanticId, "summarizes", entry.id);
+                }
+            }
+
+            // Semantic dedup: check for existing similar semantic memories
+            const dedupThreshold =
+                options?.consolidation?.semanticDedupThreshold ?? DEFAULT_SEMANTIC_DEDUP_THRESHOLD;
+
+            const existingSemantics = await context.search({
+                text: summary,
+                tags: [CHAT_SEMANTIC_TAG],
+                attributes: { layer: "semantic" },
+                minScore: dedupThreshold,
+            });
+
+            // Filter out the semantic memory we just created, non-semantic layers,
+            // and any already-invalidated ones
+            const dedupCandidates = existingSemantics.entries.filter((e) => {
+                if (e.id === semanticId) return false;
+                const attrs = e.domainAttributes[CHAT_DOMAIN_ID];
+                if (!attrs || attrs.layer !== "semantic") return false;
+                if (attrs.invalidAt != null) return false;
+                return true;
+            });
+
+            if (dedupCandidates.length > 0) {
+                const dupTarget = dedupCandidates[0];
+
+                // Merge via LLM consolidate
+                const merged = await context.debug.time(
+                    "chat.schedule.consolidate.semanticMerge",
+                    () => context.llmAt("medium").consolidate([summary, dupTarget.content]),
+                    { memories: 2 },
+                );
+
+                if (merged) {
+                    // Update the new semantic memory with merged content
+                    await context.graph.updateNode(semanticId, {
+                        content: merged,
+                        token_count: countTokens(merged),
+                    });
+
+                    // Invalidate the old semantic memory
+                    const oldAttrRows = await context.graph.query<
+                        { attributes: Record<string, unknown> }[]
+                    >("SELECT attributes FROM owned_by WHERE in = $memId AND out = $domainId", {
+                        memId: new StringRecordId(dupTarget.id),
+                        domainId: new StringRecordId(`domain:${CHAT_DOMAIN_ID}`),
+                    });
+                    if (oldAttrRows && oldAttrRows.length > 0) {
+                        await context.updateAttributes(dupTarget.id, {
+                            ...oldAttrRows[0].attributes,
+                            invalidAt: now,
+                        });
+                    }
+
+                    // Create summarizes edge from merged → old
+                    await context.graph.relate(semanticId, "summarizes", dupTarget.id);
                 }
             }
         }
