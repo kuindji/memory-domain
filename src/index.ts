@@ -70,7 +70,11 @@ export type {
     ConnectionAdapter,
     S3AdapterConfig,
     CoreMemory,
+    DomainPlugin,
+    DomainPluginHooks,
+    DomainRegistration,
 } from "./core/types.js";
+export { isDomainRegistration } from "./core/types.js";
 export type { TopicAttributes, TopicDomainOptions, TopicStatus } from "./domains/topic/types.js";
 export type { UserDomainOptions } from "./domains/user/types.js";
 export type {
@@ -88,6 +92,10 @@ export { createTopicDomain, topicDomain } from "./domains/topic/index.js";
 export { createUserDomain, userDomain } from "./domains/user/index.js";
 export { createCodeRepoDomain, codeRepoDomain } from "./domains/code-repo/index.js";
 export { createKbDomain, kbDomain } from "./domains/kb/index.js";
+
+// Plugins
+export { createTopicLinkingPlugin } from "./plugins/index.js";
+export type { TopicLinkingOptions } from "./plugins/index.js";
 
 // Adapters
 export { ClaudeCliAdapter } from "./adapters/llm/claude-cli.js";
