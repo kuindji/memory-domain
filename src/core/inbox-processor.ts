@@ -27,6 +27,7 @@ interface RawMemoryRow {
     created_at: number;
     token_count: number;
     request_context?: Record<string, unknown>;
+    structured_data?: Record<string, unknown>;
 }
 
 interface RawOwnedByEdge {
@@ -476,6 +477,10 @@ class InboxProcessor {
         const remaining = await this.countActiveInboxTags(memId);
         if (remaining === 0) {
             await this.store.unrelate(memId, "tagged", "tag:inbox");
+            // Clear transient structured data now that all domains have processed
+            await this.store.query("UPDATE $memId SET structured_data = NONE", {
+                memId: new StringRecordId(memId),
+            });
             this.events.emit("inboxProcessed", { memoryId: memId });
         }
     }
@@ -572,7 +577,12 @@ class InboxProcessor {
                 domainAttributes = ownedByEdges?.[0]?.attributes ?? {};
             }
 
-            entries.push({ memory, domainAttributes, tags });
+            const structuredData =
+                domainId && node.structured_data?.[domainId] !== undefined
+                    ? node.structured_data[domainId]
+                    : undefined;
+
+            entries.push({ memory, domainAttributes, tags, structuredData });
         }
 
         return entries;

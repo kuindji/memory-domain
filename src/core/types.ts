@@ -188,6 +188,8 @@ export interface OwnedMemory {
     memory: MemoryEntry;
     domainAttributes: Record<string, unknown>;
     tags: string[];
+    /** Domain-specific slice of pre-extracted structured data, if provided at ingest time. */
+    structuredData?: unknown;
 }
 
 export interface WriteMemoryEntry {
@@ -299,6 +301,9 @@ export interface IngestOptions {
     metadata?: Record<string, unknown>;
     skipDedup?: boolean;
     context?: RequestContext;
+    /** Pre-extracted structured data keyed by domain ID. Passed through to organizers
+     *  so they can skip LLM extraction when structured data is available. */
+    structuredData?: Record<string, unknown>;
 }
 
 export interface IngestResult {

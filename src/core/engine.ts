@@ -632,6 +632,9 @@ class MemoryEngine {
         if (embeddingVec) {
             memData.embedding = embeddingVec;
         }
+        if (options?.structuredData) {
+            memData.structured_data = options.structuredData;
+        }
         const memId = await this.graph.createNode("memory", memData);
 
         // Tag with inbox
