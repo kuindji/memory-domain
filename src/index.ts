@@ -95,7 +95,7 @@ export { createKbDomain, kbDomain } from "./domains/kb/index.js";
 
 // Plugins
 export { createTopicLinkingPlugin } from "./plugins/index.js";
-export type { TopicLinkingOptions } from "./plugins/index.js";
+export type { TopicLinkingOptions, ExtractedTopic, LinkResult } from "./plugins/index.js";
 
 // Adapters
 export { ClaudeCliAdapter } from "./adapters/llm/claude-cli.js";

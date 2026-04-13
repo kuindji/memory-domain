@@ -361,7 +361,9 @@ describe("Full chat lifecycle (real)", () => {
             );
             if (attrRows.length > 0) {
                 expect(attrRows[0].attributes.validFrom).toBeTypeOf("number");
-                console.log(`  Semantic ${mem.id} validFrom=${attrRows[0].attributes.validFrom}`);
+                console.log(
+                    `  Semantic ${mem.id} validFrom=${String(attrRows[0].attributes.validFrom)}`,
+                );
             }
         }
 
