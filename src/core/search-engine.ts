@@ -334,10 +334,16 @@ class SearchEngine {
         if (query.tags && query.tags.length > 0) {
             const tagRefs = query.tags.map((t) => (t.startsWith("tag:") ? t : `tag:${t}`));
             const tagRecordIds = tagRefs.map((t) => new StringRecordId(t));
+            const limit = query.limit ?? 10;
 
+            // Query from the tag side: scan tagged edges where out IN $tags,
+            // then fetch the referenced memories. Keeps LIMIT literal to avoid
+            // SurrealDB bind-parameter quirks on LIMIT clauses.
             const rows = await this.store.query<MemoryRow[]>(
-                `SELECT * FROM memory WHERE ->tagged.out CONTAINSANY $tags LIMIT $limit`,
-                { tags: tagRecordIds, limit: query.limit ?? 10 },
+                `SELECT * FROM memory WHERE id IN (
+                    SELECT VALUE in FROM tagged WHERE out IN $tags LIMIT ${limit}
+                )`,
+                { tags: tagRecordIds },
             );
 
             if (rows) {

@@ -70,6 +70,25 @@ class SchemaRegistry {
       DEFINE TABLE IF NOT EXISTS has_rule SCHEMALESS TYPE RELATION IN tag OUT domain;
     `);
 
+        // Indexes on relation edge fields: SurrealDB does not auto-index `in`/`out`
+        // on RELATION tables, so queries like `WHERE in = $id` or `WHERE out IN $ids`
+        // fall back to full table scans. Add explicit indexes on both directions for
+        // every core edge table.
+        const coreEdges = [
+            "tagged",
+            "child_of",
+            "owned_by",
+            "reinforces",
+            "contradicts",
+            "summarizes",
+            "refines",
+            "has_rule",
+        ];
+        for (const edge of coreEdges) {
+            await this.defineIndex(edge, { name: `idx_${edge}_in`, fields: ["in"] });
+            await this.defineIndex(edge, { name: `idx_${edge}_out`, fields: ["out"] });
+        }
+
         if (embeddingDimension) {
             await this.defineIndex("memory", {
                 name: "idx_memory_embedding",
@@ -238,6 +257,9 @@ class SchemaRegistry {
                         await this.defineField(edge.name, field);
                     }
                 }
+                // Index on in/out so WHERE in = $id / WHERE out IN $ids don't full-scan
+                await this.defineIndex(edge.name, { name: `idx_${edge.name}_in`, fields: ["in"] });
+                await this.defineIndex(edge.name, { name: `idx_${edge.name}_out`, fields: ["out"] });
                 this.registeredEdges.set(edge.name, { ...edge, contributors: [contributor] });
             }
         }
