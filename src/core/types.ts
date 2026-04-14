@@ -127,6 +127,19 @@ export interface SearchQuery extends MemoryFilter {
     rerank?: boolean;
     rerankThreshold?: number;
     filters?: Record<string, unknown>;
+    /**
+     * Skip plugin-defined `expandSearch` hooks for this query.
+     * Set by plugins that call `context.search` internally to avoid
+     * recursive/quadratic expansion work. Domain-level `search.expand`
+     * still runs.
+     */
+    skipPluginExpansion?: boolean;
+    /**
+     * Skip `enrichConnections` — do not populate `entry.connections`.
+     * Use when the caller does not read the `connections` field.
+     * Saves one (batched) query per search.
+     */
+    skipConnections?: boolean;
 }
 
 export interface SearchResult {

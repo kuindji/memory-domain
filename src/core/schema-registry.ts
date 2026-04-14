@@ -282,7 +282,10 @@ class SchemaRegistry {
                 }
                 // Index on in/out so WHERE in = $id / WHERE out IN $ids don't full-scan
                 await this.defineIndex(edge.name, { name: `idx_${edge.name}_in`, fields: ["in"] });
-                await this.defineIndex(edge.name, { name: `idx_${edge.name}_out`, fields: ["out"] });
+                await this.defineIndex(edge.name, {
+                    name: `idx_${edge.name}_out`,
+                    fields: ["out"],
+                });
                 this.registeredEdges.set(edge.name, { ...edge, contributors: [contributor] });
             }
         }

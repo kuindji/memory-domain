@@ -769,14 +769,16 @@ class MemoryEngine {
             }
         }
 
-        // Plugin search expansion
-        for (const domainId of targetDomains) {
-            const domainPlugins = this.pluginsByDomain.get(domainId);
-            if (domainPlugins) {
-                for (const plugin of domainPlugins) {
-                    if (plugin.hooks.expandSearch) {
-                        const ctx = this.createDomainContext(domainId, query.context);
-                        expandedQuery = await plugin.hooks.expandSearch(expandedQuery, ctx);
+        // Plugin search expansion (skippable for internal plugin-initiated searches)
+        if (!query.skipPluginExpansion) {
+            for (const domainId of targetDomains) {
+                const domainPlugins = this.pluginsByDomain.get(domainId);
+                if (domainPlugins) {
+                    for (const plugin of domainPlugins) {
+                        if (plugin.hooks.expandSearch) {
+                            const ctx = this.createDomainContext(domainId, query.context);
+                            expandedQuery = await plugin.hooks.expandSearch(expandedQuery, ctx);
+                        }
                     }
                 }
             }

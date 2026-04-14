@@ -120,7 +120,10 @@ class SearchEngine {
         }
 
         // Enrich results with connections and domain attributes
-        await Promise.all([this.enrichConnections(entries), this.enrichDomainAttributes(entries)]);
+        await Promise.all([
+            query.skipConnections ? Promise.resolve() : this.enrichConnections(entries),
+            this.enrichDomainAttributes(entries),
+        ]);
 
         const totalTokens = entries.reduce((sum, e) => sum + this.getTokenCount(e), 0);
 
@@ -472,14 +475,12 @@ class SearchEngine {
         if (entries.length === 0) return;
         const ids = entries.map((e) => new StringRecordId(e.id));
 
-        const edges: { id: unknown; in: unknown; out: unknown }[] = [];
-        for (const table of ["reinforces", "contradicts", "summarizes", "refines"]) {
-            const rows = await this.store.query<{ id: unknown; in: unknown; out: unknown }[]>(
-                `SELECT id, in, out FROM ${table} WHERE in IN $ids OR out IN $ids`,
+        const edges =
+            (await this.store.query<{ id: unknown; in: unknown; out: unknown }[]>(
+                `SELECT id, in, out FROM reinforces, contradicts, summarizes, refines
+                 WHERE in IN $ids OR out IN $ids`,
                 { ids },
-            );
-            if (rows) edges.push(...rows);
-        }
+            )) ?? [];
 
         if (edges.length === 0) return;
 

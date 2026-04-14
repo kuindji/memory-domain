@@ -106,6 +106,8 @@ function createTopicLinkingPlugin(options?: TopicLinkingOptions): DomainPlugin {
             text: topicName,
             tags: [topicTag],
             minScore,
+            skipPluginExpansion: true,
+            skipConnections: true,
         });
 
         let topicMemoryId: string;
