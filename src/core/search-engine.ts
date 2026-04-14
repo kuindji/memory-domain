@@ -201,13 +201,12 @@ class SearchEngine {
 
         for (const row of rows) {
             const id = String(row.id);
-            const tags = await this.getMemoryTags(id);
             candidates.set(id, {
                 id,
                 content: row.content,
                 score: row.score,
                 scores: { vector: row.score },
-                tags,
+                tags: [],
                 domainAttributes: {},
                 eventTime: row.event_time ?? null,
                 createdAt: row.created_at,
@@ -215,6 +214,7 @@ class SearchEngine {
             });
         }
 
+        await this.hydrateTags(candidates);
         return candidates;
     }
 
@@ -254,13 +254,12 @@ class SearchEngine {
 
         for (const row of rows) {
             const id = String(row.id);
-            const tags = await this.getMemoryTags(id);
             candidates.set(id, {
                 id,
                 content: row.content,
                 score: row.score ?? 0.5,
                 scores: { fulltext: row.score ?? 0.5 },
-                tags,
+                tags: [],
                 domainAttributes: {},
                 eventTime: row.event_time ?? null,
                 createdAt: row.created_at,
@@ -268,6 +267,7 @@ class SearchEngine {
             });
         }
 
+        await this.hydrateTags(candidates);
         return candidates;
     }
 
@@ -313,13 +313,12 @@ class SearchEngine {
                     // Detect which format we got by checking for the content property.
                     if (row.content === undefined) continue;
                     const id = String(row.id);
-                    const tags = await this.getMemoryTags(id);
                     candidates.set(id, {
                         id,
                         content: row.content,
                         score: 1.0,
                         scores: { graph: 1.0 },
-                        tags,
+                        tags: [],
                         domainAttributes: {},
                         eventTime: row.event_time ?? null,
                         createdAt: row.created_at,
@@ -327,6 +326,7 @@ class SearchEngine {
                     });
                 }
             }
+            await this.hydrateTags(candidates);
             return candidates;
         }
 
@@ -349,13 +349,12 @@ class SearchEngine {
             if (rows) {
                 for (const row of rows) {
                     const id = String(row.id);
-                    const tags = await this.getMemoryTags(id);
                     candidates.set(id, {
                         id,
                         content: row.content,
                         score: 1.0,
                         scores: { graph: 1.0 },
-                        tags,
+                        tags: [],
                         domainAttributes: {},
                         eventTime: row.event_time ?? null,
                         createdAt: row.created_at,
@@ -364,6 +363,7 @@ class SearchEngine {
                 }
             }
 
+            await this.hydrateTags(candidates);
             return candidates;
         }
 
@@ -533,12 +533,39 @@ class SearchEngine {
     }
 
     private async getMemoryTags(memoryId: string): Promise<string[]> {
-        const tags = await this.store.query<string[]>(
-            `SELECT VALUE out.label FROM tagged WHERE in = $mem`,
-            { mem: new StringRecordId(memoryId) },
+        const map = await this.getMemoryTagsBatch([memoryId]);
+        return map.get(memoryId) ?? [];
+    }
+
+    private async getMemoryTagsBatch(memoryIds: string[]): Promise<Map<string, string[]>> {
+        const result = new Map<string, string[]>();
+        if (memoryIds.length === 0) return result;
+
+        const unique = Array.from(new Set(memoryIds));
+        const refs = unique.map((id) => new StringRecordId(id));
+
+        const rows = await this.store.query<{ in: unknown; label: unknown }[]>(
+            `SELECT in, out.label AS label FROM tagged WHERE in IN $ids`,
+            { ids: refs },
         );
-        if (!tags || !Array.isArray(tags)) return [];
-        return tags.filter((label): label is string => typeof label === "string");
+        if (!rows) return result;
+
+        for (const row of rows) {
+            if (typeof row.label !== "string") continue;
+            const memId = String(row.in);
+            const arr = result.get(memId);
+            if (arr) arr.push(row.label);
+            else result.set(memId, [row.label]);
+        }
+        return result;
+    }
+
+    private async hydrateTags(candidates: Map<string, ScoredMemory>): Promise<void> {
+        if (candidates.size === 0) return;
+        const tagMap = await this.getMemoryTagsBatch([...candidates.keys()]);
+        for (const [id, mem] of candidates) {
+            mem.tags = tagMap.get(id) ?? [];
+        }
     }
 
     private async rerankByEmbedding(

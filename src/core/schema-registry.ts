@@ -4,6 +4,7 @@ import type { DomainSchema, NodeDef, EdgeDef, FieldDef, IndexDef } from "./types
 interface RegisteredNode {
     name: string;
     fields: FieldDef[];
+    indexes: IndexDef[];
     contributors: string[];
 }
 
@@ -119,6 +120,20 @@ class SchemaRegistry {
         });
 
         // Track core nodes in memory
+        const coreMemoryIndexes: IndexDef[] = [
+            { name: "idx_memory_content", fields: ["content"], type: "search" },
+            { name: "idx_memory_answers_question", fields: ["answers_question"], type: "search" },
+            { name: "idx_memory_event_time", fields: ["event_time"] },
+        ];
+        if (embeddingDimension) {
+            coreMemoryIndexes.unshift({
+                name: "idx_memory_embedding",
+                fields: ["embedding"],
+                type: "hnsw",
+                config: { dimension: embeddingDimension, dist: "COSINE" },
+            });
+        }
+
         this.registeredNodes.set("memory", {
             name: "memory",
             fields: [
@@ -131,6 +146,7 @@ class SchemaRegistry {
                 { name: "structured_data", type: "option<object>" },
                 { name: "answers_question", type: "option<string>" },
             ],
+            indexes: coreMemoryIndexes,
             contributors: ["core"],
         });
         this.registeredNodes.set("tag", {
@@ -139,6 +155,7 @@ class SchemaRegistry {
                 { name: "label", type: "string" },
                 { name: "created_at", type: "int" },
             ],
+            indexes: [],
             contributors: ["core"],
         });
         this.registeredNodes.set("domain", {
@@ -147,11 +164,13 @@ class SchemaRegistry {
                 { name: "name", type: "string" },
                 { name: "settings", type: "option<object>" },
             ],
+            indexes: [],
             contributors: ["core"],
         });
         this.registeredNodes.set("meta", {
             name: "meta",
             fields: [{ name: "value", type: "option<string>" }],
+            indexes: [],
             contributors: ["core"],
         });
     }
@@ -201,6 +220,9 @@ class SchemaRegistry {
                 if (node.indexes) {
                     for (const idx of node.indexes) {
                         await this.defineIndex(node.name, idx);
+                        if (!existing.indexes.some((i) => i.name === idx.name)) {
+                            existing.indexes.push(idx);
+                        }
                     }
                 }
 
@@ -222,6 +244,7 @@ class SchemaRegistry {
                 this.registeredNodes.set(node.name, {
                     name: node.name,
                     fields: [...node.fields],
+                    indexes: node.indexes ? [...node.indexes] : [],
                     contributors: [contributor],
                 });
             }
@@ -306,6 +329,47 @@ class SchemaRegistry {
             }
         }
         await this.db.query(query);
+    }
+
+    /**
+     * Verify that every registered edge table has `idx_<edge>_in` / `idx_<edge>_out`
+     * defined, and every node table has all declared indexes. Returns a list of
+     * `<table>.<index_name>` identifiers that are missing. Intended for debug mode —
+     * does not throw.
+     */
+    async verifyIndexes(): Promise<string[]> {
+        const missing: string[] = [];
+
+        for (const [edgeName] of this.registeredEdges) {
+            const expected = [`idx_${edgeName}_in`, `idx_${edgeName}_out`];
+            const found = await this.listTableIndexes(edgeName);
+            for (const name of expected) {
+                if (!found.has(name)) missing.push(`${edgeName}.${name}`);
+            }
+        }
+
+        for (const [nodeName, node] of this.registeredNodes) {
+            if (node.indexes.length === 0) continue;
+            const found = await this.listTableIndexes(nodeName);
+            for (const idx of node.indexes) {
+                if (!found.has(idx.name)) missing.push(`${nodeName}.${idx.name}`);
+            }
+        }
+
+        return missing;
+    }
+
+    private async listTableIndexes(table: string): Promise<Set<string>> {
+        try {
+            const rows = await this.db.query<[{ indexes?: Record<string, unknown> }]>(
+                `INFO FOR TABLE ${table}`,
+            );
+            const info = Array.isArray(rows) ? rows[0] : rows;
+            const indexes = info?.indexes ?? {};
+            return new Set(Object.keys(indexes));
+        } catch {
+            return new Set();
+        }
     }
 }
 

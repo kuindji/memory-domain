@@ -1091,7 +1091,7 @@ class MemoryEngine {
                 for (let depth = 0; depth < 10 && frontier.length > 0; depth++) {
                     const refs = frontier.map((id) => new StringRecordId(id));
                     const children = await graph.query<string[]>(
-                        "SELECT VALUE id FROM tag WHERE ->child_of->tag CONTAINSANY $parentIds",
+                        "SELECT VALUE in FROM child_of WHERE out IN $parentIds",
                         { parentIds: refs },
                     );
                     if (!children || children.length === 0) break;
@@ -1365,6 +1365,15 @@ class MemoryEngine {
 
     getEvents(): EventEmitter {
         return this.events;
+    }
+
+    /**
+     * Verify that every registered table has its declared indexes defined in
+     * SurrealDB. Returns a list of `<table>.<index_name>` identifiers that are
+     * missing. Intended for debug mode / verification scripts — does not throw.
+     */
+    async verifyIndexes(): Promise<string[]> {
+        return this.schema.verifyIndexes();
     }
 
     startProcessing(options?: InboxProcessorOptions): void {
