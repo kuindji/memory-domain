@@ -188,13 +188,13 @@ class SearchEngine {
         );
         const filterSql = filterClauses.length > 0 ? ` AND ${filterClauses.join(" AND ")}` : "";
 
+        const limit = query.limit ?? 10;
         const rows = await this.store.query<(MemoryRow & { score: number })[]>(
             `SELECT *, vector::similarity::cosine(embedding, $queryVec) AS score
        FROM memory
-       WHERE embedding IS NOT NONE${filterSql}
-       ORDER BY score DESC
-       LIMIT $limit`,
-            { queryVec, limit: query.limit ?? 10, ...filterVars },
+       WHERE embedding <|${limit},40|> $queryVec${filterSql}
+       ORDER BY score DESC`,
+            { queryVec, ...filterVars },
         );
 
         if (!rows) return candidates;

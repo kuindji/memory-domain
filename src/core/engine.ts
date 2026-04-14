@@ -101,6 +101,12 @@ class MemoryEngine {
 
         // Set up schema
         this.schema = new SchemaRegistry(db);
+
+        // Prime lazy embedding adapters so `dimension` is populated before
+        // schema-registry decides whether to define the HNSW index on memory.embedding.
+        if (config.embedding && config.embedding.dimension === 0) {
+            await config.embedding.embed("");
+        }
         await this.schema.registerCore(config.embedding?.dimension);
 
         // Create inbox tag
@@ -557,9 +563,8 @@ class MemoryEngine {
                             this.graph.query<(Record<string, unknown> & { score: number })[]>(
                                 `SELECT *, vector::similarity::cosine(embedding, $queryVec) AS score
              FROM memory
-             WHERE embedding IS NOT NONE
-             ORDER BY score DESC
-             LIMIT 5`,
+             WHERE embedding <|5,40|> $queryVec
+             ORDER BY score DESC`,
                                 { queryVec: embeddingVec },
                             ),
                         { chars: text.length },
