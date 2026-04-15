@@ -81,6 +81,12 @@ interface SimilarityBatch {
 
 type TagFilter = { type: "assert-claim" } | { type: "domain"; domainId: string };
 
+// Sentinel parent tag. Every inbox:processing:<uuid> tag gets a child_of edge to this
+// root so fetchProcessing can find them via two index-scans instead of scanning the
+// full `tagged` table with a string::starts_with(out.label, ...) predicate.
+const PROCESSING_ROOT_LABEL = "inbox:processing:_root";
+const PROCESSING_ROOT_TAG_ID = `tag:\`${PROCESSING_ROOT_LABEL}\``;
+
 class InboxProcessor {
     private timeout: ReturnType<typeof setTimeout> | null = null;
     private running = false;
@@ -108,13 +114,24 @@ class InboxProcessor {
 
     private async recoverStaleBatches(): Promise<void> {
         const cutoff = Date.now() - this.staleAfterMs;
-        await this.store.query(
-            `DELETE tagged WHERE
-        out.label IS NOT NONE
-        AND string::starts_with(out.label, 'inbox:processing:')
-        AND out.created_at < $cutoff`,
-            { cutoff },
+        // Find stale processing tags via child_of sentinel (index-scan on idx_child_of_out).
+        const staleTags = await this.store.query<Array<{ in: RecordIdLike | string }>>(
+            `SELECT in FROM child_of
+       WHERE out = $root
+         AND in.created_at < $cutoff`,
+            { root: new StringRecordId(PROCESSING_ROOT_TAG_ID), cutoff },
         );
+        if (!staleTags || staleTags.length === 0) return;
+
+        const staleTagIds = staleTags.map((r) => new StringRecordId(String(r.in)));
+
+        // Best-effort cascading delete: tagged edges, child_of edge, then the tag node.
+        await this.store.query(`DELETE tagged WHERE out IN $tagIds`, { tagIds: staleTagIds });
+        await this.store.query(`DELETE child_of WHERE in IN $tagIds AND out = $root`, {
+            tagIds: staleTagIds,
+            root: new StringRecordId(PROCESSING_ROOT_TAG_ID),
+        });
+        await this.store.query(`DELETE $tagIds`, { tagIds: staleTagIds });
     }
 
     // --- Candidate Fetching ---
@@ -143,21 +160,39 @@ class InboxProcessor {
             vars.domainTag = new StringRecordId(`tag:\`inbox:${filter.domainId}\``);
         }
 
-        const candidates = await this.store.query<Array<{ in: RecordIdLike | string }>>(
-            query,
-            vars,
+        const candidates = await this.debug.time(
+            "buildSimilarityBatch.fetchInboxTagged",
+            () =>
+                this.store.query<Array<{ in: RecordIdLike | string }>>(query, vars),
+            { filter: filter.type },
         );
         if (!candidates || candidates.length === 0) return [];
 
         const memIds = [...new Set(candidates.map((r) => String(r.in)))];
 
-        // Exclude any currently tagged as processing
-        const processing = await this.store.query<Array<{ in: RecordIdLike | string }>>(
-            `SELECT in FROM tagged
-       WHERE out.label IS NOT NONE
-         AND string::starts_with(out.label, 'inbox:processing:')`,
+        // Exclude any currently tagged as processing.
+        // Two separate index-scans: first find active processing tag ids via the
+        // child_of sentinel (idx_child_of_out), then materialize them and query
+        // `tagged` with a literal $procTagIds list (idx_tagged_out). A single query
+        // with a subquery in `WHERE out IN (...)` was a correlated plan in SurrealDB
+        // and ran ~6x slower than the old full scan.
+        const processingIds = await this.debug.time(
+            "buildSimilarityBatch.fetchProcessing",
+            async () => {
+                const procTagRows = await this.store.query<
+                    Array<{ in: RecordIdLike | string }>
+                >(`SELECT in FROM child_of WHERE out = $root`, {
+                    root: new StringRecordId(PROCESSING_ROOT_TAG_ID),
+                });
+                if (!procTagRows || procTagRows.length === 0) return new Set<string>();
+
+                const procTagIds = procTagRows.map((r) => new StringRecordId(String(r.in)));
+                const taggedRows = await this.store.query<
+                    Array<{ in: RecordIdLike | string }>
+                >(`SELECT in FROM tagged WHERE out IN $procTagIds`, { procTagIds });
+                return new Set((taggedRows ?? []).map((r) => String(r.in)));
+            },
         );
-        const processingIds = new Set((processing ?? []).map((r) => String(r.in)));
 
         return memIds.filter((id) => !processingIds.has(id));
     }
@@ -188,16 +223,35 @@ class InboxProcessor {
 
     // --- Similarity Batch Building ---
 
-    private async buildSimilarityBatch(
+    private buildSimilarityBatch(
+        filter: TagFilter,
+        domainId?: string,
+    ): Promise<SimilarityBatch | null> {
+        return this.debug.time(
+            "buildSimilarityBatch",
+            () => this.buildSimilarityBatchImpl(filter, domainId),
+            { domain: domainId ?? "none" },
+        );
+    }
+
+    private async buildSimilarityBatchImpl(
         filter: TagFilter,
         domainId?: string,
     ): Promise<SimilarityBatch | null> {
         // 1. Get candidate IDs (filtered)
-        const candidateIds = await this.fetchCandidateIds(filter);
+        const candidateIds = await this.debug.time(
+            "buildSimilarityBatch.fetchCandidateIds",
+            () => this.fetchCandidateIds(filter),
+            { filter: filter.type },
+        );
         if (candidateIds.length === 0) return null;
 
         // 2. Fetch all candidate rows and sort by created_at (oldest first)
-        const candidateRows = await this.fetchMemoryRows(candidateIds);
+        const candidateRows = await this.debug.time(
+            "buildSimilarityBatch.fetchMemoryRows",
+            () => this.fetchMemoryRows(candidateIds),
+            { candidates: candidateIds.length },
+        );
         if (candidateRows.length === 0) return null;
         candidateRows.sort((a, b) => a.created_at - b.created_at);
 
@@ -216,7 +270,11 @@ class InboxProcessor {
         if (seed.embedding && sameContextRows.length > 1) {
             // Use similarity-based ordering
             const neighborIds = sameContextRows.slice(1).map((r) => String(r.id));
-            batchIds = await this.findSimilarNeighbors(seed, neighborIds);
+            batchIds = await this.debug.time(
+                "buildSimilarityBatch.findSimilarNeighbors",
+                () => this.findSimilarNeighbors(seed, neighborIds),
+                { neighbors: neighborIds.length },
+            );
             batchIds = [seedId, ...batchIds];
         } else {
             // No embedding or single candidate: chronological
@@ -224,10 +282,18 @@ class InboxProcessor {
         }
 
         // 4. Tag as processing
-        const batchId = await this.tagBatchAsProcessing(batchIds);
+        const batchId = await this.debug.time(
+            "buildSimilarityBatch.tagBatchAsProcessing",
+            () => this.tagBatchAsProcessing(batchIds),
+            { batchSize: batchIds.length },
+        );
 
         // 5. Build OwnedMemory entries
-        const entries = await this.buildOwnedMemoryEntries(batchIds, domainId);
+        const entries = await this.debug.time(
+            "buildSimilarityBatch.buildOwnedMemoryEntries",
+            () => this.buildOwnedMemoryEntries(batchIds, domainId),
+            { batchSize: batchIds.length },
+        );
 
         return { batchId, entries, memoryIds: batchIds, requestContext };
     }
@@ -503,10 +569,16 @@ class InboxProcessor {
         const tagId = `tag:\`inbox:processing:${batchId}\``;
         const now = Date.now();
 
+        await this.ensureProcessingRoot();
+
         await this.store.createNodeWithId(tagId, {
             label: `inbox:processing:${batchId}`,
             created_at: now,
         });
+
+        // Link to the processing-root sentinel so fetchProcessing can find this tag
+        // via an index-scan on child_of instead of a full scan of `tagged`.
+        await this.store.relate(tagId, "child_of", PROCESSING_ROOT_TAG_ID);
 
         for (const memId of memoryIds) {
             await this.store.relate(memId, "tagged", tagId);
@@ -520,11 +592,29 @@ class InboxProcessor {
         await this.store.query(`DELETE tagged WHERE out = $tagId`, {
             tagId: new StringRecordId(tagId),
         });
+        await this.store.query(`DELETE child_of WHERE in = $tagId AND out = $root`, {
+            tagId: new StringRecordId(tagId),
+            root: new StringRecordId(PROCESSING_ROOT_TAG_ID),
+        });
         try {
             await this.store.deleteNode(tagId);
         } catch {
             /* best-effort */
         }
+    }
+
+    private processingRootReady = false;
+    private async ensureProcessingRoot(): Promise<void> {
+        if (this.processingRootReady) return;
+        try {
+            await this.store.createNodeWithId(PROCESSING_ROOT_TAG_ID, {
+                label: PROCESSING_ROOT_LABEL,
+                created_at: Date.now(),
+            });
+        } catch {
+            // Already exists
+        }
+        this.processingRootReady = true;
     }
 
     private toMemoryEntry(raw: RawMemoryRow): MemoryEntry {

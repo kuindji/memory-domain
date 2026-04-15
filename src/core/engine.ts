@@ -121,7 +121,12 @@ class MemoryEngine {
         }
 
         // Initialize subsystems
-        this.searchEngine = new SearchEngine(this.graph, config.search, config.embedding);
+        this.searchEngine = new SearchEngine(
+            this.graph,
+            config.search,
+            config.embedding,
+            createDebugTools("search", this.debugConfig),
+        );
         const stateStore = new MetaScheduleStateStore(this.graph);
         this.scheduler = new Scheduler(
             (domainId: string) => this.createDomainContext(domainId),
@@ -646,19 +651,25 @@ class MemoryEngine {
         await this.graph.relate(memId, "tagged", "tag:inbox");
 
         // Add extra tags
-        if (options?.tags) {
-            for (const tag of options.tags) {
-                const tagId = tag.startsWith("tag:") ? tag : `tag:${tag}`;
-                try {
-                    await this.graph.createNodeWithId(tagId, {
-                        label: tag.startsWith("tag:") ? tag.slice(4) : tag,
-                        created_at: now,
-                    });
-                } catch {
-                    // Already exists
-                }
-                await this.graph.relate(memId, "tagged", tagId);
-            }
+        if (options?.tags && options.tags.length > 0) {
+            await this.debug.time(
+                "ingest.tagLoop",
+                async () => {
+                    for (const tag of options.tags!) {
+                        const tagId = tag.startsWith("tag:") ? tag : `tag:${tag}`;
+                        try {
+                            await this.graph.createNodeWithId(tagId, {
+                                label: tag.startsWith("tag:") ? tag.slice(4) : tag,
+                                created_at: now,
+                            });
+                        } catch {
+                            // Already exists
+                        }
+                        await this.graph.relate(memId, "tagged", tagId);
+                    }
+                },
+                { tags: options.tags.length },
+            );
         }
 
         // Path A: Explicit domains specified — direct ownership + inbox processing tags
@@ -683,61 +694,76 @@ class MemoryEngine {
                 throw new Error("Cannot ingest: all target domains are read-only");
             }
 
-            for (const domainId of targetDomainIds) {
-                const fullDomainId = domainId.startsWith("domain:")
-                    ? domainId
-                    : `domain:${domainId}`;
-                await this.graph.relate(memId, "owned_by", fullDomainId, {
-                    attributes: options?.metadata ?? {},
-                    owned_at: now,
-                });
-                // Add inbox processing tag for this domain
-                const inboxTagId = await this.ensureInboxTag(`inbox:${domainId}`, now);
-                await this.graph.relate(memId, "tagged", inboxTagId);
-            }
+            await this.debug.time(
+                "ingest.ownershipLoop.pathA",
+                async () => {
+                    for (const domainId of targetDomainIds) {
+                        const fullDomainId = domainId.startsWith("domain:")
+                            ? domainId
+                            : `domain:${domainId}`;
+                        await this.graph.relate(memId, "owned_by", fullDomainId, {
+                            attributes: options?.metadata ?? {},
+                            owned_at: now,
+                        });
+                        // Add inbox processing tag for this domain
+                        const inboxTagId = await this.ensureInboxTag(`inbox:${domainId}`, now);
+                        await this.graph.relate(memId, "tagged", inboxTagId);
+                    }
+                },
+                { domains: targetDomainIds.length },
+            );
         }
         // Path B: No explicit domains — assertion-based ownership
         else {
-            let hasAnyTarget = false;
+            await this.debug.time(
+                "ingest.ownershipLoop.pathB",
+                async () => {
+                    let hasAnyTarget = false;
 
-            // autoOwn domains get direct ownership + inbox processing tags
-            for (const domain of this.domainRegistry.list()) {
-                if (
-                    domain.settings?.autoOwn &&
-                    this.domainRegistry.getAccess(domain.id) === "write"
-                ) {
-                    const fullDomainId = `domain:${domain.id}`;
-                    await this.graph.relate(memId, "owned_by", fullDomainId, {
-                        attributes: options?.metadata ?? {},
-                        owned_at: now,
-                    });
-                    const inboxTagId = await this.ensureInboxTag(`inbox:${domain.id}`, now);
-                    await this.graph.relate(memId, "tagged", inboxTagId);
-                    hasAnyTarget = true;
-                }
-            }
+                    // autoOwn domains get direct ownership + inbox processing tags
+                    for (const domain of this.domainRegistry.list()) {
+                        if (
+                            domain.settings?.autoOwn &&
+                            this.domainRegistry.getAccess(domain.id) === "write"
+                        ) {
+                            const fullDomainId = `domain:${domain.id}`;
+                            await this.graph.relate(memId, "owned_by", fullDomainId, {
+                                attributes: options?.metadata ?? {},
+                                owned_at: now,
+                            });
+                            const inboxTagId = await this.ensureInboxTag(
+                                `inbox:${domain.id}`,
+                                now,
+                            );
+                            await this.graph.relate(memId, "tagged", inboxTagId);
+                            hasAnyTarget = true;
+                        }
+                    }
 
-            // Domains with assertInboxClaimBatch get assertion tags
-            for (const domain of this.domainRegistry.list()) {
-                if (
-                    domain.assertInboxClaimBatch &&
-                    !domain.settings?.autoOwn &&
-                    this.domainRegistry.getAccess(domain.id) === "write"
-                ) {
-                    const assertTagId = await this.ensureInboxTag(
-                        `inbox:assert-claim:${domain.id}`,
-                        now,
-                    );
-                    await this.graph.relate(memId, "tagged", assertTagId);
-                    hasAnyTarget = true;
-                }
-            }
+                    // Domains with assertInboxClaimBatch get assertion tags
+                    for (const domain of this.domainRegistry.list()) {
+                        if (
+                            domain.assertInboxClaimBatch &&
+                            !domain.settings?.autoOwn &&
+                            this.domainRegistry.getAccess(domain.id) === "write"
+                        ) {
+                            const assertTagId = await this.ensureInboxTag(
+                                `inbox:assert-claim:${domain.id}`,
+                                now,
+                            );
+                            await this.graph.relate(memId, "tagged", assertTagId);
+                            hasAnyTarget = true;
+                        }
+                    }
 
-            if (!hasAnyTarget) {
-                throw new Error(
-                    "Cannot ingest: no domains available (no explicit domain, no autoOwn, no assertInboxClaimBatch)",
-                );
-            }
+                    if (!hasAnyTarget) {
+                        throw new Error(
+                            "Cannot ingest: no domains available (no explicit domain, no autoOwn, no assertInboxClaimBatch)",
+                        );
+                    }
+                },
+                { domains: this.domainRegistry.list().length },
+            );
         }
 
         // Emit event

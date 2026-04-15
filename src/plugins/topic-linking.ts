@@ -75,6 +75,11 @@ interface TopicLinkingOptions {
 
 const PLUGIN_BASE_DIR = dirname(fileURLToPath(import.meta.url));
 
+/** Normalized key used for cache + indexed exact-match dedup of topic memories. */
+function normalizeTopicName(name: string): string {
+    return name.trim().toLowerCase();
+}
+
 const BATCH_TOPIC_EXTRACTION_SCHEMA = JSON.stringify({
     type: "array",
     items: {
@@ -97,57 +102,153 @@ function createTopicLinkingPlugin(options?: TopicLinkingOptions): DomainPlugin {
     const minScore = options?.minScore ?? 0.8;
     const denormalize = options?.denormalize ?? true;
 
+    /** Process-scoped cache: normalized topic name → { id, attrs }.
+     *  Storing attrs alongside the id avoids a re-fetch on cache hit (updateAttributes
+     *  replaces, not merges, so we need the prior snapshot to preserve non-counter fields). */
+    interface CachedTopic {
+        id: string;
+        attrs: Record<string, unknown> | undefined;
+    }
+    const nameCache = new Map<string, CachedTopic>();
+
     async function linkSingleTopic(
         context: DomainContext,
         memoryId: string,
         topicName: string,
     ): Promise<{ topicMemoryId: string; isNew: boolean }> {
-        const searchResult = await context.search({
-            text: topicName,
-            tags: [topicTag],
-            minScore,
-            skipPluginExpansion: true,
-            skipConnections: true,
-        });
+        return context.debug.time(
+            "topicLinking.linkSingleTopic",
+            () => linkSingleTopicImpl(context, memoryId, topicName),
+            { chars: topicName.length },
+        );
+    }
 
-        let topicMemoryId: string;
+    async function linkSingleTopicImpl(
+        context: DomainContext,
+        memoryId: string,
+        topicName: string,
+    ): Promise<{ topicMemoryId: string; isNew: boolean }> {
+        const key = normalizeTopicName(topicName);
+
+        // Tier A: process cache (normalized-name → {id, attrs}). Zero DB cost on hit.
+        const cached = key ? nameCache.get(key) : undefined;
+        let topicMemoryId: string | undefined = cached?.id;
+        let existingAttrs: Record<string, unknown> | undefined = cached?.attrs;
         let isNew = false;
 
-        if (searchResult.entries.length > 0) {
-            topicMemoryId = searchResult.entries[0].id;
-            const topicAttrs = searchResult.entries[0].domainAttributes[topicDomainId] as
-                | Record<string, unknown>
-                | undefined;
-            const currentCount = (topicAttrs?.mentionCount as number | undefined) ?? 0;
+        // Tier B: indexed exact-match DB lookup on cache miss. O(log N) via idx_memory_name_normalized.
+        // Also fetches existing domain attributes so the updateAttributes call below doesn't clobber them.
+        if (!topicMemoryId && key) {
+            const domainRef = new StringRecordId(`domain:${topicDomainId}`);
+            topicMemoryId = await context.debug.time(
+                "topicLinking.exactLookup",
+                async () => {
+                    try {
+                        const rows = await context.graph.query<
+                            Array<{ id: unknown; attrs?: Record<string, unknown> | null }>
+                        >(
+                            `SELECT id,
+                                    (SELECT VALUE attributes FROM owned_by
+                                       WHERE in = $parent.id AND out = $domainId)[0] AS attrs
+                             FROM memory WHERE name_normalized = $key LIMIT 1`,
+                            { key, domainId: domainRef },
+                        );
+                        const first = Array.isArray(rows) ? rows[0] : undefined;
+                        if (!first?.id) return undefined;
+                        if (first.attrs && typeof first.attrs === "object") {
+                            existingAttrs = first.attrs;
+                        }
+                        return String(first.id);
+                    } catch {
+                        return undefined;
+                    }
+                },
+                { chars: key.length },
+            );
+        }
 
-            await context.updateAttributes(topicMemoryId, {
-                ...topicAttrs,
+        // Tier C (existing): similarity search — catches near-name matches the exact tiers miss.
+        if (!topicMemoryId) {
+            const searchResult = await context.debug.time(
+                "topicLinking.dedupSearch",
+                () =>
+                    context.search({
+                        text: topicName,
+                        tags: [topicTag],
+                        minScore,
+                        skipPluginExpansion: true,
+                        skipConnections: true,
+                    }),
+                { chars: topicName.length },
+            );
+            if (searchResult.entries.length > 0) {
+                topicMemoryId = searchResult.entries[0].id;
+                existingAttrs = searchResult.entries[0].domainAttributes[topicDomainId] as
+                    | Record<string, unknown>
+                    | undefined;
+            }
+        }
+
+        if (topicMemoryId) {
+            const currentCount = (existingAttrs?.mentionCount as number | undefined) ?? 0;
+            const resolvedId = topicMemoryId;
+            const nextAttrs: Record<string, unknown> = {
+                ...existingAttrs,
                 mentionCount: currentCount + 1,
                 lastMentionedAt: Date.now(),
-            });
+            };
+
+            await context.debug.time(
+                "topicLinking.updateAttributes",
+                () => context.updateAttributes(resolvedId, nextAttrs),
+            );
+            // Keep cache in sync with the new on-disk attrs so the next hit preserves them too.
+            existingAttrs = nextAttrs;
         } else {
-            topicMemoryId = await context.writeMemory({
-                content: topicName,
-                tags: [topicTag],
-                ownership: {
-                    domain: topicDomainId,
-                    attributes: {
-                        name: topicName,
-                        status: "active",
-                        mentionCount: 1,
-                        lastMentionedAt: Date.now(),
-                        createdBy: context.domain,
-                    },
+            const seedAttrs: Record<string, unknown> = {
+                name: topicName,
+                status: "active",
+                mentionCount: 1,
+                lastMentionedAt: Date.now(),
+                createdBy: context.domain,
+            };
+            topicMemoryId = await context.debug.time(
+                "topicLinking.writeMemory",
+                async () => {
+                    const newId = await context.writeMemory({
+                        content: topicName,
+                        tags: [topicTag],
+                        ownership: { domain: topicDomainId, attributes: seedAttrs },
+                    });
+                    if (key) {
+                        // Populate denormalized exact-match field so tier B hits on next occurrence.
+                        try {
+                            await context.graph.query(
+                                "UPDATE $id SET name_normalized = $key",
+                                { id: new StringRecordId(newId), key },
+                            );
+                        } catch {
+                            /* best-effort — next bootstrap backfill will catch it */
+                        }
+                    }
+                    return newId;
                 },
-            });
+            );
+            existingAttrs = seedAttrs;
             isNew = true;
         }
 
-        await context.graph.relate(memoryId, "about_topic", topicMemoryId, {
-            domain: context.domain,
-        });
+        if (key && topicMemoryId) {
+            nameCache.set(key, { id: topicMemoryId, attrs: existingAttrs });
+        }
 
-        return { topicMemoryId, isNew };
+        await context.debug.time("topicLinking.relateAboutTopic", () =>
+            context.graph.relate(memoryId, "about_topic", topicMemoryId!, {
+                domain: context.domain,
+            }),
+        );
+
+        return { topicMemoryId: topicMemoryId!, isNew };
     }
 
     async function defaultExtractTopics(
@@ -206,7 +307,11 @@ function createTopicLinkingPlugin(options?: TopicLinkingOptions): DomainPlugin {
         entries: OwnedMemory[],
     ): Promise<void> {
         const extract = options?.extractTopics ?? defaultExtractTopics;
-        const topicsMap = await extract(entries, context);
+        const topicsMap = await context.debug.time(
+            "topicLinking.extract",
+            () => extract(entries, context),
+            { entries: entries.length },
+        );
 
         for (const entry of entries) {
             const topics = topicsMap.get(entry.memory.id) ?? [];
@@ -223,12 +328,17 @@ function createTopicLinkingPlugin(options?: TopicLinkingOptions): DomainPlugin {
                 );
 
                 if (options?.afterTopicLink) {
-                    await options.afterTopicLink(
-                        topicMemoryId,
-                        topic,
-                        entry.memory.id,
-                        isNew,
-                        context,
+                    await context.debug.time(
+                        "topicLinking.afterTopicLink",
+                        () =>
+                            options.afterTopicLink!(
+                                topicMemoryId,
+                                topic,
+                                entry.memory.id,
+                                isNew,
+                                context,
+                            ),
+                        { isNew: isNew ? 1 : 0 },
                     );
                 }
 
@@ -236,16 +346,25 @@ function createTopicLinkingPlugin(options?: TopicLinkingOptions): DomainPlugin {
             }
 
             if (options?.afterAllTopicsLinked && linked.length > 0) {
-                await options.afterAllTopicsLinked(entry, linked, context);
+                await context.debug.time(
+                    "topicLinking.afterAllTopicsLinked",
+                    () => options.afterAllTopicsLinked!(entry, linked, context),
+                    { linkedCount: linked.length },
+                );
             }
 
             if (denormalize && linked.length > 0) {
                 try {
                     const topicNames = linked.map((l) => l.topic.name);
-                    await context.graph.query("UPDATE $memId SET topics = $topics", {
-                        memId: new StringRecordId(entry.memory.id),
-                        topics: topicNames,
-                    });
+                    await context.debug.time(
+                        "topicLinking.denormalize",
+                        () =>
+                            context.graph.query("UPDATE $memId SET topics = $topics", {
+                                memId: new StringRecordId(entry.memory.id),
+                                topics: topicNames,
+                            }),
+                        { topicCount: topicNames.length },
+                    );
                 } catch {
                     /* best-effort denormalization */
                 }
@@ -283,7 +402,18 @@ function createTopicLinkingPlugin(options?: TopicLinkingOptions): DomainPlugin {
         type: "topic-linking",
 
         schema: {
-            nodes: [],
+            nodes: [
+                {
+                    name: "memory",
+                    fields: [{ name: "name_normalized", type: "option<string>" }],
+                    indexes: [
+                        {
+                            name: "idx_memory_name_normalized",
+                            fields: ["name_normalized"],
+                        },
+                    ],
+                },
+            ],
             edges: [
                 {
                     name: "about_topic",
@@ -302,7 +432,11 @@ function createTopicLinkingPlugin(options?: TopicLinkingOptions): DomainPlugin {
             async expandSearch(query: SearchQuery, context: DomainContext): Promise<SearchQuery> {
                 if (!query.text) return query;
                 try {
-                    const topicIds = await findMatchingTopicMemoryIds(query.text, context.graph);
+                    const topicIds = await context.debug.time(
+                        "topicLinking.findMatchingTopicMemoryIds",
+                        () => findMatchingTopicMemoryIds(query.text!, context.graph),
+                        { chars: query.text.length },
+                    );
                     if (topicIds.length === 0) return query;
                     return {
                         ...query,
@@ -318,6 +452,21 @@ function createTopicLinkingPlugin(options?: TopicLinkingOptions): DomainPlugin {
             },
 
             async bootstrap(context: DomainContext): Promise<void> {
+                // One-time backfill: populate name_normalized on existing topic memories so tier B
+                // (indexed exact-match) can find them on first occurrence in a new process. Idempotent
+                // via the IS NONE guard — later runs are no-ops.
+                try {
+                    const topicTagRef = new StringRecordId(`tag:${topicTag}`);
+                    await context.graph.query(
+                        `UPDATE (SELECT VALUE in FROM tagged WHERE out = $tagId)
+                         SET name_normalized = string::lowercase(string::trim(content))
+                         WHERE name_normalized IS NONE`,
+                        { tagId: topicTagRef },
+                    );
+                } catch {
+                    /* best-effort — missing field just means tier B misses on legacy rows */
+                }
+
                 if (denormalize) {
                     const domainRef = new StringRecordId(`domain:${context.domain}`);
                     const rows = await context.graph.query<

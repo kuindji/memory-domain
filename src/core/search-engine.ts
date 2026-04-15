@@ -1,7 +1,10 @@
 import { StringRecordId } from "surrealdb";
-import type { GraphApi, EngineConfig, EmbeddingAdapter } from "./types.js";
+import type { GraphApi, EngineConfig, EmbeddingAdapter, DebugTools } from "./types.js";
 import type { SearchQuery, SearchResult, ScoredMemory } from "./types.js";
 import { countTokens, mergeScores, applyTokenBudget, cosineSimilarity } from "./scoring.js";
+import { createDebugTools } from "./debug.js";
+
+const NOOP_DEBUG: DebugTools = createDebugTools("search", { timing: false });
 
 interface MemoryRow {
     id: unknown;
@@ -16,11 +19,15 @@ class SearchEngine {
     private defaultMode: NonNullable<SearchQuery["mode"]>;
     private defaultWeights: { vector: number; fulltext: number; graph: number };
 
+    private debug: DebugTools;
+
     constructor(
         private store: GraphApi,
         searchConfig?: EngineConfig["search"],
         private embeddingAdapter?: EmbeddingAdapter,
+        debug?: DebugTools,
     ) {
+        this.debug = debug ?? NOOP_DEBUG;
         this.defaultMode = searchConfig?.defaultMode ?? "hybrid";
         this.defaultWeights = {
             vector: searchConfig?.defaultWeights?.vector ?? 0.5,
@@ -32,7 +39,17 @@ class SearchEngine {
         }
     }
 
-    async search(query: SearchQuery): Promise<SearchResult> {
+    search(query: SearchQuery): Promise<SearchResult> {
+        return this.debug.time("search.total", () => this.searchImpl(query), {
+            mode: query.mode ?? this.defaultMode,
+            hasText: query.text ? 1 : 0,
+            tags: query.tags?.length ?? 0,
+            skipConnections: query.skipConnections ? 1 : 0,
+            skipPluginExpansion: query.skipPluginExpansion ? 1 : 0,
+        });
+    }
+
+    private async searchImpl(query: SearchQuery): Promise<SearchResult> {
         const mode = query.mode ?? this.defaultMode;
         const weights = {
             vector: query.weights?.vector ?? this.defaultWeights.vector,
@@ -179,7 +196,14 @@ class SearchEngine {
         return { clauses, vars };
     }
 
-    private async vectorSearch(query: SearchQuery): Promise<Map<string, ScoredMemory>> {
+    private vectorSearch(query: SearchQuery): Promise<Map<string, ScoredMemory>> {
+        return this.debug.time("vectorSearch", () => this.vectorSearchImpl(query), {
+            hasText: query.text ? 1 : 0,
+            limit: query.limit ?? 10,
+        });
+    }
+
+    private async vectorSearchImpl(query: SearchQuery): Promise<Map<string, ScoredMemory>> {
         const candidates = new Map<string, ScoredMemory>();
         if (!this.embeddingAdapter || !query.text) return candidates;
 
@@ -221,7 +245,14 @@ class SearchEngine {
         return candidates;
     }
 
-    private async fulltextSearch(query: SearchQuery): Promise<Map<string, ScoredMemory>> {
+    private fulltextSearch(query: SearchQuery): Promise<Map<string, ScoredMemory>> {
+        return this.debug.time("fulltextSearch", () => this.fulltextSearchImpl(query), {
+            hasText: query.text ? 1 : 0,
+            limit: query.limit ?? 10,
+        });
+    }
+
+    private async fulltextSearchImpl(query: SearchQuery): Promise<Map<string, ScoredMemory>> {
         const candidates = new Map<string, ScoredMemory>();
         if (!query.text) return candidates;
 
@@ -298,7 +329,15 @@ class SearchEngine {
         return rows ?? [];
     }
 
-    private async graphSearch(query: SearchQuery): Promise<Map<string, ScoredMemory>> {
+    private graphSearch(query: SearchQuery): Promise<Map<string, ScoredMemory>> {
+        return this.debug.time("graphSearch", () => this.graphSearchImpl(query), {
+            tags: query.tags?.length ?? 0,
+            traversal: query.traversal ? 1 : 0,
+            limit: query.limit ?? 10,
+        });
+    }
+
+    private async graphSearchImpl(query: SearchQuery): Promise<Map<string, ScoredMemory>> {
         const candidates = new Map<string, ScoredMemory>();
         // Traversal-based search
         if (query.traversal) {
@@ -484,7 +523,13 @@ class SearchEngine {
         return filtered;
     }
 
-    private async enrichConnections(entries: ScoredMemory[]): Promise<void> {
+    private enrichConnections(entries: ScoredMemory[]): Promise<void> {
+        return this.debug.time("enrichConnections", () => this.enrichConnectionsImpl(entries), {
+            entries: entries.length,
+        });
+    }
+
+    private async enrichConnectionsImpl(entries: ScoredMemory[]): Promise<void> {
         if (entries.length === 0) return;
         const ids = entries.map((e) => new StringRecordId(e.id));
 
@@ -520,7 +565,15 @@ class SearchEngine {
         }
     }
 
-    private async enrichDomainAttributes(entries: ScoredMemory[]): Promise<void> {
+    private enrichDomainAttributes(entries: ScoredMemory[]): Promise<void> {
+        return this.debug.time(
+            "enrichDomainAttributes",
+            () => this.enrichDomainAttributesImpl(entries),
+            { entries: entries.length },
+        );
+    }
+
+    private async enrichDomainAttributesImpl(entries: ScoredMemory[]): Promise<void> {
         if (entries.length === 0) return;
         const ids = entries.map((e) => new StringRecordId(e.id));
 
@@ -574,7 +627,13 @@ class SearchEngine {
         return result;
     }
 
-    private async hydrateTags(candidates: Map<string, ScoredMemory>): Promise<void> {
+    private hydrateTags(candidates: Map<string, ScoredMemory>): Promise<void> {
+        return this.debug.time("hydrateTags", () => this.hydrateTagsImpl(candidates), {
+            entries: candidates.size,
+        });
+    }
+
+    private async hydrateTagsImpl(candidates: Map<string, ScoredMemory>): Promise<void> {
         if (candidates.size === 0) return;
         const tagMap = await this.getMemoryTagsBatch([...candidates.keys()]);
         for (const [id, mem] of candidates) {
