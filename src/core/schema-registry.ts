@@ -305,14 +305,62 @@ class SchemaRegistry {
         await this.db.query(query);
     }
 
+    /**
+     * Ensure an HNSW index exists with the specified dimension. Handles three cases:
+     *   1. Index absent — define it fresh.
+     *   2. Index present but NOT HNSW, OR dimension mismatch — drop and redefine.
+     *   3. Index present, HNSW, correct dimension — no-op.
+     *
+     * Needed because `DEFINE INDEX IF NOT EXISTS` does not upgrade a stub index and
+     * because some SurrealDB builds have been observed to drop the HNSW structure
+     * across restarts (e.g. after a process crash); a plain bootstrap would then
+     * silently run with no vector index and fall back to TableScan.
+     */
+    private async ensureHnswIndex(
+        table: string,
+        name: string,
+        field: string,
+        config: { dimension: number; dist: string },
+    ): Promise<void> {
+        const defineStmt = `DEFINE INDEX ${name} ON ${table} FIELDS ${field} HNSW DIMENSION ${config.dimension} DIST ${config.dist}`;
+
+        let current: string | undefined;
+        try {
+            const raw: unknown = await this.db.query(`INFO FOR TABLE ${table}`);
+            const info = (Array.isArray(raw) ? raw[0] : raw) as
+                | { indexes?: Record<string, string> }
+                | undefined;
+            current = info?.indexes?.[name];
+        } catch {
+            // Treat as missing — we'll try to define fresh.
+        }
+
+        if (current) {
+            const isHnsw = /\bHNSW\b/i.test(current);
+            const dimMatch = current.match(/DIMENSION\s+(\d+)/i);
+            const currentDim = dimMatch ? Number(dimMatch[1]) : undefined;
+            if (isHnsw && currentDim === config.dimension) {
+                return;
+            }
+            await this.db.query(`REMOVE INDEX IF EXISTS ${name} ON ${table}`);
+        }
+
+        await this.db.query(defineStmt);
+    }
+
     private async defineIndex(table: string, idx: IndexDef): Promise<void> {
+        if (idx.type === "hnsw") {
+            const dim = (idx.config?.dimension as number) ?? 384;
+            const dist = (idx.config?.dist as string) ?? "COSINE";
+            await this.ensureHnswIndex(table, idx.name, idx.fields.join(", "), {
+                dimension: dim,
+                dist,
+            });
+            return;
+        }
         let query = `DEFINE INDEX IF NOT EXISTS ${idx.name} ON ${table} FIELDS ${idx.fields.join(", ")}`;
         if (idx.type === "unique") {
             query += " UNIQUE";
-        } else if (idx.type === "hnsw") {
-            const dim = (idx.config?.dimension as number) ?? 384;
-            const dist = (idx.config?.dist as string) ?? "COSINE";
-            query += ` HNSW DIMENSION ${dim} DIST ${dist}`;
         } else if (idx.type === "search") {
             const analyzer = (idx.config?.analyzer as string) ?? "ascii";
             const k1 = idx.config?.k1 as number | undefined;
