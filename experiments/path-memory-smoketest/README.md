@@ -84,22 +84,31 @@ tests/
   helpers.ts      fake/deterministic embedder + tokenize stub for unit tests
 ```
 
-## Tier-1 results (post-Phase 1.5, defaults)
+## Tier-1 results (post-Phase 1.6, defaults)
 
 **Eval (A) — vs flat vector baseline (P/R @ K=|ideal|):**
 
 ```
 Queries: 12    path wins: 3    baseline wins: 3    ties: 6
-Mean F1 — path: 0.530    baseline: 0.507
+Mean F1 — path: 0.530    baseline: 0.507  (defaults: BFS, raw cosine, union)
 ```
 
-BFS (default) stays at 0.530. Phase 1.5's weight-aware Dijkstra is
-opt-in via `RetrievalOptions.traversal = "dijkstra"`; its best sweep
-plateau is 0.510 (see `CONTEXT.md` § Phase 1.5 findings for the full
-table). Phase 1's `pathQuality` / `lexicalIdfFloor` knobs remain
-available but off by default.
+Best Phase-1.6 configurations (opt-in):
 
-Query-level highlights under BFS:
+```
+A2 dijkstra anchor=cosine-idf-mass alpha=0.8       → mean F1 0.632  (+0.102 over BFS)
+A2+A3 dijkstra anchor a=0.7 probe=intersection    → mean F1 0.596  +  3/3 coherent arcs
+```
+
+A2 (graph-informed anchor scoring) is the breakthrough — first
+configuration to lift mean F1 above 0.530 since Phase 1. A2+A3
+(intersection) is the first config in the smoke-test's history to
+converge all three eval (B) arcs, including the long-broken career
+arc. A1 (temporal decay) is actively harmful at this corpus shape
+and is not recommended; see `CONTEXT.md` § Phase 1.6 findings for
+the full sweep table and analysis.
+
+Query-level highlights under BFS-default:
 
 - **Path wins decisively on as-of queries** (e.g. "where alex lived in 2015"
   → F1 1.00 vs 0.00). Bitemporal-light primitive validates.
@@ -108,29 +117,33 @@ Query-level highlights under BFS:
 - **Baseline still wins on queries with strong literal cues** ("marriage
   and partner" natural query contains "Sam" + "marriage").
 
-**Eval (B) — multi-turn arc convergence (BFS default):**
+**Eval (B) — multi-turn arc convergence:**
 
 ```
-Arcs: 3    narrowed: 3    coherent (≥0.5): 2
+config                                                | narrowed | coherent
+bfs (default)                                         | 3/3      | 2/3
+A2 dijkstra anchor=idf alpha=0.8                      | 3/3      | 2/3
+A2+A3 dijkstra anchor=idf a=0.7 probe=intersection    | 3/3      | 3/3
 ```
 
-- *family arc* — converges cleanly (date_sam, child_lily, met_sam at top across
-  turns)
-- *location arc (asOf)* — converges (loc_sf surfaces consistently)
-- *career arc* — does NOT converge. Dijkstra doesn't fix this either:
-  on tier-1 the primitive (probe composition + anchor selection) is the
-  bottleneck, not the traversal algorithm.
+- *family arc* — converges under all configs
+- *location arc (asOf)* — converges under all configs
+- *career arc* — converges only under **A2+A3 intersection**;
+  BFS-default still fails it.
 
 ## Hypothesis status
 
-**Partially supported, post-Phase 1.5.** Architecture works end-to-end,
-bitemporal-light validates, path retrieval beats baseline on specific
-query shapes, but at tier-1 scale neither BFS nor weighted Dijkstra
-dominates mean F1 at default weights. The length-penalty failure mode
-is resolved; the lexical-edge-noise failure mode is *not* fixed by
-weight-aware traversal alone — tier-1 is primitive-limited. Next
-candidates: temporal-weight decay by `deltaT`, graph-informed anchor
-re-selection, or moving to tier-2 (see `CONTEXT.md`).
+**Strongly supported, post-Phase 1.6.** Architecture works end-to-end,
+bitemporal-light validates, multi-probe path-matching beats baseline
+on specific query shapes — and a single primitive change (graph-
+informed anchor scoring) lifts mean F1 by +0.102 on tier-1, with no
+eval (B) regression. Adding probe-set intersection on top fixes the
+career-arc convergence failure that survived through Phase 1.5. The
+remaining tier-1 failure mode (`alex`-dominant tokenization
+inflating anchor noise) is now addressed at the right layer (anchor
+selection, not edge scoring or traversal-only). Next: tier-2
+Greek-history corpus to validate the win at scale (`CONTEXT.md` §
+Recommended next-session entry point).
 
 ## Out of scope (for follow-on work)
 

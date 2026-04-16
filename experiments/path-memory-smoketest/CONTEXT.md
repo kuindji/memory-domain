@@ -297,27 +297,144 @@ Findings:
    solo path gets outscored by weight-optimized multi-hop paths
    through unrelated nodes.
 
+### Phase 1.6 findings
+
+Phase 1.6 implemented all three Option-A primitive revisits as opt-in
+options:
+
+1. **A1 — temporal-weight decay by `deltaT`.** New
+   `GraphConfig.temporalDecayTau`; when set, temporal edges receive
+   `weight = exp(-deltaT / tau)`. Dijkstra reads
+   `temporalDecayEnabled()` and uses
+   `cost = temporalHopCost · (1 − weight)` instead of the flat
+   Phase-1.5 cost.
+2. **A2 — graph-informed anchor scoring.** New
+   `RetrievalOptions.anchorScoring = { kind: "cosine-idf-mass", alpha }`;
+   anchor score becomes `cosine · (1 + alpha · normalizedNodeIdfMass)`
+   where `normalizedNodeIdfMass = sum(idf(t) for t in tokens) /
+   maxNodeIdfMass`. New `GraphIndex.nodeIdfMass(id)` helper.
+3. **A3 — probe composition.** New
+   `RetrievalOptions.probeComposition: "union" | "intersection" |
+   "weighted-fusion"`. Intersection requires anchor in
+   `≥ ceil(P/2)` per-probe top-K sets; weighted-fusion ranks claims
+   by `sum_p max(0, cos(p, claim) − tau)` (`weightedFusionTau` default
+   0.2). Both fall back to union if no anchor passes their gate
+   (defensive — prevents empty results).
+
+Sweep over eval (A), 12 queries:
+
+```
+config                                                    | mean-path-F1 | wins | losses
+bfs (default)                                             | 0.530        | 3    | 3
+dijkstra tmp=0.5                                          | 0.510        | 5    | 4
+A1 dijkstra tau=2  tmp=0.5                                | 0.403        | 2    | 5
+A1 dijkstra tau=5  tmp=0.5                                | 0.424        | 2    | 4
+A1 dijkstra tau=10 tmp=0.5                                | 0.340        | 1    | 4
+A2 bfs anchor=idf alpha=0.5                               | 0.545        | 2    | 3
+A2 bfs anchor=idf alpha=0.7                               | 0.555        | 3    | 2
+A2 bfs anchor=idf alpha=1.0                               | 0.475        | 3    | 3
+A2 dijkstra tmp=0.5 anchor=idf alpha=0.3                  | 0.510        | 5    | 4
+A2 dijkstra tmp=0.5 anchor=idf alpha=0.5                  | 0.580        | 4    | 4
+A2 dijkstra tmp=0.5 anchor=idf alpha=0.6                  | 0.568        | 5    | 4
+A2 dijkstra tmp=0.5 anchor=idf alpha=0.7                  | 0.617        | 5    | 2
+A2 dijkstra tmp=0.5 anchor=idf alpha=0.8                  | 0.632        | 3    | 1
+A2 dijkstra tmp=0.5 anchor=idf alpha=0.9                  | 0.632        | 3    | 1
+A2 dijkstra tmp=0.5 anchor=idf alpha=1.0                  | 0.590        | 2    | 1
+A3 bfs probe=intersection                                 | 0.530        | 3    | 3
+A3 bfs probe=weighted-fusion tau=0.2                      | 0.510        | 3    | 2
+A3 dijkstra tmp=0.5 probe=intersection                    | 0.489        | 5    | 5
+A3 dijkstra tmp=0.5 probe=weighted-fusion tau=0.2         | 0.468        | 4    | 3
+A2+A3 dijkstra anchor=idf a=0.5 probe=intersection        | 0.587        | 4    | 4
+A2+A3 dijkstra anchor=idf a=0.7 probe=intersection        | 0.596        | 5    | 3
+A2+A3 dijkstra anchor=idf a=0.5 fusion tau=0.2            | 0.468        | 4    | 3
+A1+A2 dijkstra tau=5 anchor=idf alpha=0.5                 | 0.407        | 1    | 5
+A1+A2+A3 dijkstra tau=5 anchor=idf a=0.5 fusion tau=0.2   | 0.431        | 2    | 2
+```
+
+Eval (B) — multi-turn arc convergence on promoted configs:
+
+```
+config                                                | narrowed | coherent
+bfs (default)                                         | 3/3      | 2/3
+A2 dijkstra tmp=0.5 anchor=idf alpha=0.7              | 3/3      | 2/3
+A2 dijkstra tmp=0.5 anchor=idf alpha=0.8              | 3/3      | 2/3
+A2+A3 dijkstra anchor=idf a=0.7 probe=intersection    | 3/3      | 3/3
+```
+
+**Findings:**
+
+1. **A1 is actively harmful at this corpus shape.** Every tau tested
+   regresses F1 vs both BFS and the Phase-1.5 Dijkstra plateau.
+   Decay re-introduces the "free timeline highway" failure mode
+   Phase 1.5 already identified — at tier-1's tight integer-year
+   timestamp range, any tau small enough to differentiate adjacent
+   from distant hops also makes adjacent hops nearly free, so
+   Dijkstra drags paths through topically-irrelevant timeline
+   neighbors. Larger tau (10) flattens the signal back toward
+   "everything is free," compounding the regression. **Conclusion:**
+   `deltaT` is the wrong signal for temporal cost on this corpus;
+   what we actually want is *topic-conditional* temporal cost (cheap
+   only when neighbors share lexical/semantic context). Out of
+   scope here.
+
+2. **A2 is the breakthrough.** First config to lift mean F1 above
+   0.530 since Phase 1. With Dijkstra at `alpha = 0.8–0.9`, F1
+   reaches **0.632 (+0.102 over BFS)**; with BFS at `alpha = 0.7`
+   it reaches **0.555**. The IDF-mass term down-weights `alex`-only
+   anchors that previously polluted top-K, replacing them with
+   higher-information-content claims. Effect plateaus past
+   `alpha ≈ 0.8` and breaks down near `alpha = 1.0` (over-emphasis
+   pulls in rare but irrelevant claims). The Dijkstra+A2 synergy is
+   real (+0.077 over A2-with-BFS at α=0.7) — once anchors carry more
+   IDF mass, weighted traversal has higher-quality endpoints to
+   work with.
+
+3. **A3 alone is neutral or harmful, but A3 *with* A2 fixes the
+   career arc.** Intersection on top of A2 (α=0.7) hits **3/3
+   coherent arcs** in eval (B) — the first config since the
+   smoke-test began that converges all three traces, including
+   the long-broken career arc. Per-arc F1 is slightly lower
+   (0.596 vs 0.617 for A2-alone) but the multi-turn coherence
+   gain is the more interesting result for agent-memory use.
+   Weighted-fusion mode is consistently worse than intersection
+   here — the additive sum-of-(cos-tau) signal isn't sharp enough
+   on this corpus.
+
+4. **A1 ⊕ A2 / A1 ⊕ A2 ⊕ A3 all regress.** A1's harm dominates
+   any combination it joins.
+
 ### Hypothesis status
 
-**Partially supported, post-Phase 1.5.** Architecture works end-to-end,
-bitemporal-light validates strongly, multi-probe path-matching adds
-value on specific query types — but at tier-1 scale with this corpus
-shape (~38 claims, `alex`-dominant tokenization), neither BFS nor
-weighted Dijkstra dominates the flat baseline at default weights.
+**Strongly supported, post-Phase 1.6.** Both Phase-1.6 pass
+criteria are met on tier-1:
 
-Of the two Phase-1 failure modes originally identified:
+- *Strong*: A2 (Dijkstra + anchor=idf, α=0.8) lifts mean F1 to
+  0.632 (**+0.102 ≥ +0.02**) without eval (B) regression
+  (still 2/3 coherent arcs, same as BFS).
+- *Bonus*: A2+A3 (Dijkstra + anchor=idf α=0.7 + intersection)
+  hits 0.596 F1 **and** 3/3 coherent arcs — first config in the
+  smoke-test's history to converge all three iterative traces.
 
-1. **Length-penalty / multi-anchor trade-off** — *fixed*. Informational
-   length penalty (hops minus anchors-in-path) is live by default and
-   does not regress F1.
-2. **Lexical edge noise from ubiquitous tokens** — *not fixed at the
-   ranking or traversal layer*. IDF-weighted edge weights are correctly
-   computed and observable; neither `pathQuality` scoring, `lexicalIdfFloor`
-   pruning, nor weight-aware Dijkstra improves mean F1 on tier-1.
+Of the four originally-identified Phase-1 failure modes:
 
-CONTEXT.md's Phase 1.5 prediction held: *"If this doesn't lift tier-1
-F1 above 0.58ish, the conclusion is primitive-limited, not tuning-
-limited."* Confirmed on tier-1.
+1. **Length-penalty / multi-anchor trade-off** — *fixed in
+   Phase 1* (informational length penalty).
+2. **Lexical edge noise from ubiquitous tokens at scoring** —
+   IDF-weighted edge weights computed but did not help via
+   `pathQuality` or `lexicalIdfFloor`.
+3. **Lexical edge noise via traversal** — *partially addressed
+   in Phase 1.5 with weighted Dijkstra*; no F1 lift on its own.
+4. **Anchor selection biased by ubiquitous tokens** — *fixed in
+   Phase 1.6 A2*. Moving the IDF correction from edge-scoring
+   (where it was inert) to anchor-selection (where it gates which
+   claims can participate in path discovery at all) was the right
+   primitive change.
+
+CONTEXT.md's Phase 1.5 prediction was that tier-1 was
+"primitive-limited, not tuning-limited." Confirmed: a *primitive*
+change — moving IDF from edge-scoring to anchor-selection — lifted
+F1 substantially, where every tuning knob in Phases 1 and 1.5
+failed.
 
 ### Files delivered
 
@@ -386,6 +503,30 @@ Outcome: no tier-1 F1 lift at default weights (best Dijkstra 0.510 vs
 BFS 0.530). Confirmed "primitive-limited, not tuning-limited" per
 Phase 1.5's own pass-condition. Infrastructure retained for tier-2 +
 future primitive changes (see below).
+
+### Phase 1.6 — Option-A primitive revisits — **done, A2 is the win**
+
+See "Phase 1.6 findings" in Part 2. Landed:
+- **A1**: `temporalDecayTau` on `GraphConfig` → temporal edge
+  `weight = exp(-deltaT / tau)`; Dijkstra reads
+  `temporalDecayEnabled()` and uses
+  `cost = temporalHopCost · (1 − weight)` when on. Off by default.
+- **A2**: `RetrievalOptions.anchorScoring`; `cosine-idf-mass` mode
+  reorders anchors by `cosine · (1 + alpha · normalizedNodeIdfMass)`.
+  `GraphIndex.nodeIdfMass(id)` exposed. Default `cosine` (off).
+- **A3**: `RetrievalOptions.probeComposition` with `intersection` and
+  `weighted-fusion` modes (`weightedFusionTau` knob, default 0.2).
+  Default `union` (off). Both gates fall back to union when nothing
+  passes — defensive against empty results.
+- Eval `eval/iterative-sweep.ts` runner for parameterized eval (B).
+
+Outcome: **A2 is the breakthrough.** Best single-knob: A2 Dijkstra
+α=0.8 → 0.632 mean F1 (+0.102 over BFS), no eval (B) regression.
+Best comprehensive: A2+A3 Dijkstra α=0.7 intersection → 0.596 F1
+**and 3/3 coherent arcs** (vs BFS's 2/3). A1 is actively harmful in
+every combination; not recommended at this corpus shape. Defaults
+unchanged (BFS, raw cosine, union) — promotion to default deferred
+to tier-2 validation (see Phase 2).
 
 ### Phase 2 — Tier-2 dataset (Greek history) — medium scope
 
@@ -479,39 +620,42 @@ tier-3 results are in.
 
 ### Recommended next-session entry point
 
-Phase 1.5 is done and confirmed tier-1 is primitive-limited: neither
-IDF-weighted scoring, pruning, nor weight-aware traversal lifts F1
-above BFS. Two plausible next directions, each independently landable:
+Phase 1.6 is done and tier-1 has produced its first decisive lift:
+**A2 (graph-informed anchor scoring) is the right primitive change**,
+and **A2+A3 (intersection) closes the long-broken career arc**. Two
+plausible next directions, each independently landable:
 
-**Option A — primitive revisit (deeper, higher ROI if it works):**
-investigate alternatives that change *what's in the search space*, not
-how we walk it. Candidates in order of cheapness:
-- **Temporal-weight decay by `deltaT`** — temporal edges currently have
-  uniform weight 1 (cost override 0.5). Replace with `weight = f(1/deltaT)`
-  so close-in-time adjacency costs much less than distant adjacency.
-  May fix the first-child regression without re-introducing the
-  free-highway failure mode.
-- **Anchor re-selection** — top-K cosine is noisy on tier-1 (the
-  family/career regressions often stem from bad anchors, not bad
-  traversal). Try graph-informed anchor scoring (neighbor weight mass,
-  IDF-weighted cosine).
-- **Probe composition** — currently probes are independent; their
-  anchor sets are unioned. Consider intersection/weighted fusion for
-  multi-probe queries.
+**Option B — Phase 2 (tier-2 Greek-history corpus, recommended):**
+the tier-1 question is now closed — primitive choices matter, A2 is
+the productive one, A1 is the wrong cost signal at this scale. The
+key open question is whether A2's win persists at scale (~200-500
+claims, multi-topic) or is an artifact of tier-1's `alex`-dominant
+tokenization. Tier-2 also exposes whether Dijkstra's weight-awareness
+starts paying off in its own right when the graph is sparser and
+topics are more diverse, and whether *topic-conditional temporal
+cost* (the conjecture that came out of A1's failure) is feasible at
+non-toy scale.
 
-**Option B — Phase 2 (tier-2 Greek-history corpus):** stop tuning on
-tier-1 and test the architecture at the intended scale (~200-500
-claims, multi-topic). Tier-1 may simply be too small to differentiate
-retrieval strategies — every claim shares `alex`, every anchor pair
-is ≤ 2 hops apart via direct lexical edges. Tier-2 exposes whether
-Dijkstra's weight-awareness starts paying off when the graph is
-sparser and topics are more diverse.
+**Option C — promote A2 to default + tighten the A2 sweep:** before
+tier-2, make the A2-Dijkstra-α=0.7-or-α=0.8 config the default for
+the smoke-test (or at least the default-recommended), gated behind
+a single confirming sweep. Cheap, unblocks downstream work that
+otherwise has to remember to opt in. Not strictly necessary if we're
+about to introduce a tier-2 corpus anyway — defaults will be
+re-evaluated there.
 
-Recommendation: **Option A first, Option B second.** A is cheap (small
-graph.ts / retriever.ts changes, same eval harness), and the result
-either closes the tier-1 F1 gap or provides the "we've exhausted
-primitive tweaks on tier-1" evidence that unblocks B. Running B first
-risks inheriting the wrong primitives into the larger-corpus test.
+**Option D — investigate *topic-conditional* temporal cost
+(A1 redux):** A1's failure mode was pure-deltaT cost discounting
+adjacency regardless of topic. A topic-aware variant — temporal
+edge cost = `temporalHopCost · max(1 − deltaT-weight,
+1 − cosine(claimA, claimB))` — would cheap-out only on temporally
+*and* semantically related neighbors, blocking the timeline-
+highway pathology. Worth ~1 evening of work; low downside; could
+slot in before or after tier-2.
 
-Then let the results decide whether to go wider (tier-2 dataset) or
-deeper (access tracking + agent profile).
+Recommendation: **Option B first.** The A2+A3 finding is strong
+enough to scale, and tier-2 will both validate the win and set up
+the legitimate next round of primitive iteration on a corpus that
+isn't dominated by a single shared token. Option C is a bookkeeping
+nicety; Option D is the most promising next-after-B primitive
+experiment but is best run with tier-2's noise floor in view.

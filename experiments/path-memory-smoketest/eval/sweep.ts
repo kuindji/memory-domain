@@ -30,65 +30,221 @@ function rankClaims(paths: ScoredPath[]): ClaimId[] {
 type Config = {
     label: string;
     lexicalIdfFloor?: number;
+    temporalDecayTau?: number;
     options: RetrievalOptions;
 };
 
 const CONFIGS: Config[] = [
     // --- BFS baseline (Phase 1 default) for reference ---
     { label: "bfs (default)", options: { traversal: "bfs" } },
-    // --- Phase 1.5 Dijkstra: temporalHopCost sweep at pq=0 ---
+    // --- Phase 1.5 Dijkstra reference (best plateau) ---
     {
-        label: "dijkstra tmp=0.0, pq=0",
-        options: { traversal: "dijkstra", temporalHopCost: 0 },
+        label: "dijkstra tmp=0.5",
+        options: { traversal: "dijkstra", temporalHopCost: 0.5 },
     },
+    // --- Phase 1.6 A1: temporal decay tau sweep ---
     {
-        label: "dijkstra tmp=0.3, pq=0",
-        options: { traversal: "dijkstra", temporalHopCost: 0.3 },
-    },
-    {
-        label: "dijkstra tmp=0.5, pq=0",
+        label: "A1 dijkstra tau=2 tmp=0.5",
+        temporalDecayTau: 2,
         options: { traversal: "dijkstra", temporalHopCost: 0.5 },
     },
     {
-        label: "dijkstra tmp=0.7, pq=0",
-        options: { traversal: "dijkstra", temporalHopCost: 0.7 },
+        label: "A1 dijkstra tau=5 tmp=0.5",
+        temporalDecayTau: 5,
+        options: { traversal: "dijkstra", temporalHopCost: 0.5 },
     },
     {
-        label: "dijkstra tmp=1.0, pq=0",
-        options: { traversal: "dijkstra", temporalHopCost: 1.0 },
+        label: "A1 dijkstra tau=10 tmp=0.5",
+        temporalDecayTau: 10,
+        options: { traversal: "dijkstra", temporalHopCost: 0.5 },
     },
-    // --- Dijkstra + pathQuality combos ---
+    // --- Phase 1.6 A2: cosine + IDF-mass anchor scoring ---
     {
-        label: "dijkstra tmp=0.5, pq=0.3",
+        label: "A2 bfs anchor=idf alpha=0.5",
         options: {
-            traversal: "dijkstra",
-            temporalHopCost: 0.5,
-            weights: { pathQuality: 0.3 },
+            traversal: "bfs",
+            anchorScoring: { kind: "cosine-idf-mass", alpha: 0.5 },
         },
     },
     {
-        label: "dijkstra tmp=0.7, pq=0.3",
+        label: "A2 bfs anchor=idf alpha=1.0",
         options: {
-            traversal: "dijkstra",
-            temporalHopCost: 0.7,
-            weights: { pathQuality: 0.3 },
+            traversal: "bfs",
+            anchorScoring: { kind: "cosine-idf-mass", alpha: 1.0 },
         },
     },
-    // --- Dijkstra + lexicalIdfFloor ---
     {
-        label: "dijkstra tmp=0.5, floor=0.15, pq=0.3",
-        lexicalIdfFloor: 0.15,
+        label: "A2 dijkstra tmp=0.5 anchor=idf alpha=0.5",
         options: {
             traversal: "dijkstra",
             temporalHopCost: 0.5,
-            weights: { pathQuality: 0.3 },
+            anchorScoring: { kind: "cosine-idf-mass", alpha: 0.5 },
+        },
+    },
+    // --- Phase 1.6 A3: probe composition ---
+    {
+        label: "A3 bfs probe=intersection",
+        options: { traversal: "bfs", probeComposition: "intersection" },
+    },
+    {
+        label: "A3 bfs probe=weighted-fusion tau=0.2",
+        options: {
+            traversal: "bfs",
+            probeComposition: "weighted-fusion",
+            weightedFusionTau: 0.2,
+        },
+    },
+    {
+        label: "A3 bfs probe=weighted-fusion tau=0.3",
+        options: {
+            traversal: "bfs",
+            probeComposition: "weighted-fusion",
+            weightedFusionTau: 0.3,
+        },
+    },
+    {
+        label: "A3 dijkstra tmp=0.5 probe=intersection",
+        options: {
+            traversal: "dijkstra",
+            temporalHopCost: 0.5,
+            probeComposition: "intersection",
+        },
+    },
+    {
+        label: "A3 dijkstra tmp=0.5 probe=weighted-fusion tau=0.2",
+        options: {
+            traversal: "dijkstra",
+            temporalHopCost: 0.5,
+            probeComposition: "weighted-fusion",
+            weightedFusionTau: 0.2,
+        },
+    },
+    // --- Phase 1.6 A2 finer alpha sweep around 0.5 (best so far) ---
+    {
+        label: "A2 dijkstra tmp=0.5 anchor=idf alpha=0.3",
+        options: {
+            traversal: "dijkstra",
+            temporalHopCost: 0.5,
+            anchorScoring: { kind: "cosine-idf-mass", alpha: 0.3 },
+        },
+    },
+    {
+        label: "A2 dijkstra tmp=0.5 anchor=idf alpha=0.7",
+        options: {
+            traversal: "dijkstra",
+            temporalHopCost: 0.5,
+            anchorScoring: { kind: "cosine-idf-mass", alpha: 0.7 },
+        },
+    },
+    {
+        label: "A2 dijkstra tmp=0.5 anchor=idf alpha=0.6",
+        options: {
+            traversal: "dijkstra",
+            temporalHopCost: 0.5,
+            anchorScoring: { kind: "cosine-idf-mass", alpha: 0.6 },
+        },
+    },
+    {
+        label: "A2 dijkstra tmp=0.5 anchor=idf alpha=0.8",
+        options: {
+            traversal: "dijkstra",
+            temporalHopCost: 0.5,
+            anchorScoring: { kind: "cosine-idf-mass", alpha: 0.8 },
+        },
+    },
+    {
+        label: "A2 dijkstra tmp=0.5 anchor=idf alpha=0.9",
+        options: {
+            traversal: "dijkstra",
+            temporalHopCost: 0.5,
+            anchorScoring: { kind: "cosine-idf-mass", alpha: 0.9 },
+        },
+    },
+    {
+        label: "A2 dijkstra tmp=0.5 anchor=idf alpha=1.0",
+        options: {
+            traversal: "dijkstra",
+            temporalHopCost: 0.5,
+            anchorScoring: { kind: "cosine-idf-mass", alpha: 1.0 },
+        },
+    },
+    // BFS variant of α=0.7 to isolate Dijkstra vs anchor contributions
+    {
+        label: "A2 bfs anchor=idf alpha=0.7",
+        options: {
+            traversal: "bfs",
+            anchorScoring: { kind: "cosine-idf-mass", alpha: 0.7 },
+        },
+    },
+    // --- A2+A3 combos (no A1) ---
+    {
+        label: "A2+A3 dijkstra anchor=idf a=0.5 probe=intersection",
+        options: {
+            traversal: "dijkstra",
+            temporalHopCost: 0.5,
+            anchorScoring: { kind: "cosine-idf-mass", alpha: 0.5 },
+            probeComposition: "intersection",
+        },
+    },
+    {
+        label: "A2+A3 dijkstra anchor=idf a=0.7 probe=intersection",
+        options: {
+            traversal: "dijkstra",
+            temporalHopCost: 0.5,
+            anchorScoring: { kind: "cosine-idf-mass", alpha: 0.7 },
+            probeComposition: "intersection",
+        },
+    },
+    {
+        label: "A2+A3 dijkstra anchor=idf a=0.5 fusion tau=0.2",
+        options: {
+            traversal: "dijkstra",
+            temporalHopCost: 0.5,
+            anchorScoring: { kind: "cosine-idf-mass", alpha: 0.5 },
+            probeComposition: "weighted-fusion",
+            weightedFusionTau: 0.2,
+        },
+    },
+    // --- Combined best-of (filled in after individual sweeps) ---
+    {
+        label: "A1+A2 dijkstra tau=5 anchor=idf alpha=0.5",
+        temporalDecayTau: 5,
+        options: {
+            traversal: "dijkstra",
+            temporalHopCost: 0.5,
+            anchorScoring: { kind: "cosine-idf-mass", alpha: 0.5 },
+        },
+    },
+    {
+        label: "A1+A3 dijkstra tau=5 probe=weighted-fusion tau=0.2",
+        temporalDecayTau: 5,
+        options: {
+            traversal: "dijkstra",
+            temporalHopCost: 0.5,
+            probeComposition: "weighted-fusion",
+            weightedFusionTau: 0.2,
+        },
+    },
+    {
+        label: "A1+A2+A3 dijkstra tau=5 anchor=idf a=0.5 fusion tau=0.2",
+        temporalDecayTau: 5,
+        options: {
+            traversal: "dijkstra",
+            temporalHopCost: 0.5,
+            anchorScoring: { kind: "cosine-idf-mass", alpha: 0.5 },
+            probeComposition: "weighted-fusion",
+            weightedFusionTau: 0.2,
         },
     },
 ];
 
 async function runConfig(config: Config): Promise<{ mean: number; wins: number; losses: number }> {
     const embedder = await getEmbedder();
-    const memory = new PathMemory({ embedder, lexicalIdfFloor: config.lexicalIdfFloor });
+    const memory = new PathMemory({
+        embedder,
+        lexicalIdfFloor: config.lexicalIdfFloor,
+        temporalDecayTau: config.temporalDecayTau,
+    });
     const baseline = new FlatVectorBaseline(embedder, memory.store);
 
     for (const c of tier1Alex) {
