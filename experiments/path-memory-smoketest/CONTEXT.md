@@ -254,25 +254,70 @@ score alone isn't enough.
 accumulation reaches unrelated claims via low-weight "alex" edges that
 BFS freely traverses.
 
+### Phase 1.5 findings
+
+Phase 1.5 implemented bounded-depth Dijkstra over
+`cost = max(0, 1 − edge.weight)` for lexical/semantic edges, with a
+fixed per-temporal-hop cost (`temporalHopCost`, default 0.5) so the
+timeline isn't a free corpus-wide highway. Ships as **opt-in traversal**
+(`RetrievalOptions.traversal = "dijkstra"`); BFS remains the default.
+
+Sweep over `temporalHopCost ∈ {0, 0.3, 0.5, 0.7, 1.0}` and
+`pathQuality ∈ {0, 0.3}` with and without `lexicalIdfFloor` on eval (A):
+
+```
+config                                | mean-path-F1 | wins | losses
+bfs (default)                         | 0.530        | 3    | 3
+dijkstra tmp=0.0, pq=0                | 0.417        | 2    | 6
+dijkstra tmp=0.3, pq=0                | 0.367        | 3    | 6
+dijkstra tmp=0.5, pq=0                | 0.510        | 5    | 4
+dijkstra tmp=0.7, pq=0                | 0.510        | 5    | 4
+dijkstra tmp=1.0, pq=0                | 0.510        | 5    | 4
+dijkstra tmp=0.5, pq=0.3              | 0.433        | 4    | 5
+dijkstra tmp=0.7, pq=0.3              | 0.454        | 4    | 4
+dijkstra tmp=0.5, floor=0.15, pq=0.3  | 0.462        | 2    | 5
+```
+
+Findings:
+
+1. **`temporalHopCost ≈ 0` is actively harmful.** With the whole timeline
+   free, Dijkstra drags paths through temporally-adjacent but topically-
+   irrelevant claims (e.g. `conf_neurips` bleeding into the family arc).
+   Plateau lifts as cost climbs, stabilizing at **0.510** from
+   `temporalHopCost ≥ 0.5`.
+2. **Dijkstra is more decisive but no better in aggregate.** Best
+   Dijkstra config: 5 wins / 4 losses vs BFS's 3 / 3 — more queries
+   shift direction, but the net is ~0.02 F1 *below* BFS.
+3. **pathQuality and lexicalIdfFloor still don't help under weighted
+   traversal** — confirming Phase 1's observation that the score/prune
+   knobs are ineffective on tier-1 at this corpus size.
+4. **Eval (B): 2/3 coherent arcs preserved under BFS; Dijkstra drops to
+   1/3** at `tmp=0.5`. The first-child query is a notable Dijkstra
+   regression (BFS 1.00 → Dijkstra 0.00 at same K) — the child_lily
+   solo path gets outscored by weight-optimized multi-hop paths
+   through unrelated nodes.
+
 ### Hypothesis status
 
-**Partially supported, post-Phase 1.** Architecture works end-to-end,
-bitemporal-light validates strongly, multi-probe path-matching adds value
-on specific query types — but still doesn't dominate the flat baseline at
-default weights. Of the two Phase-1 failure modes originally identified:
+**Partially supported, post-Phase 1.5.** Architecture works end-to-end,
+bitemporal-light validates strongly, multi-probe path-matching adds
+value on specific query types — but at tier-1 scale with this corpus
+shape (~38 claims, `alex`-dominant tokenization), neither BFS nor
+weighted Dijkstra dominates the flat baseline at default weights.
+
+Of the two Phase-1 failure modes originally identified:
 
 1. **Length-penalty / multi-anchor trade-off** — *fixed*. Informational
    length penalty (hops minus anchors-in-path) is live by default and
    does not regress F1.
 2. **Lexical edge noise from ubiquitous tokens** — *not fixed at the
-   ranking layer*. IDF-weighted edge weights are correctly computed and
-   observable, but neither `pathQuality` scoring nor `lexicalIdfFloor`
-   pruning improves mean F1 on tier-1. The signal is present in the
-   graph; BFS-by-hops ignores it.
+   ranking or traversal layer*. IDF-weighted edge weights are correctly
+   computed and observable; neither `pathQuality` scoring, `lexicalIdfFloor`
+   pruning, nor weight-aware Dijkstra improves mean F1 on tier-1.
 
-The next iteration is **weight-aware traversal** (Phase 1.5 — Dijkstra
-over `1 − edgeWeight`) so path *choice* respects IDF. Score-level
-interventions proved insufficient on tier-1.
+CONTEXT.md's Phase 1.5 prediction held: *"If this doesn't lift tier-1
+F1 above 0.58ish, the conclusion is primitive-limited, not tuning-
+limited."* Confirmed on tier-1.
 
 ### Files delivered
 
@@ -286,7 +331,7 @@ experiments/path-memory-smoketest/
 │   ├── store.ts                # MemoryStore — bitemporal-light store
 │   ├── graph.ts                # GraphIndex — three-edge-type builder
 │   ├── tokenize.ts             # stopword-filtered tokenizer
-│   ├── retriever.ts            # multi-probe path matcher
+│   ├── retriever.ts            # multi-probe matcher; BFS + Dijkstra traversal
 │   ├── interfaces.ts           # PathMemory + Session facades
 │   └── embedder.ts             # ONNX embedder factory (wraps parent adapter)
 ├── data/
@@ -301,13 +346,13 @@ experiments/path-memory-smoketest/
     ├── embedder.test.ts        # real embedder smoke test
     ├── store.test.ts           # 7 bitemporal invariants
     ├── graph.test.ts           # 13 edge-formation + IDF invariants
-    ├── retriever.test.ts       # 9 retrieval behaviors
+    ├── retriever.test.ts       # 11 retrieval behaviors
     ├── eval-vs-baseline.test.ts   # eval (A) — vs flat baseline
     └── eval-iterative.test.ts  # eval (B) — multi-turn convergence
 ```
 
-33 tests pass. Typecheck clean. Smoke-test lint clean (pre-existing
-warnings in `src/plugins/topic-linking.ts` unrelated to this branch).
+35 tests pass. Typecheck clean. Smoke-test lint clean (pre-existing
+errors in `src/plugins/topic-linking.ts` unrelated to this branch).
 
 ---
 
@@ -327,27 +372,20 @@ See "Phase 1 findings" in Part 2. Landed:
   infrastructure, default weights/floor disable them because no sweeped
   configuration lifted mean F1 above 0.530 on tier-1.
 
-### Phase 1.5 — weight-aware traversal (new; high ROI)
+### Phase 1.5 — weight-aware traversal — **done, shipped opt-in**
 
-The natural follow-up to Phase 1. Replace bounded BFS with
-bounded-depth Dijkstra over edge cost `1 − weight` (temporal cost≈0,
-strong semantic cost small, ubiquitous-lexical cost ≈1). The shortest
-*cost* path is different from the shortest *hop* path; low-weight
-lexical noise no longer looks like a free bridge.
+See "Phase 1.5 findings" in Part 2. Landed:
+- Bounded-depth Dijkstra over `cost = max(0, 1 − edge.weight)` for
+  lexical/semantic edges; temporal edges take a fixed `temporalHopCost`
+  (default 0.5) to avoid a free timeline highway.
+- `traversal: "bfs" | "dijkstra"` option (default `"bfs"`) so the
+  weighted traversal is available without changing default behavior.
+- Sweep harness extended with the traversal knob.
 
-Work:
-- Introduce a bounded-cost shortest-path function that still honors
-  `bfsMaxDepth` and the `isValid` mode filter.
-- Keep `pathQuality` and/or `lexicalIdfFloor` available but re-evaluate
-  defaults under weighted traversal — both may become useful again when
-  traversal itself is weight-aware.
-- Re-run eval (A) and (B). Expected outcome: career-arc convergence
-  improves; "marriage and partner" / "family" regressions shrink
-  because noise bridges cost more than real bridges.
-
-If this doesn't lift tier-1 F1 above 0.58ish, the conclusion is
-primitive-limited, not tuning-limited, and we revisit the retrieval
-model before tier-2.
+Outcome: no tier-1 F1 lift at default weights (best Dijkstra 0.510 vs
+BFS 0.530). Confirmed "primitive-limited, not tuning-limited" per
+Phase 1.5's own pass-condition. Infrastructure retained for tier-2 +
+future primitive changes (see below).
 
 ### Phase 2 — Tier-2 dataset (Greek history) — medium scope
 
@@ -441,14 +479,39 @@ tier-3 results are in.
 
 ### Recommended next-session entry point
 
-**Start with Phase 1.5** (weight-aware traversal). Phase 1's score-level
-use of IDF weights didn't lift F1; the signal needs to influence *path
-choice*, not just ranking. Implement bounded-cost Dijkstra over
-`1 − edgeWeight`, re-run eval (A) and (B), and compare.
+Phase 1.5 is done and confirmed tier-1 is primitive-limited: neither
+IDF-weighted scoring, pruning, nor weight-aware traversal lifts F1
+above BFS. Two plausible next directions, each independently landable:
 
-If Phase 1.5 also fails to lift tier-1 F1 above ~0.58, primitives are
-the bottleneck — revisit the retrieval model (probe composition,
-anchor selection, or substitute for lexical edges) before tier-2.
+**Option A — primitive revisit (deeper, higher ROI if it works):**
+investigate alternatives that change *what's in the search space*, not
+how we walk it. Candidates in order of cheapness:
+- **Temporal-weight decay by `deltaT`** — temporal edges currently have
+  uniform weight 1 (cost override 0.5). Replace with `weight = f(1/deltaT)`
+  so close-in-time adjacency costs much less than distant adjacency.
+  May fix the first-child regression without re-introducing the
+  free-highway failure mode.
+- **Anchor re-selection** — top-K cosine is noisy on tier-1 (the
+  family/career regressions often stem from bad anchors, not bad
+  traversal). Try graph-informed anchor scoring (neighbor weight mass,
+  IDF-weighted cosine).
+- **Probe composition** — currently probes are independent; their
+  anchor sets are unioned. Consider intersection/weighted fusion for
+  multi-probe queries.
+
+**Option B — Phase 2 (tier-2 Greek-history corpus):** stop tuning on
+tier-1 and test the architecture at the intended scale (~200-500
+claims, multi-topic). Tier-1 may simply be too small to differentiate
+retrieval strategies — every claim shares `alex`, every anchor pair
+is ≤ 2 hops apart via direct lexical edges. Tier-2 exposes whether
+Dijkstra's weight-awareness starts paying off when the graph is
+sparser and topics are more diverse.
+
+Recommendation: **Option A first, Option B second.** A is cheap (small
+graph.ts / retriever.ts changes, same eval harness), and the result
+either closes the tier-1 F1 gap or provides the "we've exhausted
+primitive tweaks on tier-1" evidence that unblocks B. Running B first
+risks inheriting the wrong primitives into the larger-corpus test.
 
 Then let the results decide whether to go wider (tier-2 dataset) or
 deeper (access tracking + agent profile).

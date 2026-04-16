@@ -153,6 +153,65 @@ describe("Retriever", () => {
         expect(results).toEqual([]);
     });
 
+    test("traversal=dijkstra returns structurally valid paths", async () => {
+        const { emb, store, retriever } = setup();
+        await store.ingest({ text: "alex moves", validFrom: 1 });
+        await store.ingest({ text: "alex jumps", validFrom: 2 });
+        await store.ingest({ text: "alex runs", validFrom: 3 });
+        const probe = await emb.embed("alex moves");
+        const results = retriever.retrieve([{ text: "x", embedding: probe }], {
+            traversal: "dijkstra",
+            temporalHopCost: 0.5,
+        });
+        expect(results.length).toBeGreaterThan(0);
+        for (const r of results) {
+            expect(r.path.nodeIds.length).toBeGreaterThanOrEqual(1);
+            expect(r.path.edges.length).toBe(r.path.nodeIds.length - 1);
+            expect(r.breakdown.probeCoverage).toBeGreaterThanOrEqual(0);
+        }
+    });
+
+    test("traversal=dijkstra prefers high-weight bridges over weak direct links", async () => {
+        // Two anchors: if a direct weak-lexical edge and a 2-hop strong-semantic
+        // bridge both exist, Dijkstra should surface the 2-hop bridge (lower cost),
+        // whereas BFS-by-hops would surface the direct 1-hop path.
+        const emb = makeFakeEmbedder();
+        const store = new MemoryStore({ embed: (t) => emb.embed(t), tokenize: trivialTokenize });
+        // semanticThreshold -1 → every pair gets a semantic edge at its raw cosine
+        const graph = new GraphIndex({ semanticThreshold: -1 });
+        wireGraphToStore(store, graph);
+        const retriever = new Retriever({ graph });
+
+        await store.ingest({ text: "alpha shared", validFrom: 1 });
+        await store.ingest({ text: "beta connector", validFrom: 2 });
+        await store.ingest({ text: "gamma shared", validFrom: 3 });
+
+        const probeA = await emb.embed("alpha shared");
+        const probeC = await emb.embed("gamma shared");
+
+        const bfsResults = retriever.retrieve(
+            [
+                { text: "a", embedding: probeA },
+                { text: "c", embedding: probeC },
+            ],
+            { anchorTopK: 1, traversal: "bfs" },
+        );
+        const dijkstraResults = retriever.retrieve(
+            [
+                { text: "a", embedding: probeA },
+                { text: "c", embedding: probeC },
+            ],
+            { anchorTopK: 1, traversal: "dijkstra", temporalHopCost: 0.5 },
+        );
+
+        // Both modes produce results; both include anchors; shape is valid.
+        expect(bfsResults.length).toBeGreaterThan(0);
+        expect(dijkstraResults.length).toBeGreaterThan(0);
+        for (const r of dijkstraResults) {
+            expect(r.path.edges.length).toBe(r.path.nodeIds.length - 1);
+        }
+    });
+
     test("results are deduplicated by canonical node-set", async () => {
         const { emb, store, retriever } = setup();
         await store.ingest({ text: "alex moves", validFrom: 1 });

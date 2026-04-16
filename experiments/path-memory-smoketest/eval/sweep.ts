@@ -34,32 +34,56 @@ type Config = {
 };
 
 const CONFIGS: Config[] = [
-    // solo=0: pathQuality boosts ONLY multi-edge paths
-    { label: "floor=0, pq=0.2", options: {} },
-    { label: "floor=0, pq=0.3", options: { weights: { pathQuality: 0.3 } } },
-    { label: "floor=0, pq=0.5", options: { weights: { pathQuality: 0.5 } } },
-    { label: "floor=0, pq=1.0", options: { weights: { pathQuality: 1.0 } } },
+    // --- BFS baseline (Phase 1 default) for reference ---
+    { label: "bfs (default)", options: { traversal: "bfs" } },
+    // --- Phase 1.5 Dijkstra: temporalHopCost sweep at pq=0 ---
     {
-        label: "floor=0.15, pq=0.3",
+        label: "dijkstra tmp=0.0, pq=0",
+        options: { traversal: "dijkstra", temporalHopCost: 0 },
+    },
+    {
+        label: "dijkstra tmp=0.3, pq=0",
+        options: { traversal: "dijkstra", temporalHopCost: 0.3 },
+    },
+    {
+        label: "dijkstra tmp=0.5, pq=0",
+        options: { traversal: "dijkstra", temporalHopCost: 0.5 },
+    },
+    {
+        label: "dijkstra tmp=0.7, pq=0",
+        options: { traversal: "dijkstra", temporalHopCost: 0.7 },
+    },
+    {
+        label: "dijkstra tmp=1.0, pq=0",
+        options: { traversal: "dijkstra", temporalHopCost: 1.0 },
+    },
+    // --- Dijkstra + pathQuality combos ---
+    {
+        label: "dijkstra tmp=0.5, pq=0.3",
+        options: {
+            traversal: "dijkstra",
+            temporalHopCost: 0.5,
+            weights: { pathQuality: 0.3 },
+        },
+    },
+    {
+        label: "dijkstra tmp=0.7, pq=0.3",
+        options: {
+            traversal: "dijkstra",
+            temporalHopCost: 0.7,
+            weights: { pathQuality: 0.3 },
+        },
+    },
+    // --- Dijkstra + lexicalIdfFloor ---
+    {
+        label: "dijkstra tmp=0.5, floor=0.15, pq=0.3",
         lexicalIdfFloor: 0.15,
-        options: { weights: { pathQuality: 0.3 } },
+        options: {
+            traversal: "dijkstra",
+            temporalHopCost: 0.5,
+            weights: { pathQuality: 0.3 },
+        },
     },
-    {
-        label: "floor=0.2, pq=0.3",
-        lexicalIdfFloor: 0.2,
-        options: { weights: { pathQuality: 0.3 } },
-    },
-    {
-        label: "floor=0.25, pq=0.3",
-        lexicalIdfFloor: 0.25,
-        options: { weights: { pathQuality: 0.3 } },
-    },
-    {
-        label: "floor=0.2, pq=0.5",
-        lexicalIdfFloor: 0.2,
-        options: { weights: { pathQuality: 0.5 } },
-    },
-    { label: "floor=0, pq=0 (baseline)", options: { weights: { pathQuality: 0 } } },
 ];
 
 async function runConfig(config: Config): Promise<{ mean: number; wins: number; losses: number }> {

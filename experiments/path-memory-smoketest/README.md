@@ -64,9 +64,9 @@ default test root to `./tests/`.
 src/        core implementation
   types.ts        Claim, Edge, HistoryEvent, Path, ScoredPath, RetrievalOptions
   store.ts        MemoryStore (bitemporal-light, history log, supersession)
-  graph.ts        GraphIndex (temporal/lexical/semantic edges, BFS-friendly)
+  graph.ts        GraphIndex (temporal/lexical/semantic edges, IDF-weighted)
   tokenize.ts     stopword-filtered tokenizer (no NLP libs)
-  retriever.ts    Multi-probe matcher: anchors → bounded BFS → scored paths
+  retriever.ts    Multi-probe matcher with BFS (default) or Dijkstra traversal
   interfaces.ts   PathMemory facade + Session for iterative refinement
   embedder.ts     Factory wrapping parent's OnnxEmbeddingAdapter (cached)
 
@@ -84,7 +84,7 @@ tests/
   helpers.ts      fake/deterministic embedder + tokenize stub for unit tests
 ```
 
-## Tier-1 results (post-Phase 1, defaults)
+## Tier-1 results (post-Phase 1.5, defaults)
 
 **Eval (A) — vs flat vector baseline (P/R @ K=|ideal|):**
 
@@ -93,12 +93,13 @@ Queries: 12    path wins: 3    baseline wins: 3    ties: 6
 Mean F1 — path: 0.530    baseline: 0.507
 ```
 
-Aggregate unchanged from pre-Phase 1. Phase 1 landed informational
-length penalty + IDF-weighted edge infrastructure; `pathQuality`
-scoring and `lexicalIdfFloor` pruning are available as knobs but off by
-default because no swept configuration improved mean F1.
+BFS (default) stays at 0.530. Phase 1.5's weight-aware Dijkstra is
+opt-in via `RetrievalOptions.traversal = "dijkstra"`; its best sweep
+plateau is 0.510 (see `CONTEXT.md` § Phase 1.5 findings for the full
+table). Phase 1's `pathQuality` / `lexicalIdfFloor` knobs remain
+available but off by default.
 
-Query-level highlights:
+Query-level highlights under BFS:
 
 - **Path wins decisively on as-of queries** (e.g. "where alex lived in 2015"
   → F1 1.00 vs 0.00). Bitemporal-light primitive validates.
@@ -107,7 +108,7 @@ Query-level highlights:
 - **Baseline still wins on queries with strong literal cues** ("marriage
   and partner" natural query contains "Sam" + "marriage").
 
-**Eval (B) — multi-turn arc convergence:**
+**Eval (B) — multi-turn arc convergence (BFS default):**
 
 ```
 Arcs: 3    narrowed: 3    coherent (≥0.5): 2
@@ -116,22 +117,23 @@ Arcs: 3    narrowed: 3    coherent (≥0.5): 2
 - *family arc* — converges cleanly (date_sam, child_lily, met_sam at top across
   turns)
 - *location arc (asOf)* — converges (loc_sf surfaces consistently)
-- *career arc* — does NOT converge. Accumulating probes still pull in noise
-  via lexical edges on "Alex" because BFS-by-hops treats noise and real
-  edges identically — weight-aware traversal (Phase 1.5) is the next step.
+- *career arc* — does NOT converge. Dijkstra doesn't fix this either:
+  on tier-1 the primitive (probe composition + anchor selection) is the
+  bottleneck, not the traversal algorithm.
 
 ## Hypothesis status
 
-**Partially supported, post-Phase 1.** Architecture works end-to-end,
+**Partially supported, post-Phase 1.5.** Architecture works end-to-end,
 bitemporal-light validates, path retrieval beats baseline on specific
-query shapes, but doesn't dominate mean F1 at default weights. One of
-the two original failure modes is resolved (length penalty), the other
-(lexical-edge noise) needs the path *choice* to be weight-aware, not
-just the scoring.
+query shapes, but at tier-1 scale neither BFS nor weighted Dijkstra
+dominates mean F1 at default weights. The length-penalty failure mode
+is resolved; the lexical-edge-noise failure mode is *not* fixed by
+weight-aware traversal alone — tier-1 is primitive-limited. Next
+candidates: temporal-weight decay by `deltaT`, graph-informed anchor
+re-selection, or moving to tier-2 (see `CONTEXT.md`).
 
 ## Out of scope (for follow-on work)
 
-- Weight-aware traversal / Dijkstra over `1 − edgeWeight` — Phase 1.5
 - Tiers 2 (Greek history) and 3 (Wikipedia) datasets
 - Access tracking / well-worn-path index
 - Agent profile knob (facts ↔ abstractions weighting)

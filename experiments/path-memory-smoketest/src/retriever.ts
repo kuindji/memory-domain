@@ -12,12 +12,15 @@ import type {
     ScoreBreakdown,
     ScoredPath,
     Timestamp,
+    TraversalMode,
 } from "./types.js";
 
 const DEFAULTS = {
     anchorTopK: 5,
     bfsMaxDepth: 3,
     resultTopN: 10,
+    traversal: "bfs" as TraversalMode,
+    temporalHopCost: 0.5,
     weights: {
         probeCoverage: 1.0,
         edgeTypeDiversity: 0.3,
@@ -48,6 +51,8 @@ export class Retriever {
         const anchorTopK = options.anchorTopK ?? DEFAULTS.anchorTopK;
         const bfsMaxDepth = options.bfsMaxDepth ?? DEFAULTS.bfsMaxDepth;
         const resultTopN = options.resultTopN ?? DEFAULTS.resultTopN;
+        const traversal = options.traversal ?? DEFAULTS.traversal;
+        const temporalHopCost = options.temporalHopCost ?? DEFAULTS.temporalHopCost;
         const weights = { ...DEFAULTS.weights, ...options.weights };
 
         const isValid = makeValidityFilter(mode);
@@ -80,7 +85,10 @@ export class Retriever {
         }
 
         for (let i = 0; i < allAnchors.length; i++) {
-            const reachable = this.bfsShortestPaths(allAnchors[i], bfsMaxDepth, isValid);
+            const reachable =
+                traversal === "dijkstra"
+                    ? this.shortestCostPaths(allAnchors[i], bfsMaxDepth, isValid, temporalHopCost)
+                    : this.bfsShortestPaths(allAnchors[i], bfsMaxDepth, isValid);
             for (let j = i + 1; j < allAnchors.length; j++) {
                 const path = reachable.get(allAnchors[j]);
                 if (!path) continue;
@@ -149,6 +157,69 @@ export class Retriever {
                     depth: cur.depth + 1,
                     nodes: path.nodeIds,
                     edges: path.edges,
+                });
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * Bounded-depth lowest-cost path search (Phase-1.5 opt-in traversal).
+     * Lexical/semantic edge cost = max(0, 1 - edge.weight). Temporal edges
+     * cost a fixed `temporalHopCost` (default 0.5) — a real signal but not
+     * a free corpus-wide highway. On tier-1 at default weights this did
+     * not lift mean F1 above BFS (primitive-limited, not tuning-limited);
+     * ships as infrastructure for tier-2 and future experiments.
+     */
+    private shortestCostPaths(
+        start: ClaimId,
+        maxDepth: number,
+        isValid: (c: Claim) => boolean,
+        temporalHopCost: number,
+    ): Map<ClaimId, Path> {
+        type State = { id: ClaimId; cost: number; depth: number; path: Path };
+        const bestCost = new Map<ClaimId, number>();
+        const result = new Map<ClaimId, Path>();
+        bestCost.set(start, 0);
+
+        const pq: State[] = [
+            { id: start, cost: 0, depth: 0, path: { nodeIds: [start], edges: [] } },
+        ];
+
+        while (pq.length > 0) {
+            pq.sort((a, b) => a.cost - b.cost || a.depth - b.depth);
+            const cur = pq.shift()!;
+
+            const known = bestCost.get(cur.id);
+            if (known !== undefined && cur.cost > known) continue;
+
+            if (cur.id !== start && !result.has(cur.id)) {
+                result.set(cur.id, cur.path);
+            }
+
+            if (cur.depth >= maxDepth) continue;
+
+            for (const e of this.graph.neighbors(cur.id)) {
+                if (cur.path.nodeIds.includes(e.to)) continue;
+                const node = this.graph.getNode(e.to);
+                if (!node || !isValid(node)) continue;
+
+                const edgeCost =
+                    e.type === "temporal" ? temporalHopCost : Math.max(0, 1 - e.weight);
+                const newCost = cur.cost + edgeCost;
+                const prev = bestCost.get(e.to);
+                if (prev !== undefined && prev <= newCost) continue;
+
+                bestCost.set(e.to, newCost);
+                pq.push({
+                    id: e.to,
+                    cost: newCost,
+                    depth: cur.depth + 1,
+                    path: {
+                        nodeIds: [...cur.path.nodeIds, e.to],
+                        edges: [...cur.path.edges, e],
+                    },
                 });
             }
         }

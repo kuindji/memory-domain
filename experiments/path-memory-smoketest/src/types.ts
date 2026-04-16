@@ -58,11 +58,15 @@ export type ScoredPath = {
 
 export type RetrievalMode = "current" | { kind: "asOf"; at: Timestamp };
 
+export type TraversalMode = "bfs" | "dijkstra";
+
 export type RetrievalOptions = {
     mode?: RetrievalMode;
     anchorTopK?: number;
     bfsMaxDepth?: number;
     resultTopN?: number;
+    traversal?: TraversalMode;
+    temporalHopCost?: number;
     weights?: {
         probeCoverage?: number;
         edgeTypeDiversity?: number;
