@@ -1,12 +1,14 @@
 import { cosineSimilarity } from "../../../src/core/scoring.js";
 import type { GraphIndex } from "./graph.js";
 import type {
+    AnchorScoring,
     Claim,
     ClaimId,
     Edge,
     EdgeType,
     Path,
     Probe,
+    ProbeComposition,
     RetrievalMode,
     RetrievalOptions,
     ScoreBreakdown,
@@ -21,6 +23,9 @@ const DEFAULTS = {
     resultTopN: 10,
     traversal: "bfs" as TraversalMode,
     temporalHopCost: 0.5,
+    anchorScoring: { kind: "cosine" } as AnchorScoring,
+    probeComposition: "union" as ProbeComposition,
+    weightedFusionTau: 0.2,
     weights: {
         probeCoverage: 1.0,
         edgeTypeDiversity: 0.3,
@@ -53,6 +58,9 @@ export class Retriever {
         const resultTopN = options.resultTopN ?? DEFAULTS.resultTopN;
         const traversal = options.traversal ?? DEFAULTS.traversal;
         const temporalHopCost = options.temporalHopCost ?? DEFAULTS.temporalHopCost;
+        const anchorScoring = options.anchorScoring ?? DEFAULTS.anchorScoring;
+        const probeComposition = options.probeComposition ?? DEFAULTS.probeComposition;
+        const weightedFusionTau = options.weightedFusionTau ?? DEFAULTS.weightedFusionTau;
         const weights = { ...DEFAULTS.weights, ...options.weights };
 
         const isValid = makeValidityFilter(mode);
@@ -61,20 +69,13 @@ export class Retriever {
             .map((id) => this.graph.getNode(id))
             .filter((c): c is Claim => c !== undefined && isValid(c));
 
-        const anchorsByProbe: ClaimId[][] = probes.map((p) =>
-            this.findAnchors(p.embedding, validClaims, anchorTopK),
-        );
-
-        const probesByAnchor = new Map<ClaimId, Set<number>>();
-        anchorsByProbe.forEach((anchors, pIdx) => {
-            for (const aid of anchors) {
-                let set = probesByAnchor.get(aid);
-                if (!set) {
-                    set = new Set<number>();
-                    probesByAnchor.set(aid, set);
-                }
-                set.add(pIdx);
-            }
+        const probesByAnchor = this.composeAnchors({
+            probes,
+            validClaims,
+            anchorTopK,
+            anchorScoring,
+            probeComposition,
+            weightedFusionTau,
         });
 
         const allAnchors = Array.from(probesByAnchor.keys());
@@ -118,13 +119,141 @@ export class Retriever {
         return scored.slice(0, resultTopN);
     }
 
-    private findAnchors(probeEmbedding: number[], claims: Claim[], topK: number): ClaimId[] {
-        const scored = claims.map((c) => ({
-            id: c.id,
-            sim: this.similarity(probeEmbedding, c.embedding),
-        }));
-        scored.sort((a, b) => b.sim - a.sim);
-        return scored.slice(0, topK).map((s) => s.id);
+    /**
+     * Per-probe top-K with the configured anchor scoring. Returns both the
+     * ordered IDs and the per-anchor cosine — the cosine is reused by
+     * weighted-fusion probe composition (A3).
+     */
+    private scoreAnchorsForProbe(
+        probeEmbedding: number[],
+        claims: Claim[],
+        topK: number,
+        scoring: AnchorScoring,
+    ): { ranked: ClaimId[]; cosineByAnchor: Map<ClaimId, number> } {
+        const cosineByAnchor = new Map<ClaimId, number>();
+        let maxNodeIdf = 0;
+        if (scoring.kind === "cosine-idf-mass") {
+            for (const c of claims) {
+                const m = this.graph.nodeIdfMass(c.id);
+                if (m > maxNodeIdf) maxNodeIdf = m;
+            }
+        }
+
+        const scored = claims.map((c) => {
+            const sim = this.similarity(probeEmbedding, c.embedding);
+            cosineByAnchor.set(c.id, sim);
+            let score = sim;
+            if (scoring.kind === "cosine-idf-mass" && maxNodeIdf > 0) {
+                const norm = this.graph.nodeIdfMass(c.id) / maxNodeIdf;
+                score = sim * (1 + scoring.alpha * norm);
+            }
+            return { id: c.id, score };
+        });
+        scored.sort((a, b) => b.score - a.score);
+        const ranked = scored.slice(0, topK).map((s) => s.id);
+        return { ranked, cosineByAnchor };
+    }
+
+    /**
+     * Compose per-probe anchor sets into a single `probesByAnchor` map.
+     * - "union" (default): every probe's top-K contributes; an anchor records
+     *   which probe(s) chose it.
+     * - "intersection": anchor must appear in `>= ceil(P/2)` per-probe top-K
+     *   sets, falling back to union when only one probe.
+     * - "weighted-fusion": aggregate score per claim is
+     *   `sum_p max(0, cosine(p, claim) - tau)`; top-K of aggregate are anchors,
+     *   each anchor records every probe whose per-probe cosine cleared `tau`.
+     */
+    private composeAnchors(args: {
+        probes: Probe[];
+        validClaims: Claim[];
+        anchorTopK: number;
+        anchorScoring: AnchorScoring;
+        probeComposition: ProbeComposition;
+        weightedFusionTau: number;
+    }): Map<ClaimId, Set<number>> {
+        const { probes, validClaims, anchorTopK, anchorScoring, probeComposition } = args;
+
+        const perProbe = probes.map((p) =>
+            this.scoreAnchorsForProbe(p.embedding, validClaims, anchorTopK, anchorScoring),
+        );
+
+        const probesByAnchor = new Map<ClaimId, Set<number>>();
+        const remember = (aid: ClaimId, pIdx: number): void => {
+            let s = probesByAnchor.get(aid);
+            if (!s) {
+                s = new Set<number>();
+                probesByAnchor.set(aid, s);
+            }
+            s.add(pIdx);
+        };
+
+        if (probeComposition === "intersection" && probes.length > 1) {
+            const counts = new Map<ClaimId, Set<number>>();
+            perProbe.forEach((pp, pIdx) => {
+                for (const aid of pp.ranked) {
+                    let s = counts.get(aid);
+                    if (!s) {
+                        s = new Set<number>();
+                        counts.set(aid, s);
+                    }
+                    s.add(pIdx);
+                }
+            });
+            const minProbes = Math.ceil(probes.length / 2);
+            for (const [aid, hitProbes] of counts) {
+                if (hitProbes.size >= minProbes) {
+                    for (const pIdx of hitProbes) remember(aid, pIdx);
+                }
+            }
+            if (probesByAnchor.size > 0) return probesByAnchor;
+            // No claim cleared the intersection threshold — fall back to union
+            // so we don't return an empty result on every multi-probe query.
+        }
+
+        if (probeComposition === "weighted-fusion" && probes.length > 1) {
+            const tau = args.weightedFusionTau;
+            const aggregate = new Map<ClaimId, number>();
+            const probesAboveTau = new Map<ClaimId, Set<number>>();
+            for (const claim of validClaims) {
+                let agg = 0;
+                const above = new Set<number>();
+                perProbe.forEach((pp, pIdx) => {
+                    const cos = pp.cosineByAnchor.get(claim.id) ?? 0;
+                    const contribution = Math.max(0, cos - tau);
+                    if (contribution > 0) {
+                        agg += contribution;
+                        above.add(pIdx);
+                    }
+                });
+                if (agg > 0) {
+                    aggregate.set(claim.id, agg);
+                    probesAboveTau.set(claim.id, above);
+                }
+            }
+            const ranked = Array.from(aggregate.entries())
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, anchorTopK)
+                .map(([id]) => id);
+            for (const aid of ranked) {
+                const above = probesAboveTau.get(aid);
+                if (!above || above.size === 0) {
+                    // Defensive: include the anchor without probe attribution
+                    // rather than dropping a high-aggregate node entirely.
+                    remember(aid, 0);
+                    continue;
+                }
+                for (const pIdx of above) remember(aid, pIdx);
+            }
+            if (probesByAnchor.size > 0) return probesByAnchor;
+            // Fall through to union if fusion produced nothing.
+        }
+
+        // Default: union of per-probe top-K.
+        perProbe.forEach((pp, pIdx) => {
+            for (const aid of pp.ranked) remember(aid, pIdx);
+        });
+        return probesByAnchor;
     }
 
     private bfsShortestPaths(
@@ -182,6 +311,7 @@ export class Retriever {
         const bestCost = new Map<ClaimId, number>();
         const result = new Map<ClaimId, Path>();
         bestCost.set(start, 0);
+        const decayOn = this.graph.temporalDecayEnabled();
 
         const pq: State[] = [
             { id: start, cost: 0, depth: 0, path: { nodeIds: [start], edges: [] } },
@@ -205,8 +335,18 @@ export class Retriever {
                 const node = this.graph.getNode(e.to);
                 if (!node || !isValid(node)) continue;
 
-                const edgeCost =
-                    e.type === "temporal" ? temporalHopCost : Math.max(0, 1 - e.weight);
+                let edgeCost: number;
+                if (e.type === "temporal") {
+                    // Phase 1.6 A1: when temporal decay is on the graph, scale the hop
+                    // cost by (1 − weight) so close-in-time adjacency is cheap and
+                    // distant adjacency approaches `temporalHopCost`. Without decay,
+                    // weights are uniform 1; fall back to the flat Phase-1.5 cost.
+                    edgeCost = decayOn
+                        ? temporalHopCost * Math.max(0, 1 - e.weight)
+                        : temporalHopCost;
+                } else {
+                    edgeCost = Math.max(0, 1 - e.weight);
+                }
                 const newCost = cur.cost + edgeCost;
                 const prev = bestCost.get(e.to);
                 if (prev !== undefined && prev <= newCost) continue;

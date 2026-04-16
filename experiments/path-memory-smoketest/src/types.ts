@@ -60,6 +60,10 @@ export type RetrievalMode = "current" | { kind: "asOf"; at: Timestamp };
 
 export type TraversalMode = "bfs" | "dijkstra";
 
+export type AnchorScoring = { kind: "cosine" } | { kind: "cosine-idf-mass"; alpha: number };
+
+export type ProbeComposition = "union" | "intersection" | "weighted-fusion";
+
 export type RetrievalOptions = {
     mode?: RetrievalMode;
     anchorTopK?: number;
@@ -67,6 +71,9 @@ export type RetrievalOptions = {
     resultTopN?: number;
     traversal?: TraversalMode;
     temporalHopCost?: number;
+    anchorScoring?: AnchorScoring;
+    probeComposition?: ProbeComposition;
+    weightedFusionTau?: number;
     weights?: {
         probeCoverage?: number;
         edgeTypeDiversity?: number;

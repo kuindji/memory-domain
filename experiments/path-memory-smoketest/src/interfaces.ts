@@ -10,6 +10,7 @@ export type PathMemoryConfig = {
     semanticThreshold?: number;
     similarity?: GraphConfig["similarity"];
     lexicalIdfFloor?: number;
+    temporalDecayTau?: number;
 };
 
 export class PathMemory {
@@ -28,6 +29,7 @@ export class PathMemory {
             semanticThreshold: config.semanticThreshold,
             similarity: config.similarity,
             lexicalIdfFloor: config.lexicalIdfFloor,
+            temporalDecayTau: config.temporalDecayTau,
         });
         this.store.subscribe((e) => {
             if (e.kind === "ingested") this.graph.addClaim(e.claim);

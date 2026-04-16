@@ -5,6 +5,12 @@ export type GraphConfig = {
     semanticThreshold?: number;
     similarity?: (a: number[], b: number[]) => number;
     lexicalIdfFloor?: number;
+    /**
+     * If set, temporal edges receive `weight = exp(-deltaT / tau)` instead of
+     * the default uniform `weight = 1`. Used by Dijkstra to prefer close-in-
+     * time adjacency over distant adjacency. BFS ignores edge weights.
+     */
+    temporalDecayTau?: number;
 };
 
 const DEFAULT_SEMANTIC_THRESHOLD = 0.65;
@@ -19,11 +25,13 @@ export class GraphIndex {
     private readonly semanticThreshold: number;
     private readonly similarity: (a: number[], b: number[]) => number;
     private readonly lexicalIdfFloor: number;
+    private readonly temporalDecayTau: number | undefined;
 
     constructor(config: GraphConfig = {}) {
         this.semanticThreshold = config.semanticThreshold ?? DEFAULT_SEMANTIC_THRESHOLD;
         this.similarity = config.similarity ?? cosineSimilarity;
         this.lexicalIdfFloor = config.lexicalIdfFloor ?? DEFAULT_LEXICAL_IDF_FLOOR;
+        this.temporalDecayTau = config.temporalDecayTau;
     }
 
     addClaim(claim: Claim): void {
@@ -74,6 +82,23 @@ export class GraphIndex {
     idf(token: string): number {
         const df = this.documentFrequency.get(token) ?? 0;
         return Math.log((this.documentCount + 1) / (df + 1)) + 1;
+    }
+
+    temporalDecayEnabled(): boolean {
+        return this.temporalDecayTau !== undefined && this.temporalDecayTau > 0;
+    }
+
+    /**
+     * Sum of IDF over a claim's distinct tokens. Used by graph-informed
+     * anchor scoring (Phase 1.6 A2) to bias anchor selection toward nodes
+     * whose tokens carry more information mass than ubiquitous-token nodes.
+     */
+    nodeIdfMass(id: ClaimId): number {
+        const node = this.nodes.get(id);
+        if (!node) return 0;
+        let sum = 0;
+        for (const t of new Set(node.tokens)) sum += this.idf(t);
+        return sum;
     }
 
     private lexicalWeight(sharedTokens: string[], unionTokens: string[]): number {
@@ -134,6 +159,12 @@ export class GraphIndex {
         }
     }
 
+    private temporalWeight(deltaT: number): number {
+        if (this.temporalDecayTau === undefined || this.temporalDecayTau <= 0) return 1;
+        const dt = Math.max(0, deltaT);
+        return Math.exp(-dt / this.temporalDecayTau);
+    }
+
     private insertIntoTemporalChain(claim: Claim): void {
         let i = 0;
         while (i < this.temporalChain.length) {
@@ -156,24 +187,26 @@ export class GraphIndex {
         if (prevId !== undefined) {
             const prev = this.nodes.get(prevId);
             if (prev) {
+                const deltaT = claim.validFrom - prev.validFrom;
                 this.pushBidirectional({
                     type: "temporal",
                     from: prev.id,
                     to: claim.id,
-                    weight: 1,
-                    meta: { deltaT: claim.validFrom - prev.validFrom },
+                    weight: this.temporalWeight(deltaT),
+                    meta: { deltaT },
                 });
             }
         }
         if (nextId !== undefined) {
             const next = this.nodes.get(nextId);
             if (next) {
+                const deltaT = next.validFrom - claim.validFrom;
                 this.pushBidirectional({
                     type: "temporal",
                     from: claim.id,
                     to: next.id,
-                    weight: 1,
-                    meta: { deltaT: next.validFrom - claim.validFrom },
+                    weight: this.temporalWeight(deltaT),
+                    meta: { deltaT },
                 });
             }
         }

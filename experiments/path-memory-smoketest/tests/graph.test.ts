@@ -182,4 +182,59 @@ describe("GraphIndex", () => {
         g.addClaim(c);
         expect(() => g.addClaim(c)).toThrow(/already in graph/);
     });
+
+    test("temporal edges are uniform weight=1 when no decay tau is configured", () => {
+        const g = new GraphIndex({ semanticThreshold: 99 });
+        g.addClaim(makeClaim("a", "a", ["a"], [0, 0, 0], 1));
+        g.addClaim(makeClaim("b", "b", ["b"], [0, 0, 0], 4));
+        g.addClaim(makeClaim("c", "c", ["c"], [0, 0, 0], 30));
+        const ab = g.neighbors("a", ["temporal"])[0];
+        const bc = g.neighbors("b", ["temporal"]).find((e) => e.to === "c");
+        expect(ab.weight).toBe(1);
+        expect(bc?.weight).toBe(1);
+        expect(g.temporalDecayEnabled()).toBe(false);
+    });
+
+    test("temporalDecayTau yields weight = exp(-deltaT/tau) on temporal edges", () => {
+        const tau = 5;
+        const g = new GraphIndex({ semanticThreshold: 99, temporalDecayTau: tau });
+        g.addClaim(makeClaim("a", "a", ["a"], [0, 0, 0], 1));
+        g.addClaim(makeClaim("b", "b", ["b"], [0, 0, 0], 4)); // deltaT=3 → exp(-3/5)
+        g.addClaim(makeClaim("c", "c", ["c"], [0, 0, 0], 30)); // deltaT=26 → exp(-26/5)
+        expect(g.temporalDecayEnabled()).toBe(true);
+        const ab = g.neighbors("a", ["temporal"])[0];
+        const bc = g.neighbors("b", ["temporal"]).find((e) => e.to === "c");
+        expect(ab.weight).toBeCloseTo(Math.exp(-3 / tau), 6);
+        expect(bc?.weight).toBeCloseTo(Math.exp(-26 / tau), 6);
+        expect(ab.weight).toBeGreaterThan(bc?.weight ?? Infinity);
+    });
+
+    test("middle insertion under decay rewires both edges with their own deltaT-based weights", () => {
+        const tau = 4;
+        const g = new GraphIndex({ semanticThreshold: 99, temporalDecayTau: tau });
+        g.addClaim(makeClaim("a", "a", ["a"], [0, 0, 0], 1));
+        g.addClaim(makeClaim("c", "c", ["c"], [0, 0, 0], 11));
+        g.addClaim(makeClaim("b", "b", ["b"], [0, 0, 0], 5));
+        const ab = g.neighbors("a", ["temporal"]).find((e) => e.to === "b");
+        const bc = g.neighbors("b", ["temporal"]).find((e) => e.to === "c");
+        const ac = g.neighbors("a", ["temporal"]).find((e) => e.to === "c");
+        expect(ac).toBeUndefined();
+        expect(ab?.weight).toBeCloseTo(Math.exp(-4 / tau), 6); // deltaT=4
+        expect(bc?.weight).toBeCloseTo(Math.exp(-6 / tau), 6); // deltaT=6
+    });
+
+    test("nodeIdfMass aggregates idf over the claim's distinct tokens", () => {
+        const g = new GraphIndex({ semanticThreshold: 99 });
+        g.addClaim(makeClaim("a", "alex moves", ["alex", "moves"], [1, 0, 0], 1));
+        g.addClaim(makeClaim("b", "alex jumps", ["alex", "jumps"], [0, 1, 0], 2));
+        g.addClaim(makeClaim("c", "alex runs", ["alex", "runs"], [0, 0, 1], 3));
+        g.addClaim(makeClaim("d", "neurips paper", ["neurips", "paper"], [1, 0, 1], 4));
+        // 'alex' appears in 3/4 docs → low idf; 'neurips' and 'paper' in 1/4 → high idf.
+        // d's tokens are both rare → larger nodeIdfMass than a's.
+        const massA = g.nodeIdfMass("a");
+        const massD = g.nodeIdfMass("d");
+        expect(massD).toBeGreaterThan(massA);
+        // sanity: equals manual sum
+        expect(massA).toBeCloseTo(g.idf("alex") + g.idf("moves"), 6);
+    });
 });
