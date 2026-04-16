@@ -173,9 +173,7 @@ class InboxProcessor {
                     (await this.store.query<Array<{ in: RecordIdLike | string }>>(
                         `SELECT in FROM tagged WHERE out = $domainTag`,
                         {
-                            domainTag: new StringRecordId(
-                                `tag:\`inbox:${filter.domainId}\``,
-                            ),
+                            domainTag: new StringRecordId(`tag:\`inbox:${filter.domainId}\``),
                         },
                     )) ?? []
                 );
@@ -195,17 +193,19 @@ class InboxProcessor {
         const processingIds = await this.debug.time(
             "buildSimilarityBatch.fetchProcessing",
             async () => {
-                const procTagRows = await this.store.query<
-                    Array<{ in: RecordIdLike | string }>
-                >(`SELECT in FROM child_of WHERE out = $root`, {
-                    root: new StringRecordId(PROCESSING_ROOT_TAG_ID),
-                });
+                const procTagRows = await this.store.query<Array<{ in: RecordIdLike | string }>>(
+                    `SELECT in FROM child_of WHERE out = $root`,
+                    {
+                        root: new StringRecordId(PROCESSING_ROOT_TAG_ID),
+                    },
+                );
                 if (!procTagRows || procTagRows.length === 0) return new Set<string>();
 
                 const procTagIds = procTagRows.map((r) => new StringRecordId(String(r.in)));
-                const taggedRows = await this.store.query<
-                    Array<{ in: RecordIdLike | string }>
-                >(`SELECT in FROM tagged WHERE out IN $procTagIds`, { procTagIds });
+                const taggedRows = await this.store.query<Array<{ in: RecordIdLike | string }>>(
+                    `SELECT in FROM tagged WHERE out IN $procTagIds`,
+                    { procTagIds },
+                );
                 return new Set((taggedRows ?? []).map((r) => String(r.in)));
             },
         );

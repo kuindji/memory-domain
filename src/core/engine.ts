@@ -731,10 +731,7 @@ class MemoryEngine {
                                 attributes: options?.metadata ?? {},
                                 owned_at: now,
                             });
-                            const inboxTagId = await this.ensureInboxTag(
-                                `inbox:${domain.id}`,
-                                now,
-                            );
+                            const inboxTagId = await this.ensureInboxTag(`inbox:${domain.id}`, now);
                             await this.graph.relate(memId, "tagged", inboxTagId);
                             hasAnyTarget = true;
                         }
