@@ -1,8 +1,16 @@
 import { getEmbedder } from "../src/embedder.js";
 import { PathMemory } from "../src/interfaces.js";
 import { tier1Alex } from "../data/tier1-alex.js";
+import { tier2Greek } from "../data/tier2-greek.js";
 import { tracesTier1 } from "./conversation-traces-tier1.js";
+import { tracesTier2 } from "./conversation-traces-tier2.js";
 import type { ClaimId, RetrievalOptions, ScoredPath } from "../src/types.js";
+
+const TIER = (process.env.TIER ?? "tier1").toLowerCase();
+const DATASET =
+    TIER === "tier2"
+        ? { claims: tier2Greek, traces: tracesTier2 }
+        : { claims: tier1Alex, traces: tracesTier1 };
 
 function rankClaims(paths: ScoredPath[]): ClaimId[] {
     const best = new Map<ClaimId, number>();
@@ -56,6 +64,27 @@ const CONFIGS: Config[] = [
             probeComposition: "intersection",
         },
     },
+    // Tier-2 eval-A lead: weighted-fusion at tau=0.2 on plain BFS.
+    {
+        label: "A3 bfs probe=weighted-fusion tau=0.2",
+        options: {
+            traversal: "bfs",
+            probeComposition: "weighted-fusion",
+            weightedFusionTau: 0.2,
+        },
+    },
+    {
+        label: "A3 bfs probe=weighted-fusion tau=0.3",
+        options: {
+            traversal: "bfs",
+            probeComposition: "weighted-fusion",
+            weightedFusionTau: 0.3,
+        },
+    },
+    {
+        label: "A3 bfs probe=intersection",
+        options: { traversal: "bfs", probeComposition: "intersection" },
+    },
 ];
 
 async function runConfig(config: Config): Promise<{
@@ -68,7 +97,7 @@ async function runConfig(config: Config): Promise<{
         embedder,
         temporalDecayTau: config.temporalDecayTau,
     });
-    for (const c of tier1Alex) {
+    for (const c of DATASET.claims) {
         await memory.ingest({
             id: c.id,
             text: c.text,
@@ -81,7 +110,7 @@ async function runConfig(config: Config): Promise<{
     let coherent = 0;
     let arcs = 0;
 
-    for (const trace of tracesTier1) {
+    for (const trace of DATASET.traces) {
         const session = memory.createSession();
         const sizeAcrossTurns: number[] = [];
         let lastTopClaims: Set<ClaimId> = new Set();
@@ -120,6 +149,9 @@ async function runConfig(config: Config): Promise<{
 }
 
 async function main(): Promise<void> {
+    console.log(
+        `# iterative-sweep tier=${TIER}  (claims=${DATASET.claims.length}, traces=${DATASET.traces.length})`,
+    );
     console.log(`config | narrowed | coherent`);
     for (const cfg of CONFIGS) {
         const r = await runConfig(cfg);

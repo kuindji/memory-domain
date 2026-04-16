@@ -84,6 +84,66 @@ tests/
   helpers.ts      fake/deterministic embedder + tokenize stub for unit tests
 ```
 
+## Tier-2 results (Phase 2)
+
+Greek-history corpus: 242 claims across 8 topical clusters (pan-Hellenic,
+Athenian politics, Persian Wars, Peloponnesian War, philosophers,
+Alexander+Macedon, the Diadochi, arts/historiography). 19 queries,
+4 conversation traces. Timestamps are years since 800 BCE (positive
+integers), so Marathon = 310, Alexander's death = 477.
+
+**Eval (A) — vs flat vector baseline, at defaults:**
+
+```
+Queries: 19    path wins: 5    baseline wins: 5    ties: 9
+Mean F1 — path: 0.526    baseline: 0.544
+```
+
+Best Phase-2 configuration:
+
+```
+A3 bfs probe=weighted-fusion tau=0.2    → mean F1 0.548  (+0.022 over BFS)
+```
+
+**Eval (B) — multi-turn arc convergence:**
+
+```
+config                                   | narrowed | coherent
+bfs (default) / A2 / A2+A3 / A3-fusion   | 4/4      | 0/4
+```
+
+**Headline findings:**
+
+- **A2 does not generalize.** Tier-1's +0.102 F1 lift from graph-
+  informed anchor scoring was an artifact of tier-1's `alex`-dominant
+  tokenization. On tier-2, every A2 configuration regresses F1 (worst
+  case 0.333 under Dijkstra α=0.5). Without a single ubiquitous
+  token to penalize, IDF-mass reranking pushes the wrong anchors up.
+- **A3 weighted-fusion** is the first primitive to win at *both*
+  tiers without regressing the other. Robust to corpus shape where
+  A2 is not.
+- **Dijkstra/A1 underperform BFS at both tiers.** No configuration
+  in either tier has them beating BFS.
+- **Eval-B coherence fails uniformly (0/4) at tier-2.** Root cause
+  is session-mode probe accumulation treating all turns equally —
+  a retriever-architecture gap, not a tunable one. Narrowing (4/4)
+  still holds. Probe-turn weighting is the natural next primitive
+  (see `CONTEXT.md` § Phase 2 findings + "Recommended next-session
+  entry point").
+- **Path retriever's genuine tier-2 wins** are on cross-cluster
+  and as-of queries: *Ptolemaic Egypt* (1.00 vs 0.25), *kings of
+  Macedon* (1.00 vs 0.67), *as-of Academy head in 340 BCE* (1.00
+  vs 0.00), *tragic playwrights* (0.33 vs 0.00). Same shape as
+  tier-1 — the architecture wins where multi-probe + bitemporal-
+  light are real signals, loses on single-literal-cue queries.
+
+Run tier-2 sweeps:
+
+```bash
+TIER=tier2 bun run experiments/path-memory-smoketest/eval/sweep.ts
+TIER=tier2 bun run experiments/path-memory-smoketest/eval/iterative-sweep.ts
+```
+
 ## Tier-1 results (post-Phase 1.6, defaults)
 
 **Eval (A) — vs flat vector baseline (P/R @ K=|ideal|):**
@@ -133,17 +193,20 @@ A2+A3 dijkstra anchor=idf a=0.7 probe=intersection    | 3/3      | 3/3
 
 ## Hypothesis status
 
-**Strongly supported, post-Phase 1.6.** Architecture works end-to-end,
-bitemporal-light validates, multi-probe path-matching beats baseline
-on specific query shapes — and a single primitive change (graph-
-informed anchor scoring) lifts mean F1 by +0.102 on tier-1, with no
-eval (B) regression. Adding probe-set intersection on top fixes the
-career-arc convergence failure that survived through Phase 1.5. The
-remaining tier-1 failure mode (`alex`-dominant tokenization
-inflating anchor noise) is now addressed at the right layer (anchor
-selection, not edge scoring or traversal-only). Next: tier-2
-Greek-history corpus to validate the win at scale (`CONTEXT.md` §
-Recommended next-session entry point).
+**Mixed, post-Phase 2.** Architectural claims hold at both tiers:
+path retrieval wins decisively on as-of and multi-claim-coverage
+queries, baseline wins on single-strong-cue queries, and composite
+F1 is competitive (tier-2 best 0.548 vs baseline 0.544). The
+*tuning* claim from Phase 1.6 does NOT hold at scale: A2 was an
+artifact of tier-1's single-shared-token corpus and regresses on
+tier-2. A3 weighted-fusion emerges as the first primitive that
+wins at both tiers.
+
+Eval (B) coherence collapsed on tier-2 (0/4 across every Phase-1.6
+config) — session-mode probe accumulation is the next architectural
+gap, and it's not addressable within the Phase-1.6 knob surface.
+Next: probe-turn weighting (`CONTEXT.md` § Recommended next-
+session entry point, Option E).
 
 ## Out of scope (for follow-on work)
 

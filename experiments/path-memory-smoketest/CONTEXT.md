@@ -436,6 +436,142 @@ change — moving IDF from edge-scoring to anchor-selection — lifted
 F1 substantially, where every tuning knob in Phases 1 and 1.5
 failed.
 
+### Phase 2 findings — tier-2 Greek-history corpus
+
+Phase 2 authored a 242-claim Greek-history corpus (776 BCE through
+the Diadochi) across 8 topical clusters: pan-Hellenic/religious,
+Athenian politics, Persian Wars, Peloponnesian War, philosophers,
+Alexander+Macedon, Diadochi, and arts/historiography. 9 legitimate
+supersessions (state transitions only: government type, ruler of a
+region, head of a school). 19 queries in 4 categories (cross-cluster
+multi-probe, within-cluster multi-claim, as-of, strong-literal-cue
+control). 4 conversation traces. Deliberately no shared ubiquitous
+token across all claims (unlike tier-1's `alex`).
+
+Sweep over eval (A), 19 queries at default weights:
+
+```
+config                                                    | mean-path-F1 | wins | losses
+bfs (default)                                             | 0.526        | 5    | 5
+dijkstra tmp=0.5                                          | 0.412        | 4    | 8
+A1 dijkstra tau=2  tmp=0.5                                | 0.474        | 4    | 8
+A1 dijkstra tau=5  tmp=0.5                                | 0.474        | 4    | 8
+A1 dijkstra tau=10 tmp=0.5                                | 0.482        | 5    | 8
+A2 bfs anchor=idf alpha=0.5                               | 0.434        | 5    | 9
+A2 bfs anchor=idf alpha=0.7                               | 0.447        | 4    | 7
+A2 bfs anchor=idf alpha=1.0                               | 0.461        | 4    | 7
+A2 dijkstra tmp=0.5 anchor=idf alpha=0.3..1.0             | 0.333–0.382  | 3–5  | 7–10
+A3 bfs probe=intersection                                 | 0.526        | 5    | 5
+A3 bfs probe=weighted-fusion tau=0.2                      | 0.548        | 5    | 3
+A3 bfs probe=weighted-fusion tau=0.3                      | 0.496        | 4    | 3
+A3 dijkstra tmp=0.5 probe=intersection                    | 0.412        | 4    | 8
+A3 dijkstra tmp=0.5 probe=weighted-fusion tau=0.2         | 0.452        | 5    | 7
+A2+A3 dijkstra anchor=idf a=0.5 probe=intersection        | 0.333        | 5    | 10
+A2+A3 dijkstra anchor=idf a=0.7 probe=intersection        | 0.360        | 4    | 8
+A2+A3 dijkstra anchor=idf a=0.5 fusion tau=0.2            | 0.452        | 5    | 7
+A1+A2 / A1+A3 / A1+A2+A3                                  | 0.395–0.443 | 4–5 | 8–9
+```
+
+Baseline (flat vector search) on tier-2: mean F1 0.544.
+
+Eval (B) on tier-2 — 4 conversation arcs, all promoted configs
+including BFS default, A2 (α=0.7 and 0.8), A2+A3 intersection, A3
+weighted-fusion (τ=0.2, 0.3), A3 intersection alone:
+
+```
+config                                    | narrowed | coherent
+everything tested                         | 4/4      | 0/4
+```
+
+**Findings:**
+
+1. **A2 does NOT generalize to tier-2.** Tier-1's +0.102 F1 lift
+   from graph-informed anchor scoring is absent at tier-2. Every
+   A2 configuration regresses mean F1 (0.333–0.461 vs BFS's 0.526).
+   Combined with Dijkstra, the regression deepens (worst: 0.333 at
+   α=0.5). **A2 was an artifact of tier-1's `alex`-dominant
+   tokenization** — when a single ubiquitous token is driving
+   anchor pollution, reranking by IDF-mass is a targeted fix; when
+   no such token exists and the IDF distribution is spread across
+   many moderately-frequent names (Alexander, Sparta, Athens,
+   Socrates, Plato, Persian), IDF-mass reranking pushes the wrong
+   anchors up — high-IDF rare claims beat legitimately-salient
+   common claims on every query that needs the latter.
+
+2. **Dijkstra regresses at tier-2 too.** Lost ~0.11 F1 from BFS.
+   Consistent with Phase 1.5's tier-1 observation (best Dijkstra
+   was 0.02 below BFS) but deeper here — with 242 claims and
+   genuinely diverse clusters, weight-aware traversal finds paths
+   that score well on edge-weight but drag in topically-irrelevant
+   anchors. No `temporalHopCost` value rescues this on tier-2;
+   A1's `temporalDecayTau` also doesn't help (−0.05 to −0.04 F1).
+
+3. **A3 weighted-fusion is the new tier-2 lead** (+0.022 F1 over
+   BFS at τ=0.2). Modest but consistent win: 5 wins / 3 losses vs
+   BFS's 5/5 split. Intersection gate alone is neutral (identical
+   to BFS). Weighted-fusion's additive cross-probe cosine signal
+   — discarded on tier-1 as "not sharp enough" — turns out to be
+   the right gate when no single anchor dominates: it rewards
+   claims that are moderately similar to multiple probes, which
+   is exactly the situation tier-2 has.
+
+4. **Eval (B) coherence fails uniformly (0/4) across every
+   config.** Root cause is architectural, not tunable within
+   Phase 1.6's knob set: session-mode probe accumulation treats
+   all turns equally, so broad early-turn probes ("Greek
+   philosophy", "Alexander's conquests") keep dominating narrow
+   later-turn probes ("Aristotle's pupil", "the Diadochi"). On
+   tier-1 this was salvaged by A2+A3 because `alex` anchored every
+   turn; on tier-2 the later-turn probes have no shared-token
+   lifeline and get drowned out. **Probe-turn weighting or
+   session-decay is the next primitive, and it's out of scope for
+   Phase 1.6's knob surface.** Narrowing (4/4) still holds —
+   candidate counts shrink across turns — so the architecture's
+   probe-union behavior is doing *something* right, just not
+   enough to land top-K on the current turn's intended claims.
+
+5. **Path retriever's genuine wins at tier-2** (high F1 at same
+   anchor-top-K, where baseline fails): *Ptolemaic Egypt*
+   (cross-cluster: path 1.00 vs base 0.25), *kings of Macedon*
+   (1.00 vs 0.67), *Plato's dialogues* (0.67 vs 0.33),
+   *tragic playwrights* (0.33 vs 0.00 — baseline completely
+   missed), *as-of Academy head in 340 BCE* (1.00 vs 0.00 —
+   bitemporal-light shines again). Baseline still wins on
+   small-K literal-cue queries (Pythagorean theorem, as-of
+   Athenian statesman) — same as tier-1.
+
+### Phase 2 hypothesis status
+
+**Mixed.** The architectural claims hold: path retrieval wins
+decisively on as-of and multi-claim-coverage queries, baseline wins
+on single-strong-cue queries, and the composite F1 is competitive
+(0.548 best vs baseline 0.544). The *tuning* claim from Phase 1.6
+does NOT hold: A2 doesn't transfer, and A2+A3 — the tier-1 career-
+arc rescuer — is among the worst tier-2 configs. Phase 1.6's
+"primitive change lifted F1 substantially" result is now
+understood as a corpus-specific one, not a general property of
+multi-probe path retrieval.
+
+What tier-2 *adds* to the finding catalog:
+
+- **A3 weighted-fusion** is the first primitive that wins at both
+  tiers without regressing the other. On tier-1 it was neutral
+  (0.510 F1, 3 wins / 2 losses); on tier-2 it's the leader
+  (0.548, 5/3). Suggests weighted-fusion is more robust to corpus
+  shape than A2's anchor reranking, even if its tier-1 gain is
+  smaller.
+- **Eval-B coherence on tier-2 needs a new primitive.** No
+  existing Phase-1.6 knob reaches 1/4, let alone 2/4. Probe-turn
+  weighting (e.g., decay old-turn probes, or weight by recency in
+  the session) is the natural candidate — and notably, it's a
+  *retriever* concern, not a graph or store one.
+- **Dijkstra/A1 consistently underperform BFS across tiers.** Not
+  a single configuration in either tier has them lifting F1 over
+  BFS. At this point their practical value is zero; they remain
+  useful only as infrastructure for *future* primitive
+  experiments (topic-conditional temporal cost, access-informed
+  edge weights).
+
 ### Files delivered
 
 ```
@@ -452,24 +588,30 @@ experiments/path-memory-smoketest/
 │   ├── interfaces.ts           # PathMemory + Session facades
 │   └── embedder.ts             # ONNX embedder factory (wraps parent adapter)
 ├── data/
-│   └── tier1-alex.ts           # 38 hand-authored claims
+│   ├── tier1-alex.ts           # 38 hand-authored claims
+│   └── tier2-greek.ts          # 242 Greek-history claims, 8 clusters
 ├── eval/
 │   ├── baseline.ts             # flat vector-search baseline
 │   ├── queries-tier1.ts        # 12 queries with marked ideal answers
+│   ├── queries-tier2.ts        # 19 queries, 4 categories
 │   ├── conversation-traces-tier1.ts  # 3 multi-turn traces
-│   └── sweep.ts                # manual config-sweep helper over eval (A)
+│   ├── conversation-traces-tier2.ts  # 4 multi-turn traces
+│   ├── sweep.ts                # config-sweep over eval (A), TIER env var selects tier-1 / tier-2
+│   └── iterative-sweep.ts      # config-sweep over eval (B), TIER env var
 └── tests/
     ├── helpers.ts              # deterministic fake embedder + wiring
     ├── embedder.test.ts        # real embedder smoke test
     ├── store.test.ts           # 7 bitemporal invariants
     ├── graph.test.ts           # 13 edge-formation + IDF invariants
     ├── retriever.test.ts       # 11 retrieval behaviors
-    ├── eval-vs-baseline.test.ts   # eval (A) — vs flat baseline
-    └── eval-iterative.test.ts  # eval (B) — multi-turn convergence
+    ├── eval-vs-baseline.test.ts          # eval (A) tier-1
+    ├── eval-vs-baseline-tier2.test.ts    # eval (A) tier-2
+    ├── eval-iterative.test.ts            # eval (B) tier-1
+    └── eval-iterative-tier2.test.ts      # eval (B) tier-2
 ```
 
-35 tests pass. Typecheck clean. Smoke-test lint clean (pre-existing
-errors in `src/plugins/topic-linking.ts` unrelated to this branch).
+46 tests pass (35 tier-1 + new tier-2 eval-A and eval-B). Typecheck
+clean.
 
 ---
 
@@ -620,42 +762,54 @@ tier-3 results are in.
 
 ### Recommended next-session entry point
 
-Phase 1.6 is done and tier-1 has produced its first decisive lift:
-**A2 (graph-informed anchor scoring) is the right primitive change**,
-and **A2+A3 (intersection) closes the long-broken career arc**. Two
-plausible next directions, each independently landable:
+Tier-2 closed the A2 question definitively: it does not generalize.
+The productive next moves are about *probe dynamics* (eval B
+coherence) and *robustness across corpora* (A3 weighted-fusion
+looks like a candidate default). Three plausible directions:
 
-**Option B — Phase 2 (tier-2 Greek-history corpus, recommended):**
-the tier-1 question is now closed — primitive choices matter, A2 is
-the productive one, A1 is the wrong cost signal at this scale. The
-key open question is whether A2's win persists at scale (~200-500
-claims, multi-topic) or is an artifact of tier-1's `alex`-dominant
-tokenization. Tier-2 also exposes whether Dijkstra's weight-awareness
-starts paying off in its own right when the graph is sparser and
-topics are more diverse, and whether *topic-conditional temporal
-cost* (the conjecture that came out of A1's failure) is feasible at
-non-toy scale.
+**Option E — session-mode probe weighting (addresses eval-B
+coherence gap, recommended).** Tier-2's eval (B) fails 0/4
+across every Phase-1.6 config because `Session.addProbeSentences`
+appends to an unweighted list and the retriever treats all
+probes equally. Broad early-turn probes outvote narrow later-turn
+probes. The primitive change is per-probe weighting at retrieval:
+exponential decay by turn index (e.g. `w(t) = exp(-(T-t) / tau)`
+with T = current turn, tau ~ 1.5-2.0), or simple recency-biased
+top-K where later-turn probes get priority. This is a *retriever*
+change, not a graph or store change, and slots in without
+altering any existing API. Pass criterion: ≥2/4 tier-2 arcs
+coherent without tier-1 regression.
 
-**Option C — promote A2 to default + tighten the A2 sweep:** before
-tier-2, make the A2-Dijkstra-α=0.7-or-α=0.8 config the default for
-the smoke-test (or at least the default-recommended), gated behind
-a single confirming sweep. Cheap, unblocks downstream work that
-otherwise has to remember to opt in. Not strictly necessary if we're
-about to introduce a tier-2 corpus anyway — defaults will be
-re-evaluated there.
+**Option F — promote A3 weighted-fusion to default + add probe-
+composition infrastructure for Option E.** Weighted-fusion at
+τ=0.2 wins at tier-2 (+0.022) and is neutral-to-positive at
+tier-1 (0.510 vs 0.530 BFS, within noise). Making it the default
+closes the "defaults are suboptimal" tier-2 finding and gives
+Option E a stable composition baseline to build on. Low risk,
+cheap to sweep once more to confirm.
 
-**Option D — investigate *topic-conditional* temporal cost
-(A1 redux):** A1's failure mode was pure-deltaT cost discounting
-adjacency regardless of topic. A topic-aware variant — temporal
-edge cost = `temporalHopCost · max(1 − deltaT-weight,
-1 − cosine(claimA, claimB))` — would cheap-out only on temporally
-*and* semantically related neighbors, blocking the timeline-
-highway pathology. Worth ~1 evening of work; low downside; could
-slot in before or after tier-2.
+**Option G — tier-3 now, accept A2's corpus-specificity.** Skip
+the rescue work and go directly to the Wikipedia-scale test. The
+argument: if A2+A3 doesn't generalize from tier-1 to tier-2, it
+probably won't generalize to tier-3 either, and we'd rather
+discover *architectural* limits at tier-3 (e.g. "BFS doesn't
+scale past 5K claims") than keep tuning on mid-sized datasets.
+Counter-argument: without eval (B) coherence working at tier-2,
+tier-3 iterative evaluation will be uninterpretable noise.
 
-Recommendation: **Option B first.** The A2+A3 finding is strong
-enough to scale, and tier-2 will both validate the win and set up
-the legitimate next round of primitive iteration on a corpus that
-isn't dominated by a single shared token. Option C is a bookkeeping
-nicety; Option D is the most promising next-after-B primitive
-experiment but is best run with tier-2's noise floor in view.
+**Option H — topic-conditional temporal cost (A1 redux, still
+pending).** Phase 1.6 flagged this as the natural follow-up to
+A1's failure; tier-2's A1 results (−0.05 F1) don't change that
+conjecture — the failure mode is still "adjacency regardless of
+topic" and a cosine-gated version is still worth trying. But
+after tier-2, the priority is lower: topic-conditional temporal
+cost is a refinement, not a fix for the now-identified coherence
+gap.
+
+Recommendation: **Option E first** — the eval-B gap is the
+biggest open scientific question after tier-2, and it's the only
+one with a clear primitive change (probe weighting) that hasn't
+been touched in Phases 1–1.6. Option F can land alongside or
+immediately after. Option H is still interesting but sits behind
+E in priority. Option G is the "scale or die" move — plausible
+but trades information for ambition.

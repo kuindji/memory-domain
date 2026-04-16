@@ -2,8 +2,18 @@ import { getEmbedder } from "../src/embedder.js";
 import { PathMemory } from "../src/interfaces.js";
 import { FlatVectorBaseline } from "./baseline.js";
 import { tier1Alex } from "../data/tier1-alex.js";
+import { tier2Greek } from "../data/tier2-greek.js";
 import { queriesTier1 } from "./queries-tier1.js";
+import { queriesTier2 } from "./queries-tier2.js";
 import type { ClaimId, ScoredPath, RetrievalOptions } from "../src/types.js";
+
+// Select tier via TIER env var. Default is tier1 for back-compat with
+// pre-Phase-2 invocations; TIER=tier2 selects the Greek-history corpus.
+const TIER = (process.env.TIER ?? "tier1").toLowerCase();
+const DATASET =
+    TIER === "tier2"
+        ? { claims: tier2Greek, queries: queriesTier2 }
+        : { claims: tier1Alex, queries: queriesTier1 };
 
 function f1(ideal: Set<ClaimId>, predicted: ClaimId[]): number {
     if (predicted.length === 0 || ideal.size === 0) return 0;
@@ -247,7 +257,7 @@ async function runConfig(config: Config): Promise<{ mean: number; wins: number; 
     });
     const baseline = new FlatVectorBaseline(embedder, memory.store);
 
-    for (const c of tier1Alex) {
+    for (const c of DATASET.claims) {
         await memory.ingest({
             id: c.id,
             text: c.text,
@@ -259,7 +269,7 @@ async function runConfig(config: Config): Promise<{ mean: number; wins: number; 
     let pathSum = 0;
     let wins = 0;
     let losses = 0;
-    for (const q of queriesTier1) {
+    for (const q of DATASET.queries) {
         const ideal = new Set(q.ideal);
         const k = Math.max(1, ideal.size);
         const paths = await memory.queryWithProbes(q.probes, {
@@ -277,10 +287,13 @@ async function runConfig(config: Config): Promise<{ mean: number; wins: number; 
         if (pF > bF + 1e-6) wins++;
         else if (bF > pF + 1e-6) losses++;
     }
-    return { mean: pathSum / queriesTier1.length, wins, losses };
+    return { mean: pathSum / DATASET.queries.length, wins, losses };
 }
 
 async function main(): Promise<void> {
+    console.log(
+        `# sweep tier=${TIER}  (claims=${DATASET.claims.length}, queries=${DATASET.queries.length})`,
+    );
     console.log(`config | mean-path-F1 | wins | losses`);
     for (const cfg of CONFIGS) {
         const r = await runConfig(cfg);
