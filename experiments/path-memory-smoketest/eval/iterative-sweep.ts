@@ -399,6 +399,92 @@ const CONFIGS: Config[] = [
             sessionDecayTau: 0.3,
         },
     },
+    // --- Phase 2.10 Option O (spreading-activation) — eval-B target -------
+    // SYNAPSE-inspired spreading activation + lateral inhibition. Pass
+    // criterion: tier-2 coherence ≥ 2/4 (Phase 2.1 best-ever was 1/4 under
+    // BGE-small). Phase 2.8 baseline traversal (dijkstra tmp=0.5) so the
+    // coherence movement is attributable to the new anchor scorer. Same
+    // 16 primary + 5 ablation rows as eval-A sweep — kept in lockstep so
+    // the gate and target are read against identical config space.
+    ...((): Config[] => {
+        const rows: Config[] = [];
+        const base = {
+            spreadingFactor: 0.8,
+            inhibitionStrength: 0.15,
+            useSessionWeights: true,
+        };
+        for (const initialTopK of [5, 8]) {
+            for (const maxHops of [2, 3]) {
+                for (const decay of [0.5, 0.7]) {
+                    for (const inhibitionTopM of [5, 7]) {
+                        rows.push({
+                            label: `O dijkstra tmp=0.5 sa K0=${initialTopK} T=${maxHops} δ=${decay} M=${inhibitionTopM}`,
+                            options: {
+                                traversal: "dijkstra",
+                                temporalHopCost: 0.5,
+                                anchorScoring: {
+                                    kind: "spreading-activation",
+                                    initialTopK,
+                                    maxHops,
+                                    decay,
+                                    inhibitionTopM,
+                                    ...base,
+                                },
+                            },
+                        });
+                    }
+                }
+            }
+        }
+        const central = { initialTopK: 5, maxHops: 3, decay: 0.5, inhibitionTopM: 7 };
+        rows.push({
+            label: "O dijkstra tmp=0.5 sa central β=0 (no-inhibition isolation)",
+            options: {
+                traversal: "dijkstra",
+                temporalHopCost: 0.5,
+                anchorScoring: {
+                    kind: "spreading-activation",
+                    ...central,
+                    spreadingFactor: 0.8,
+                    inhibitionStrength: 0,
+                    useSessionWeights: true,
+                },
+            },
+        });
+        for (const inhibitionStrength of [0.1, 0.25]) {
+            rows.push({
+                label: `O dijkstra tmp=0.5 sa central β=${inhibitionStrength}`,
+                options: {
+                    traversal: "dijkstra",
+                    temporalHopCost: 0.5,
+                    anchorScoring: {
+                        kind: "spreading-activation",
+                        ...central,
+                        spreadingFactor: 0.8,
+                        inhibitionStrength,
+                        useSessionWeights: true,
+                    },
+                },
+            });
+        }
+        for (const spreadingFactor of [0.6, 1.0]) {
+            rows.push({
+                label: `O dijkstra tmp=0.5 sa central S=${spreadingFactor}`,
+                options: {
+                    traversal: "dijkstra",
+                    temporalHopCost: 0.5,
+                    anchorScoring: {
+                        kind: "spreading-activation",
+                        ...central,
+                        spreadingFactor,
+                        inhibitionStrength: 0.15,
+                        useSessionWeights: true,
+                    },
+                },
+            });
+        }
+        return rows;
+    })(),
 ];
 
 // Tier-3 validation matrix (Phase 2.7). Narrow sweep per CONTEXT.md §1828 —

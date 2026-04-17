@@ -34,6 +34,24 @@ Phase 4 conditional on upstream phases, and a retarget of Phase 7 from
 bespoke Wikipedia tier-3 to LongMemEval. Prior work and position are
 stated explicitly in the "Relation to existing systems" section.
 
+## Status (as of 2026-04-17)
+
+| Phase | State | Headline outcome |
+|---|---|---|
+| **2.9** Corpus-shape (Option R) | **DONE** (commit `01e1532`) | **PASS 8/8** on edgeRatio ≥ 5× uniform (mean 7.72×). Nodes stay flat (nodeRatio ≈ 1.00), edges concentrate sharply, path-as-returned signatures never repeat (0/40 sessions). Path-keyed Phase-4 design is retired; edge-hotness cache + Phase-2.10 activation profile are the real targets. |
+| **2.10** Spreading activation (Option O) | **KILLED — opt-in only** | Best Option O: 0.682 tier-1 / 0.522 tier-2 vs Phase 2.8 baseline 0.703/0.627 (regress -0.021/-0.105). Eval-B coherence flat at 1/4 (target 2/4). Inhibition load-bearing on tier-1 (β=0 drops 0.682→0.536) but slightly *hurts* tier-2 — small-graph dilution + tier-2 failure modes ≠ vocabulary-distractor. Ships as `AnchorScoring.kind = "spreading-activation"`; defaults unchanged. See CONTEXT.md § Phase 2.10. |
+| **2.11** Per-view routing (Option P) | **NEXT** | Promoted — remaining architectural hypothesis is that single-adjacency merge of temporal/lexical/semantic discards routing signal. Open question: do Phase 7 first to test 2.10's "small-graph dilution" hypothesis at LongMemEval scale? |
+| **2.12** Differentiable scorer (Option Q) | Deferred | Unchanged. |
+| **Phase 4** Cache | **Reverted to 4a only** | 4b activation-persistence is dead (no Option O activation profile to persist). 4a edge-hotness cache remains the only live cache shape. |
+| **Phase 7** LongMemEval retarget | Possibly NEXT before 2.11 | Also serves as the scale-generalization check for both 2.9 (edge concentration) and 2.10's small-graph dilution argument. |
+
+**Key 2.9 interpretation** (full details in `CONTEXT.md` § "Phase 2.9" and memory `path_memory_phase29.md`):
+
+- The graph has a natural **highway structure** — a small edge subset carries most traversal bumps under repeat-user traffic, while node coverage stays saturated. This matters for tuning Phase 2.10's lateral-inhibition: activation will ride these highways by default, and `lateralInhibitionTau` / `inhibitionStrength` need to be strong enough to push *off* them when the probe demands within-cluster differentiation.
+- "Caching paths" was never going to work on this architecture; "pruning against a hot edge set" plausibly will.
+
+**Open strategic question for next session:** commit straight to Phase 2.10, or run a minimal edge-hotness pre-experiment first (maybe half a session — wire a `hotEdgeTopK` filter into Dijkstra, measure eval-A + latency) as cheap insurance against Option O subsuming the signal? See "Ordering" below for the recommended sequence.
+
 ## Relation to existing systems
 
 All six works were surfaced in the Apr 2026 research scan; this plan
@@ -51,7 +69,18 @@ cites each only where it's methodologically load-bearing.
 | **LongMemEval** (arXiv:2410.10813, ICLR 2025) — long-term conversational memory benchmark used by Memento / Zep / MAGMA | https://arxiv.org/abs/2410.10813 | Target corpus for Phase 7 retarget | We'd adapt our retriever to the question format, not modify the benchmark |
 | **LoCoMo** — long conversation memory benchmark used by SYNAPSE / MAGMA / CompassMem | Referenced in SYNAPSE and MAGMA papers above | Secondary target for Phase 7 retarget | Same as LongMemEval — adapter work only |
 
-## Phase 2.9 — Corpus-shape experiment (Option R, small)
+## Phase 2.9 — Corpus-shape experiment (Option R, small) — **DONE 2026-04-17**
+
+**Outcome.** PASS 8/8 traces on edgeRatio ≥ 5× uniform (mean 7.72×, range 5.53–10.28). Nodes uniformly accessed (nodeRatio ≈ 1.00) but edges concentrate sharply. Top-3 path-node-set signatures never repeated across 40 sessions (repeatingPaths = 0 on every trace). Ships `eval/traces-repeat-user.ts` + `eval/eval-c-access.ts`; findings in `CONTEXT.md` § "Phase 2.9"; commit `01e1532`.
+
+**What this settles.**
+- Phase 4 (path-keyed cache shape) is **retired** — zero hit rate by construction.
+- Phase 4 (edge-hotness shape) **has a target** — a small subset carries disproportionate traversal.
+- Phase 2.10 (Option O) priority holds; its motivation doubles — activation profile = persistence substrate for the measured edge concentration.
+
+Original plan preserved below for traceability.
+
+---
 
 **Read before implementing.** No directly-derivative paper — this phase
 is an internal eval-shape experiment responding to Phase 3's flat-access
@@ -325,21 +354,19 @@ on held-out 20% of queries.
 Deferred; only worth spending if eval-A at the post-2.10/2.11 ceiling
 still leaves meaningful ground on the held-out set.
 
-## Phase 4 redesign
+## Phase 4 redesign — **updated post-2.9**
 
-Original Phase 4: "cache frequently-accessed paths." Phase 3 showed
-nothing frequent. Two conditional branches:
+Original Phase 4: "cache frequently-accessed paths." **Retired** — Phase 2.9 confirmed `repeatingPaths = 0` across all 40 repeat-user sessions. A path-keyed cache has zero hit rate by construction.
 
-- **If Phase 2.9 produces concentration** under repeat-user traffic:
-  Phase 4 goes as originally planned, but the cache is keyed on
-  **(probe-cluster, session-recency)** rather than raw access counts.
-- **If Phase 2.10 lands** with activation-based anchor scoring:
-  Phase 4 becomes "persist the activation profile across sessions."
-  The activation vector *is* the cache. No separate path cache needed
-  — hot regions emerge from accumulated activation decay.
+Phase 2.9 did produce strong concentration at the **edge** level (mean edgeRatio = 7.72× uniform), so Phase 4 has a real target. Two live sub-options, not mutually exclusive:
 
-Pick the branch based on Phase 2.9/2.10 outcomes. Phase 4's original
-"path cache" shape is retired.
+- **4a — Edge-hotness cache (standalone, small).** Maintain a rolling "hot edge" set per active cluster/session context (top-K edges by recent access count, K ≈ 50–200). Use it to prune Dijkstra's traversal frontier: expand hot edges fully, gate cold edges behind a higher threshold. Cheap to implement (~50 lines in `retriever.ts`, one new config option) and directly testable against eval-A for regressions + latency win. Good candidate for "insurance pre-experiment" before Phase 2.10.
+
+- **4b — Activation-profile persistence (subsumed by 2.10).** If Phase 2.10 lands with spreading activation + lateral inhibition, persist the activation vector across sessions with a decay schedule. The activation vector *is* the cache — hot regions emerge from accumulated activation, no separate edge store needed. This is the cleaner long-term shape if Option O validates.
+
+**Decision rule.** If Phase 2.10 lands decisively (eval-A held + eval-B coherence ≥ 2/4), skip 4a and ship 4b as the persistence layer. If Phase 2.10 stalls or only partially lifts, 4a becomes a standalone shippable primitive.
+
+**Cheapest insurance** (optional, half-session): run 4a as a pre-experiment *before* Phase 2.10. Confirms the hot-edge prune hypothesis empirically, gives us a measurable latency baseline for 2.10/2.11 to beat, and is reversible if Option O subsumes. Tradeoff: adds a session and delays the primary research bet.
 
 ## Phase 7 retarget — LongMemEval / LoCoMo instead of bespoke tier-3
 
@@ -388,16 +415,19 @@ runs per phase become cheap.
 
 ## Ordering
 
-| # | Phase | Scope | Blocks |
-|---|---|---|---|
-| 1 | **2.9** Corpus-shape experiment (Option R) | Small | Unblocks Phase 4 branch decision |
-| 2 | **2.10** Spreading activation (Option O) | Medium | Primary research bet; may subsume Phase 4 |
-| 3 | **2.11** Per-view routing (Option P) | Medium | Only if 2.10 doesn't resolve tier-2 eval-B |
-| 4 | **7 retarget** LongMemEval harness | Small | Enables external comparison + gives Phase 2.12 labels |
-| 5 | **2.12** Differentiable scorer (Option Q) | Large | Deferred; only after 2.10/2.11 + Phase 7 |
-| 6 | **Phase 4** Cache / activation persistence | Medium | Shape depends on 2.9 + 2.10 |
+| # | Phase | Scope | State | Blocks |
+|---|---|---|---|---|
+| 1 | **2.9** Corpus-shape experiment (Option R) | Small | **DONE** (PASS 8/8) | — |
+| 2a | **4a pre-experiment** Edge-hotness prune (optional) | Small (½ sess.) | Not started | Provides latency baseline + validates prune hypothesis before 2.10 |
+| 2 | **2.10** Spreading activation (Option O) | Medium | **NEXT** | Primary research bet; may subsume Phase 4 |
+| 3 | **2.11** Per-view routing (Option P) | Medium | Pending | Only if 2.10 doesn't resolve tier-2 eval-B |
+| 4 | **7 retarget** LongMemEval harness | Small | Pending | Enables external comparison + gives Phase 2.12 labels; also re-measures 2.9 edge-concentration at scale |
+| 5 | **2.12** Differentiable scorer (Option Q) | Large | Deferred | Only after 2.10/2.11 + Phase 7 |
+| 6 | **Phase 4** (4a standalone or 4b via 2.10) | Small–medium | Shape decided (see § "Phase 4 redesign") | Execution depends on 2.10 outcome |
 
-Execute 1 → 2 → decide. Do not commit to 3/4/5 until 2.10 lands.
+**Recommended next-session entry point:** Phase 2.10 directly. The 4a pre-experiment is genuine optionality — worth it only if we want a latency baseline before 2.10 or if risk-aversion about 2.10 subsuming the signal dominates. Default = skip 4a, go to 2.10.
+
+Do not commit to 3/4/5 until 2.10 lands.
 
 ## Dead primitives (re-issued under BGE-small)
 

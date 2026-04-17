@@ -2235,3 +2235,131 @@ cache. Concretely:
 - `distinctNodes = 233` across all traces (tier2 has 242 claims, 9
   presumably isolated / un-reachable at `bfsMaxDepth=3`). Not
   investigated — not load-bearing for the pass criterion.
+
+## Phase 2.10 — Spreading-activation anchor scorer (Option O) (2026-04-17)
+
+**Outcome: NEGATIVE.** Both eval-A tiers regress; eval-B coherence
+unchanged. Per the kill criterion in `PLAN-post-2.8.md` § Phase 2.10,
+Option O ships as opt-in infrastructure (new `AnchorScoring` kind
+`"spreading-activation"`) but defaults remain at Phase 2.8
+(`dijkstra tmp=0.5` + weighted-fusion `τ=0.2`).
+
+### Setup
+
+SYNAPSE-inspired (arXiv:2601.02744v2) — see
+`notes/phase-2.10-reading.md` for the reading note. New anchor
+scorer seeds activation from per-probe weighted-cosine top-K,
+propagates over `GraphIndex.neighbors` for `maxHops` iterations
+with fan-effect dilution (`/ neighbors(j).length`), applies
+non-symmetric top-`inhibitionTopM` lateral inhibition each hop,
+then re-ranks by final activation. **Adopted the paper's
+top-M-by-activation lateral inhibition** (cheaper, ablation-validated)
+rather than the cosine-pair variant in PLAN-post-2.8.md.
+
+Sweep: 16 primary configs (`initialTopK ∈ {5,8} × maxHops ∈ {2,3} ×
+decay ∈ {0.5,0.7} × inhibitionTopM ∈ {5,7}`, fixing `S=0.8, β=0.15`)
++ 5 ablation configs (β ∈ {0, 0.10, 0.25}, S ∈ {0.6, 1.0}). All
+rows pinned to `dijkstra tmp=0.5` so movement is attributable to
+the new anchor scorer, not the traversal change. K0=5 and K0=8
+collapse to identical numbers on both tiers — the seeded set is
+already a superset of what propagation/inhibition narrows down to
+on a 33-node (tier-1) / 236-node (tier-2) graph.
+
+### Eval-A results
+
+Phase 2.8 baseline (`dijkstra tmp=0.5`): **0.703 tier-1 / 0.627 tier-2**.
+
+Best Option O configs:
+
+| config | tier-1 | tier-2 |
+|---|---|---|
+| baseline (Phase 2.8) | **0.703** | **0.627** |
+| O T=2 δ=0.5 M=7 (β=0.15, S=0.8) | 0.682 | 0.474 |
+| O T=3 δ=0.5 M=7 (β=0.15, S=0.8) | 0.682 | 0.453 |
+| O central β=0.1 | 0.682 | 0.452 |
+| O central S=0.6 | 0.682 | 0.488 |
+| O T=2 δ=0.5 M=5 (β=0.15, S=0.8) | 0.661 | 0.485 |
+| O central β=0.25 | 0.599 | **0.522** (best tier-2) |
+| O central β=0 (no inhibition) | 0.536 | 0.507 |
+
+Best tier-1 config (0.682): regress -0.021 vs baseline (right at the
+0.02 threshold, technically a blocker).
+Best tier-2 config (0.522): regress -0.105 vs baseline (clear
+regression).
+**No single config holds both tier-1 ≥ 0.703 AND tier-2 ≥ 0.627.**
+
+### Eval-B coherence (tier-2)
+
+All Option O configs: **1/4 coherent arcs** (matching Phase 2.1
+`bfs wfusion τ=0.2 = 1/4`); `central β=0.25` regresses to 0/4. No
+movement on the eval-B coherence target (which was 2/4 to pass).
+
+### Ablation findings (interpretation)
+
+- **Lateral inhibition is corpus-direction-dependent.** On tier-1
+  it lifts mean F1 (β=0 → 0.536; β=0.15 → 0.682, +0.146). On
+  tier-2 it slightly *hurts* (β=0 → 0.507; β=0.15 → 0.474, −0.033).
+  This is the opposite of the SYNAPSE adversarial-robustness
+  ablation (96.6 → 71.5 F1 when inhibition removed) — our tier-2
+  failure modes apparently aren't of the adversarial-distractor
+  shape that inhibition addresses, despite our prior diagnosis.
+- **Higher decay (δ=0.7, retention 0.3) regresses sharply on
+  tier-1** (0.682 → 0.467 at the same M, β). Activation needs to
+  carry across hops on the small tier-1 graph; tier-2 is less
+  sensitive to δ.
+- **More propagation (T=3) ties or regresses vs T=2** on both
+  tiers. The paper's T=3 default is over-propagation on our
+  graph density.
+- **β=0 isolation row drops below the best β>0 row on tier-1
+  (-0.146)** — confirms the inhibition mechanism *does* work as
+  designed. The negative aggregate result is not "inhibition is
+  broken," it's "inhibition is the wrong primitive for the
+  coherence ceiling we're hitting."
+
+### Why the negative result
+
+Two plausible mechanisms (untested):
+
+1. **Spreading dilutes the seed.** Even with top-K filtering, the
+   propagated set adds neighbors that have weaker per-probe cosine
+   than the seed. On our compact graphs (tier-1 = 33 nodes,
+   tier-2 = 236 nodes), the seed is already ≥ 50% of the
+   reachable candidate space at `maxHops=2`, so propagation buys
+   no new signal it just adds noise. Per the SYNAPSE paper, the
+   mechanism was validated on LoCoMo (16k-token dialogues); our
+   corpora are 1-2 orders of magnitude smaller.
+2. **Tier-2 failure modes ≠ vocabulary-distractor.** The Phase
+   2.4 diagnosis labelled `pw_pausanias_commands` on "generals" as
+   a vocabulary-distractor failure. On re-inspection, this is more
+   accurately a *retrieval-precision-vs-recall* tradeoff than a
+   distractor — pausanias appears in the ideal set for several
+   queries; the failure is over-broad inclusion under low-IDF
+   tokens, which inhibition between near-cosine-equal anchors
+   cannot fix.
+
+### Status updates
+
+- **Phase 2.10**: KILLED, ships as opt-in. No default change.
+- **Phase 4 (4b activation-persistence)**: Subsumed-by-2.10 path
+  is dead — Option O didn't validate, no activation profile to
+  persist. Phase 4 reverts to the 4a edge-hotness branch as the
+  only live cache option.
+- **Phase 2.11 (MAGMA per-view routing)**: Promoted to NEXT. The
+  remaining architectural hypothesis (merging three edge types
+  into one adjacency discards routing signal) is now the primary
+  research bet.
+- **Open question for next session**: Is the LongMemEval retarget
+  (Phase 7) more strategic to do first? At LongMemEval scale,
+  Option O's "small graph dilution" argument might invert and the
+  primitive could be worth re-running.
+
+### Files touched
+
+- `src/types.ts` — `AnchorScoring` + `"spreading-activation"`
+  variant
+- `src/retriever.ts` — new `composeAnchors` branch +
+  `spreadingActivationRank` private method + `applyLateralInhibition`
+  helper at file scope (~140 lines total)
+- `tests/retriever.test.ts` — 8 new Phase 2.10 tests (all passing)
+- `eval/sweep.ts`, `eval/iterative-sweep.ts` — 21 Phase 2.10 rows
+- `notes/phase-2.10-reading.md` — SYNAPSE reading note

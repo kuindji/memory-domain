@@ -86,6 +86,28 @@ export type AnchorScoring =
           tau: number;
           alpha: number;
           useSessionWeights?: boolean;
+      }
+    | {
+          /**
+           * Phase 2.10 Option O — SYNAPSE-inspired spreading activation.
+           *
+           * Seed activation per-probe via weighted cosine, propagate over
+           * `GraphIndex.neighbors` for `maxHops` iterations with fan-effect
+           * dilution (`/ neighbors(j).length`), apply non-symmetric
+           * top-`inhibitionTopM` lateral inhibition each hop (only stronger
+           * nodes suppress weaker), then re-rank the anchor set by final
+           * activation. Paper defaults: maxHops=3, decay=0.5, spreadingFactor=0.8,
+           * inhibitionTopM=7, inhibitionStrength=0.15. See SYNAPSE
+           * (arXiv:2601.02744v2) and `notes/phase-2.10-reading.md`.
+           */
+          kind: "spreading-activation";
+          initialTopK: number;
+          maxHops: number;
+          decay: number;
+          spreadingFactor: number;
+          inhibitionTopM: number;
+          inhibitionStrength: number;
+          useSessionWeights?: boolean;
       };
 
 export type ProbeComposition = "union" | "intersection" | "weighted-fusion";

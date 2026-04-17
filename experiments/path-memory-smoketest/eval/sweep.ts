@@ -364,6 +364,100 @@ const CONFIGS: Config[] = [
             anchorScoring: { kind: "idf-weighted-fusion", tau: 0.2, alpha: 1.0 },
         },
     },
+    // --- Phase 2.10 Option O (spreading-activation) — eval-A gate ---------
+    // SYNAPSE-inspired spreading activation + non-symmetric top-M lateral
+    // inhibition over the seeded anchor set. Phase 2.8 baseline for the
+    // gate is "dijkstra tmp=0.5" + weighted-fusion τ=0.2 (see CONTEXT.md
+    // § Phase 2.8 — 0.703 tier-1 / 0.627 tier-2). All Option-O rows pin
+    // traversal to dijkstra+tmp=0.5 so eval-A movement is attributable to
+    // the new anchor scorer, not the traversal change.
+    //
+    // Primary sweep (16 rows): initialTopK × maxHops × decay × inhibitionTopM,
+    // fixing spreadingFactor=0.8, inhibitionStrength=0.15 at paper defaults.
+    // Ablation (5 rows) varies one of {β, S} at a time around the central
+    // base (initialTopK=5, maxHops=3, decay=0.5, M=7), plus a no-inhibition
+    // isolation row (the direct equivalent of SYNAPSE Table 3's adversarial
+    // ablation 96.6→71.5 F1).
+    ...((): Config[] => {
+        const rows: Config[] = [];
+        const base = {
+            spreadingFactor: 0.8,
+            inhibitionStrength: 0.15,
+            useSessionWeights: true,
+        };
+        for (const initialTopK of [5, 8]) {
+            for (const maxHops of [2, 3]) {
+                for (const decay of [0.5, 0.7]) {
+                    for (const inhibitionTopM of [5, 7]) {
+                        rows.push({
+                            label: `O dijkstra tmp=0.5 sa K0=${initialTopK} T=${maxHops} δ=${decay} M=${inhibitionTopM}`,
+                            options: {
+                                traversal: "dijkstra",
+                                temporalHopCost: 0.5,
+                                anchorScoring: {
+                                    kind: "spreading-activation",
+                                    initialTopK,
+                                    maxHops,
+                                    decay,
+                                    inhibitionTopM,
+                                    ...base,
+                                },
+                            },
+                        });
+                    }
+                }
+            }
+        }
+        // Ablation around central base (K0=5, T=3, δ=0.5, M=7).
+        const central = { initialTopK: 5, maxHops: 3, decay: 0.5, inhibitionTopM: 7 };
+        rows.push({
+            label: "O dijkstra tmp=0.5 sa central β=0 (no-inhibition isolation)",
+            options: {
+                traversal: "dijkstra",
+                temporalHopCost: 0.5,
+                anchorScoring: {
+                    kind: "spreading-activation",
+                    ...central,
+                    spreadingFactor: 0.8,
+                    inhibitionStrength: 0,
+                    useSessionWeights: true,
+                },
+            },
+        });
+        for (const inhibitionStrength of [0.1, 0.25]) {
+            rows.push({
+                label: `O dijkstra tmp=0.5 sa central β=${inhibitionStrength}`,
+                options: {
+                    traversal: "dijkstra",
+                    temporalHopCost: 0.5,
+                    anchorScoring: {
+                        kind: "spreading-activation",
+                        ...central,
+                        spreadingFactor: 0.8,
+                        inhibitionStrength,
+                        useSessionWeights: true,
+                    },
+                },
+            });
+        }
+        for (const spreadingFactor of [0.6, 1.0]) {
+            rows.push({
+                label: `O dijkstra tmp=0.5 sa central S=${spreadingFactor}`,
+                options: {
+                    traversal: "dijkstra",
+                    temporalHopCost: 0.5,
+                    anchorScoring: {
+                        kind: "spreading-activation",
+                        ...central,
+                        spreadingFactor,
+                        inhibitionStrength: 0.15,
+                        useSessionWeights: true,
+                    },
+                },
+            });
+        }
+        return rows;
+    })(),
 ];
 
 // Tier-3 validation sweep (Phase 2.7). Per CONTEXT.md §1828 this is a

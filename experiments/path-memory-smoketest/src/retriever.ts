@@ -511,6 +511,34 @@ export class Retriever {
             // Fall through to the default union path if τ excluded everything.
         }
 
+        // Option O (Phase 2.10): SYNAPSE-inspired spreading activation. Seed
+        // activation from the union of per-probe weighted-cosine top-K
+        // (`initialTopK`), propagate over `GraphIndex.neighbors` for
+        // `maxHops` iterations with fan-effect dilution `/ fan(j)` and
+        // non-symmetric top-`inhibitionTopM` lateral inhibition each hop,
+        // then re-rank by final activation. Targets the tier-2 vocabulary-
+        // distractor and within-cluster-granularity failure modes.
+        // Defensive fall-through to union when seeding produces nothing
+        // (matches the I/J/H/M pattern). See `notes/phase-2.10-reading.md`.
+        if (anchorScoring.kind === "spreading-activation") {
+            const ranked = this.spreadingActivationRank({
+                perProbe,
+                probeWeights,
+                validClaims,
+                anchorTopK,
+                scoring: anchorScoring,
+            });
+            for (const { id, attribution } of ranked) {
+                if (attribution.size === 0) {
+                    remember(id, 0);
+                    continue;
+                }
+                for (const pIdx of attribution) remember(id, pIdx);
+            }
+            if (probesByAnchor.size > 0) return probesByAnchor;
+            // Fall through to union if seeding produced nothing.
+        }
+
         if (probeComposition === "intersection" && probes.length > 1) {
             const counts = new Map<ClaimId, Set<number>>();
             perProbe.forEach((pp, pIdx) => {
@@ -583,6 +611,122 @@ export class Retriever {
             for (const aid of pp.ranked) remember(aid, pIdx);
         });
         return probesByAnchor;
+    }
+
+    /**
+     * Phase 2.10 Option O — SYNAPSE-style spreading activation reranker.
+     *
+     * Pipeline:
+     *  1. Seed: union of per-probe weighted-cosine top-`initialTopK`. Initial
+     *     activation per node = Σ_p w(p) · cos(p, node), summed across the
+     *     probes that selected it.
+     *  2. Propagate for `maxHops` iterations:
+     *       u_i(t) = (1 − decay) · a_i(t−1)
+     *              + Σ_{j: j→i} spreadingFactor · w_ji · a_j(t−1) / fan(j)
+     *     Edge weights come from `Edge.weight`; temporal already carries
+     *     `exp(−Δt/τ)` when `temporalDecayTau` is on.
+     *  3. Lateral inhibition (per hop, before committing): take top-M
+     *     by activation; suppress
+     *       û_i = max(0, u_i − inhibitionStrength · Σ_{k: u_k > u_i} (u_k − u_i))
+     *     Non-symmetric — only stronger nodes inhibit weaker.
+     *  4. Read out: sort by final activation, take top `anchorTopK` with
+     *     activation > 0.
+     *
+     * Probe attribution: seeded nodes carry the seeding probes; nodes
+     * activated only via propagation carry probe 0 (defensive default
+     * matching the I/J/H/M fall-through pattern). Per-probe activation
+     * channels are a future refinement.
+     */
+    private spreadingActivationRank(args: {
+        perProbe: Array<{ ranked: ClaimId[]; cosineByAnchor: Map<ClaimId, number> }>;
+        probeWeights: number[];
+        validClaims: Claim[];
+        anchorTopK: number;
+        scoring: Extract<AnchorScoring, { kind: "spreading-activation" }>;
+    }): Array<{ id: ClaimId; attribution: Set<number> }> {
+        const { perProbe, probeWeights, validClaims, anchorTopK, scoring } = args;
+        const useWeights = scoring.useSessionWeights ?? true;
+
+        // 1. Seed activation + attribution from per-probe top-K union.
+        const activation = new Map<ClaimId, number>();
+        const attribution = new Map<ClaimId, Set<number>>();
+        perProbe.forEach((pp, pIdx) => {
+            const w = useWeights ? probeWeights[pIdx] : 1;
+            for (const aid of pp.ranked) {
+                const cos = pp.cosineByAnchor.get(aid) ?? 0;
+                if (cos <= 0) continue;
+                activation.set(aid, (activation.get(aid) ?? 0) + w * cos);
+                let s = attribution.get(aid);
+                if (!s) {
+                    s = new Set<number>();
+                    attribution.set(aid, s);
+                }
+                s.add(pIdx);
+            }
+        });
+
+        if (activation.size === 0) return [];
+
+        // 2. Propagate. We only consider valid claims (mode filter already
+        //    applied upstream). Cache fan-out per source on demand.
+        const validIds = new Set(validClaims.map((c) => c.id));
+        const fanCache = new Map<ClaimId, number>();
+        const fanOf = (id: ClaimId): number => {
+            const cached = fanCache.get(id);
+            if (cached !== undefined) return cached;
+            const f = this.graph.neighbors(id).length;
+            fanCache.set(id, f);
+            return f;
+        };
+
+        for (let hop = 0; hop < scoring.maxHops; hop++) {
+            const next = new Map<ClaimId, number>();
+
+            // Retention term: (1 − decay) · a_i(t−1)
+            const retention = 1 - scoring.decay;
+            for (const [id, a] of activation) {
+                if (retention > 0) next.set(id, retention * a);
+            }
+
+            // Spread term: each currently-activated node distributes to its
+            // neighbors. We propagate from `activation` (last hop's state),
+            // accumulating into `next`.
+            for (const [srcId, srcAct] of activation) {
+                if (srcAct <= 0) continue;
+                const fan = fanOf(srcId);
+                if (fan <= 0) continue;
+                const share = (scoring.spreadingFactor * srcAct) / fan;
+                for (const edge of this.graph.neighbors(srcId)) {
+                    if (!validIds.has(edge.to)) continue;
+                    const incoming = share * edge.weight;
+                    if (incoming === 0) continue;
+                    next.set(edge.to, (next.get(edge.to) ?? 0) + incoming);
+                }
+            }
+
+            // 3. Lateral inhibition over top-M by current activation.
+            applyLateralInhibition(next, scoring.inhibitionTopM, scoring.inhibitionStrength);
+
+            // Drop zeros to keep the active set bounded.
+            for (const [id, a] of next) {
+                if (a <= 0) next.delete(id);
+            }
+
+            activation.clear();
+            for (const [id, a] of next) activation.set(id, a);
+        }
+
+        // 4. Read out: top-K by activation. Defensive — also clamp by
+        //    valid-claim membership in case anything slipped through.
+        const ranked = Array.from(activation.entries())
+            .filter(([id, a]) => a > 0 && validIds.has(id))
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, anchorTopK);
+
+        return ranked.map(([id]) => ({
+            id,
+            attribution: attribution.get(id) ?? new Set<number>(),
+        }));
     }
 
     private bfsShortestPaths(
@@ -772,6 +916,38 @@ function makeValidityFilter(mode: RetrievalMode): (c: Claim) => boolean {
 function canonicalPathKey(path: Path): string {
     const sorted = [...path.nodeIds].sort();
     return `path:${sorted.join(",")}`;
+}
+
+/**
+ * Phase 2.10 — non-symmetric top-M lateral inhibition (SYNAPSE Eq. 3).
+ *
+ * Mutates `field` in place. For each node `i` in the top-M set by current
+ * activation, subtract `strength · Σ_{k: u_k > u_i} (u_k − u_i)` and clamp
+ * to zero. Outside-top-M nodes are untouched. Suppression flows only from
+ * stronger to weaker, so the top-1 node is never inhibited.
+ *
+ * Cost is O(M²) per call — bounded by the configured `topM`, not by the
+ * size of the activation field.
+ */
+function applyLateralInhibition(field: Map<ClaimId, number>, topM: number, strength: number): void {
+    if (strength <= 0 || topM <= 0 || field.size === 0) return;
+
+    const top = Array.from(field.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, topM);
+
+    const updates = new Map<ClaimId, number>();
+    for (let i = 0; i < top.length; i++) {
+        const [id, u] = top[i];
+        let suppression = 0;
+        for (let k = 0; k < top.length; k++) {
+            if (k === i) continue;
+            const uk = top[k][1];
+            if (uk > u) suppression += uk - u;
+        }
+        updates.set(id, Math.max(0, u - strength * suppression));
+    }
+    for (const [id, v] of updates) field.set(id, v);
 }
 
 /**
