@@ -2774,3 +2774,165 @@ default):
 - `experiments/path-memory-smoketest/notes/phase-2.14-stage2-reading.md`
   — prior-art retest context.
 - Nothing in `src/`, no test changes, no default changes.
+
+## Phase 2.15 — BGE-large retune (2026-04-18)
+
+**Outcome N (refutation).** Full 1D sweep under bge-large holds
+tier-2 eval-B coherence flat at **2/4** across 13 rows (decay /
+weightedFusionTau / anchorTopK / dijkstra-tmp). The Phase-2.14 playbook
+that lifted bge-base 2/4 → 3/4 does not port to bge-large. Phase 2.13
+question #2 answered: BGE-large's +0.095 eval-A lift is the ceiling for
+a bge-large phase; anchor-layer knobs cannot move its eval-B coherence.
+Default encoder stays bge-base. Phase 2.15 row set ships in-tree as a
+reusable `CONFIG_SET=phase215`.
+
+### What was tested
+
+Stage 0 PER_ARC diagnostic (reused Phase-2.13 control row
+`bfs wfusion tau=0.2 + decay=0.3` under `ENCODER=bge-large`) confirmed
+the 2/4 state: philosophers to Alexander (cov=1.00) + Academy
+(cov=0.67) pass; Athens at war (cov=0.33) + Alexander succession
+(cov=0.33) fail. Same two arcs as bge-base pre-2.14, but with a
+**different missing/unexpected claim signature** than Phase-2.14
+Stage-2's frozen bge-base signature:
+
+| Arc | Encoder | Missing | Unexpected in top-K |
+|---|---|---|---|
+| Alexander succession | bge-base (2.14 S2) | `diad_seleucus_babylon`, `diad_cassander_macedon` | `diad_wars_begin`, `diad_ptolemaic_dynasty` |
+| Alexander succession | bge-large (2.15 S0) | `diad_ptolemy_egypt`, `diad_seleucus_babylon` | `diad_wars_begin`, `diad_lysimachus_thrace` |
+| Athens at war | bge-base (2.14) | — (arc flipped to 0.67 at decay=0.2) | — |
+| Athens at war | bge-large (2.15 S0) | `pwar_aegospotami`, `pwar_long_walls_demolished` | `alex_chaeronea_battle`, `pw_marathon_victory` |
+
+The signature shift means the arc failure **is** encoder-geometry-
+sensitive — but bge-large surfaces different wrong claims, not more
+correct claims. Greater dimensionality redistributes the error; it
+doesn't reduce it here.
+
+Stage 1 matrix (`CONFIG_SET=phase215`, 13 rows):
+
+- **Decay sweep:** `bfs wfusion τ=0.2 + decay ∈ {0.1, 0.2, 0.3, 0.4, 0.5}`
+- **Weighted-fusion τ sweep:** `bfs decay=0.3 + wfusion τ ∈ {0.1, 0.15, 0.3}`
+- **Anchor-K sweep:** `bfs wfusion τ=0.2 + decay=0.3 + K ∈ {3, 7}`
+- **Dijkstra-tmp sanity:** `dijkstra tmp ∈ {0.3, 0.5, 0.7} wfusion τ=0.2 + decay=0.3`
+
+### Eval-B findings (tier-2)
+
+| Row | coherent | nodeBumps(distinct) | edgeBumps(distinct) |
+|---|---|---|---|
+| control `decay=0.3` | **2/4** | 14153(234) | 14088(3112) |
+| `decay=0.1` | 2/4 | 14153(234) | 14088(3112) |
+| `decay=0.2` | 2/4 | 14153(234) | 14088(3112) |
+| `decay=0.4` | 2/4 | 14152(234) | 14087(3112) |
+| `decay=0.5` | 2/4 | 14152(234) | 14087(3104) |
+| `τ=0.1` | 2/4 | 14153(234) | 14088(3112) |
+| `τ=0.15` | 2/4 | 14153(234) | 14088(3112) |
+| `τ=0.3` | 2/4 | 14153(234) | 14088(3112) |
+| `K=3` | 2/4 | 8490(234) | 8451(2462) |
+| `K=7` | **1/4** regress | 19803(234) | 19712(3585) |
+| `dijkstra tmp=0.3` | 2/4 | 13961(234) | 25804(4128) |
+| `dijkstra tmp=0.5` | 2/4 | 13994(234) | 25158(3848) |
+| `dijkstra tmp=0.7` | 2/4 | 14030(234) | 24725(3745) |
+
+1. **bge-large's decay curve is flat.** bge-base's non-monotonic
+   `{0.1, 0.2}` pass-band disappears entirely. Every decay in
+   `{0.1…0.5}` yields the same 2/4 coherence and the same claim
+   ranking (byte-identical bump counts 14153/14088 across decay and
+   wfusion τ rows). Session decay has no signal on bge-large geometry
+   — the top-K is locked by the per-turn probe embeddings before
+   session-state re-weighting can shift it.
+2. **Weighted-fusion τ is flat.** Matches bge-base Phase 2.14; confirms
+   this knob is post-encoder-noise across the BGE family.
+3. **anchorTopK=7 regresses to 1/4.** Same direction as bge-base's K=7
+   regression in Phase 2.14. Extra anchors dilute path scores and
+   swap a correct claim out of final top-K.
+4. **Dijkstra doesn't regress on eval-B coherence** (all 2/4) but edge
+   bump counts differ sharply (~25k vs BFS's ~14k) — Dijkstra explores
+   more paths but surfaces the same failing arc shape. The coherence
+   metric is insensitive to traversal under bge-large.
+
+### Eval-A findings (tier-2, regression check)
+
+| Row | mean-F1 | wins / losses |
+|---|---|---|
+| `bfs (default)` | **0.722** | 4 / 4 |
+| `A3 bfs probe=weighted-fusion tau=0.2` | **0.722** | 4 / 4 |
+| `A3 dijkstra tmp=0.5 probe=weighted-fusion tau=0.2` | 0.573 | 3 / 7 |
+| `2.14 bfs decay=0.1` (reused) | 0.722 | 4 / 4 |
+| `2.14 bfs decay=0.2` (reused) | 0.722 | 4 / 4 |
+| `2.15 dijkstra tmp=0.3 wfusion τ=0.2` | 0.600 | 2 / 7 |
+| `2.15 dijkstra tmp=0.7 wfusion τ=0.2` | 0.626 | 3 / 6 |
+
+1. **BFS holds 0.722 across all rows** (+0.095 over Phase-2.8
+   bge-base/MiniLM baseline of 0.627 / +0.073 over Phase-2.13
+   bge-base best of 0.649). sessionDecayTau is inert on eval-A as
+   expected (no session state to decay).
+2. **Dijkstra regresses across the full tmp band** (0.3 → 0.600;
+   0.5 → 0.573; 0.7 → 0.626). H4 confirmed: Phase-2.13's single-row
+   Dijkstra regression is robust — it's a structural
+   Dijkstra-vs-BFS-under-bge-large phenomenon, not a tmp-0.5 artifact.
+   Best Dijkstra still undershoots BFS by ~0.1 F1.
+
+### What this settles
+
+1. **Phase 2.13 question #2 answered: structural, not an opening.**
+   bge-large's BFS flip is where its geometry wants to sit; retuning
+   anchor-layer primitives does not open a new family of wins.
+   +0.095 eval-A is the ceiling for a bge-large phase, and eval-B
+   coherence stays at 2/4 regardless.
+2. **bge-large is a parity-encoder for coherence, a winner for
+   eval-A.** For deployments where eval-A-like single-turn factual
+   retrieval dominates, bge-large's +0.095 lift is free (modulo
+   latency + model size). For eval-B-like multi-turn arc coherence,
+   bge-large offers no lift over bge-base at its Phase-2.14 default
+   (3/4).
+3. **Alexander-succession is encoder-sensitive but not
+   encoder-resolvable within the BGE family.** bge-large shifts the
+   missing-claim signature but doesn't reduce cov=0.33. H3 partially
+   confirmed (signature sensitivity) but refuted as a *resolution*
+   pathway.
+4. **Anchor-layer knobs are post-encoder-noise under bge-large.**
+   Byte-identical bump counts across 8 decay/τ rows is the cleanest
+   evidence yet that the 1024d geometry is saturating the retrieval
+   decision before downstream scoring can intervene.
+
+### Defaults (unchanged)
+
+- Smoketest default encoder stays `bge-base` (`embedder.ts:24`).
+- Test-harness `sessionDecayTau=0.2` default stays (Phase 2.14).
+- bge-large remains opt-in via `ENCODER=bge-large`. No library-side
+  changes.
+
+### Next session candidates
+
+1. **Phase 2.16 — multi-encoder ensemble / intersection indexing.**
+   Since single-encoder upgrades within the BGE family are exhausted
+   (BGE-small → BGE-base resolved 1/4 → 2/4 → 3/4 via 2.13+2.14; BGE-large
+   adds eval-A lift only), genuine orthogonality probably comes from
+   fusing across architecturally-different encoders. Candidates: RRF
+   over `{bge-base, bge-large, BM25 sparse}`, or candidate-set
+   intersection for precision. User-flagged in the conversation that
+   started Phase 2.15.
+2. **Cross-encoder reranker** (BGE-reranker-v2-m3) as a post-retrieval
+   precision stage. Orthogonal to dense-encoder choice; particularly
+   interesting given Phase 7.6's "precision-limited on LongMemEval"
+   finding.
+3. **Alternative encoder families** (E5-large-v2, GTE-large,
+   mxbai-embed-large). Would need its own infrastructure pass
+   (ONNX conversion) — probably not worth it before Phase 2.16 tests
+   whether ensemble across same-family encoders already yields lift.
+4. **Accept 3/4 tier-2 eval-B ceiling.** No single-encoder move seems
+   likely to push past it within reach of the Phase-2.X budget.
+
+### Files touched
+
+- `experiments/path-memory-smoketest/eval/iterative-sweep.ts` — Phase
+  2.15 config block (13 rows: decay sweep + wfusion τ sweep +
+  anchorTopK sweep + dijkstra-tmp sanity); `PHASE_215_LABELS`;
+  `CONFIG_SET=phase215` filter branch.
+- `experiments/path-memory-smoketest/eval/sweep.ts` — Phase 2.15
+  dijkstra-tmp sanity rows (tmp=0.3, tmp=0.7); `PHASE_215_LABELS`;
+  `CONFIG_SET=phase215` filter branch.
+- `experiments/path-memory-smoketest/tests/eval-iterative-tier2.test.ts`
+  — comment-only history update to carry Phase 2.15 finding; no
+  assertion change.
+- Nothing in `src/`, no default changes.

@@ -509,6 +509,30 @@ const CONFIGS: Config[] = [
             sessionDecayTau: 0.1,
         },
     },
+    // Phase 2.15 — traversal sanity band under bge-large (eval-A regression
+    // check). Phase 2.13 tested only Dijkstra tmp=0.5 under bge-large (it
+    // regressed to 0.573 vs bfs' 0.722); widening to tmp ∈ {0.3, 0.5, 0.7}
+    // confirms whether Dijkstra-regresses is robust or a single-row artifact.
+    // Decay-variant rows for Phase 2.15 are covered by the Phase-2.14
+    // decay=0.1/0.2 rows above (sessionDecayTau is inert on eval-A).
+    {
+        label: "2.15 dijkstra tmp=0.3 wfusion τ=0.2",
+        options: {
+            traversal: "dijkstra",
+            temporalHopCost: 0.3,
+            probeComposition: "weighted-fusion",
+            weightedFusionTau: 0.2,
+        },
+    },
+    {
+        label: "2.15 dijkstra tmp=0.7 wfusion τ=0.2",
+        options: {
+            traversal: "dijkstra",
+            temporalHopCost: 0.7,
+            probeComposition: "weighted-fusion",
+            weightedFusionTau: 0.2,
+        },
+    },
 ];
 
 // Tier-3 validation sweep (Phase 2.7). Per CONTEXT.md §1828 this is a
@@ -579,6 +603,21 @@ const PHASE_214_LABELS = new Set<string>([
     "2.14 bfs wfusion τ=0.2 + decay=0.1",
 ]);
 
+// Phase-2.15 eval-A regression matrix: Phase-2.13 bge-large control
+// ("A3 bfs probe=weighted-fusion tau=0.2", 0.722) + Phase-2.8 default
+// ("A3 dijkstra tmp=0.5 probe=weighted-fusion tau=0.2", the row that
+// regresses to 0.573 under bge-large) + Dijkstra-tmp sanity band +
+// decay-retune rows reused from Phase 2.14 (decay inert on eval-A).
+const PHASE_215_LABELS = new Set<string>([
+    "bfs (default)",
+    "A3 bfs probe=weighted-fusion tau=0.2",
+    "A3 dijkstra tmp=0.5 probe=weighted-fusion tau=0.2",
+    "2.14 bfs wfusion τ=0.2 + decay=0.2",
+    "2.14 bfs wfusion τ=0.2 + decay=0.1",
+    "2.15 dijkstra tmp=0.3 wfusion τ=0.2",
+    "2.15 dijkstra tmp=0.7 wfusion τ=0.2",
+]);
+
 const CONFIG_SET = (process.env.CONFIG_SET ?? "").toLowerCase();
 
 const ACTIVE_CONFIGS =
@@ -586,9 +625,11 @@ const ACTIVE_CONFIGS =
         ? CONFIGS.filter((c) => PHASE_213_LABELS.has(c.label))
         : CONFIG_SET === "phase214"
           ? CONFIGS.filter((c) => PHASE_214_LABELS.has(c.label))
-          : TIER === "tier3"
-            ? CONFIGS_TIER3
-            : CONFIGS;
+          : CONFIG_SET === "phase215"
+            ? CONFIGS.filter((c) => PHASE_215_LABELS.has(c.label))
+            : TIER === "tier3"
+              ? CONFIGS_TIER3
+              : CONFIGS;
 
 type ConfigResult = {
     mean: number;

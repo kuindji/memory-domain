@@ -603,6 +603,73 @@ const CONFIGS: Config[] = [
         }
         return rows;
     })(),
+
+    // Phase 2.15 — retune anchor primitives under bge-large (opt-in encoder).
+    // Phase 2.13 established bge-large at 2/4 eval-B coherence with
+    // "bfs wfusion τ=0.2 + decay=0.3"; Stage-0 PER_ARC diagnostic confirmed
+    // failing arcs = Athens + Alexander (same shape as bge-base pre-2.14) but
+    // with a DIFFERENT missing/unexpected claim signature than the Phase-2.14
+    // Stage-2 frozen signature under bge-base — suggesting arc failure is
+    // encoder-geometry-sensitive. Stage-1 sweep mirrors Phase 2.14's 1D grid
+    // (decay / weightedFusionTau / anchorTopK) plus a Dijkstra-tmp sanity
+    // band to confirm Phase 2.13's "BFS dominates under bge-large" finding
+    // across tmp ∈ {0.3, 0.5, 0.7}. Control row reuses Phase-2.13 label
+    // "bfs wfusion tau=0.2 + decay=0.3 (Phase 2.1 best)".
+    ...(() => {
+        const rows: Config[] = [];
+        // Decay sweep on bfs wfusion τ=0.2 — primary 1D retune.
+        for (const decay of [0.1, 0.2, 0.4, 0.5]) {
+            rows.push({
+                label: `2.15 bfs wfusion τ=0.2 + decay=${decay}`,
+                options: {
+                    traversal: "bfs",
+                    probeComposition: "weighted-fusion",
+                    weightedFusionTau: 0.2,
+                    sessionDecayTau: decay,
+                },
+            });
+        }
+        // weightedFusionTau sweep at decay=0.3.
+        for (const tau of [0.1, 0.15, 0.3]) {
+            rows.push({
+                label: `2.15 bfs wfusion τ=${tau} + decay=0.3`,
+                options: {
+                    traversal: "bfs",
+                    probeComposition: "weighted-fusion",
+                    weightedFusionTau: tau,
+                    sessionDecayTau: 0.3,
+                },
+            });
+        }
+        // anchorTopK sweep on current best.
+        for (const topK of [3, 7]) {
+            rows.push({
+                label: `2.15 bfs wfusion τ=0.2 + decay=0.3 + K=${topK}`,
+                options: {
+                    traversal: "bfs",
+                    probeComposition: "weighted-fusion",
+                    weightedFusionTau: 0.2,
+                    sessionDecayTau: 0.3,
+                    anchorTopK: topK,
+                },
+            });
+        }
+        // Dijkstra-tmp sanity — Phase 2.13 tested only tmp=0.5 under
+        // bge-large and found BFS wins. Widen the band.
+        for (const tmp of [0.3, 0.5, 0.7]) {
+            rows.push({
+                label: `2.15 dijkstra tmp=${tmp} wfusion τ=0.2 + decay=0.3`,
+                options: {
+                    traversal: "dijkstra",
+                    temporalHopCost: tmp,
+                    probeComposition: "weighted-fusion",
+                    weightedFusionTau: 0.2,
+                    sessionDecayTau: 0.3,
+                },
+            });
+        }
+        return rows;
+    })(),
 ];
 
 // Tier-3 validation matrix (Phase 2.7). Narrow sweep per CONTEXT.md §1828 —
@@ -694,6 +761,25 @@ const PHASE_214_STAGE2_LABELS = new Set<string>([
     "2.14s2 A1 temporalDecayTau=10 + wfusion τ=0.2 + decay=0.2",
 ]);
 
+// Phase-2.15 narrow matrix: Phase-2.13 bge-large control + Stage-1 1D
+// sweeps (decay / wfusion τ / anchorTopK / dijkstra-tmp) under bge-large.
+// See CONFIGS entries labelled "2.15 ...".
+const PHASE_215_LABELS = new Set<string>([
+    "bfs wfusion tau=0.2 + decay=0.3 (Phase 2.1 best)",
+    "2.15 bfs wfusion τ=0.2 + decay=0.1",
+    "2.15 bfs wfusion τ=0.2 + decay=0.2",
+    "2.15 bfs wfusion τ=0.2 + decay=0.4",
+    "2.15 bfs wfusion τ=0.2 + decay=0.5",
+    "2.15 bfs wfusion τ=0.1 + decay=0.3",
+    "2.15 bfs wfusion τ=0.15 + decay=0.3",
+    "2.15 bfs wfusion τ=0.3 + decay=0.3",
+    "2.15 bfs wfusion τ=0.2 + decay=0.3 + K=3",
+    "2.15 bfs wfusion τ=0.2 + decay=0.3 + K=7",
+    "2.15 dijkstra tmp=0.3 wfusion τ=0.2 + decay=0.3",
+    "2.15 dijkstra tmp=0.5 wfusion τ=0.2 + decay=0.3",
+    "2.15 dijkstra tmp=0.7 wfusion τ=0.2 + decay=0.3",
+]);
+
 const CONFIG_SET = (process.env.CONFIG_SET ?? "").toLowerCase();
 
 const ACTIVE_CONFIGS =
@@ -703,9 +789,11 @@ const ACTIVE_CONFIGS =
           ? CONFIGS.filter((c) => PHASE_214_LABELS.has(c.label))
           : CONFIG_SET === "phase214-stage2"
             ? CONFIGS.filter((c) => PHASE_214_STAGE2_LABELS.has(c.label))
-            : TIER === "tier3"
-              ? CONFIGS_TIER3
-              : CONFIGS;
+            : CONFIG_SET === "phase215"
+              ? CONFIGS.filter((c) => PHASE_215_LABELS.has(c.label))
+              : TIER === "tier3"
+                ? CONFIGS_TIER3
+                : CONFIGS;
 
 type ConfigResult = {
     narrowed: number;
