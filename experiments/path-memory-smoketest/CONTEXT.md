@@ -2450,3 +2450,129 @@ research path.
 - `eval/eval-c-access.ts` — extended with `VARIANTS` (baseline vs 4a);
   per-trace wall-clock latency via `performance.now()`; `coverage@5`
   using `expectedClaimsAfterThisTurn` from the repeat-user traces
+
+## Phase 2.13 — Encoder upgrade round 2 (BGE-base / BGE-large) (2026-04-17)
+
+### Motivation
+
+Strategic-review #1 said `all-MiniLM-L6-v2` was the weakest link; Phase 2.7
+ran the first rung (MiniLM → BGE-small). That delivered a narrowing win
+(2/4 → 4/4 on tier-2 eval-B) but left coherence flat at 1/4. Phase 2.6/2.8
+diagnosed the residual ceiling as *within-cluster embedding granularity*
+— an embedding-layer limit no anchor-scoring primitive can fix. Phase 2.13
+takes the next rung within the same family: BGE-base (768d) and BGE-large
+(1024d) against BGE-small (384d) as control.
+
+Phase 7 (LongMemEval) and everything LLM-adjacent are currently parked;
+this is the only remaining non-LLM path with a pre-diagnosed target.
+
+### Swap
+
+`download-model.ts` gains `bge-base` and `bge-large` entries (both
+BAAI/bge-*-en-v1.5, CLS-pooled, same WordPiece family as BGE-small).
+`experiments/path-memory-smoketest/src/embedder.ts` is parameterized on
+`ENCODER=bge-small|bge-base|bge-large` with bge-base as the new default.
+Test and sweep harnesses read the same env var.
+
+### Results (tier-2, narrow Phase-2.13 matrix via `CONFIG_SET=phase213`)
+
+**Eval-A (`ENCODER=<…> TIER=tier2 CONFIG_SET=phase213 bun run eval/sweep.ts`):**
+
+| Config | bge-small | bge-base | bge-large |
+|---|---|---|---|
+| bfs (default) | 0.561 | 0.581 | **0.722** |
+| dijkstra tmp=0.5 | **0.627** | **0.649** | 0.573 |
+| A3 bfs wfusion τ=0.2 | 0.561 | 0.581 | **0.722** |
+| A3 dijkstra tmp=0.5 wfusion τ=0.2 | **0.627** | **0.649** | 0.573 |
+| J bfs min-gate τ=0.1 | **0.627** | 0.643 | 0.587 |
+| J bfs min-gate τ=0.2 | **0.627** | 0.643 | 0.587 |
+
+**Eval-B (`… bun run eval/iterative-sweep.ts`):**
+
+| Config | bge-small | bge-base | bge-large |
+|---|---|---|---|
+| bfs wfusion τ=0.2 (no decay) | 4/4 narrow · 1/4 coherent | 4/4 · 1/4 | 4/4 · 0/4 |
+| bfs wfusion τ=0.2 + decay=0.3 | 4/4 · 0/4 | 4/4 · **2/4** | 4/4 · **2/4** |
+| J min-gate τ=0.1 + decay=0.3 | 4/4 · 0/4 | 4/4 · 0/4 | 4/4 · 0/4 |
+| J min-gate τ=0.2 + decay=0.3 | 4/4 · 0/4 | 4/4 · 0/4 | 4/4 · 0/4 |
+
+### Outcome tag: **A — coherence ceiling lifts, migrate default**
+
+Both bge-base and bge-large hit the Phase-2.10 pass criterion
+(coherence ≥ 2/4 on tier-2 eval-B) that no prior anchor-scoring primitive
+ever reached. Eval-A either holds (bge-base +0.022) or jumps sharply
+(bge-large +0.095 on BFS). The eval-B ceiling Phase 2.6/2.8 attributed
+to embedding-layer granularity *was* real — and dim-scaling within the
+BGE family fixes it.
+
+### Side-findings
+
+1. **Phase 2.8's "sessionDecay off by default" is encoder-stale.** Under
+   bge-small, `decay=0.3` hurt coherence; under bge-base/large it's
+   *load-bearing* for the 2/4 lift (coherence is 0–1/4 without it). Phase
+   2.1's original "decay lifts coherence" claim (MiniLM era) re-emerges
+   at bigger encoders; it was masked by BGE-small's sweet-spot alignment
+   with no-decay.
+
+2. **BGE-large flips the traversal default.** On bge-large, BFS wins
+   eval-A (0.722) and Dijkstra regresses (0.573). Under bge-base the
+   Phase-2.8 default (Dijkstra + wfusion) still wins (0.649). This is
+   a structural encoder-geometry shift, not noise — 3 of 6 tested rows
+   show it consistently.
+
+3. **J min-gate is encoder-tuned to bge-small.** It tied for the tier-2
+   eval-A top at bge-small (0.627) and now regresses on both base/large.
+   Moves into the prune list alongside L, M α≥0.5, A1, H.
+
+### Migration
+
+**New default: `bge-base` (768d).** Reasons:
+- Gives the coherence lift 1/4 → 2/4 and the cleaner eval-A lift
+  (+0.022 on the Phase-2.8 default row — no traversal retune needed).
+- bge-large's extra +0.072 eval-A comes entirely from a BFS-flip that
+  *also* requires re-tuning the anchor-scoring primitive set.
+- Cost: ~3× bge-small per-embedding latency (vs ~5× for bge-large) and
+  436 MB on disk (vs 1.3 GB).
+- bge-large is available as an opt-in (`ENCODER=bge-large`) and
+  deserves its own phase to re-establish the traversal/anchor defaults
+  — logged for a future Phase 2.14 if scale results demand it.
+
+`experiments/path-memory-smoketest/src/embedder.ts` default → `bge-base`.
+Library default (`src/adapters/onnx-embedding.ts`) stays MiniLM for
+downstream-consumer back-compat — library consumers pass their own
+`modelDir`.
+
+### Implications for next session
+
+- **Coherence ceiling is no longer the primary bottleneck** on tier-2
+  eval-B. Moving from 2/4 to 3/4 is the publishable step; the remaining
+  2 failing arcs should be inspected claim-by-claim (which probes miss
+  under bge-base?) to see whether the gap is still embedding-layer or
+  has shifted to something else.
+- **Re-tag Phase-2.8 pruned-primitive list.** Session decay is back in
+  the on-by-default position under bge-base. J min-gate moves to the
+  prune list. Option M wasn't tested here (pruned per plan) but the
+  across-encoder tuning instability argues against re-introducing it
+  without a fresh encoder-specific sweep.
+- **BGE-large's BFS-flip is a standing question.** A separate
+  bge-large retuning pass could plausibly push eval-A above 0.722 by
+  finding BFS-friendly anchor primitives — decoupled from the coherence
+  question which is now resolved.
+
+### Files touched
+
+- `src/bin/download-model.ts` — `bge-base`, `bge-large` entries added
+  to the `MODELS` registry; help text updated.
+- `experiments/path-memory-smoketest/src/embedder.ts` — `ENCODER` env
+  var (default `bge-base`); per-encoder cache; exported `resolveEncoder`
+  + `ENCODER_DIMS`.
+- `experiments/path-memory-smoketest/tests/embedder.test.ts` — reads
+  encoder from the same source as the adapter; dimension assertion is
+  parameterized.
+- `experiments/path-memory-smoketest/tests/eval-iterative-tier2.test.ts`
+  — updated the Phase-2.1/2.7/2.13 encoder-history comment. No
+  assertion changes (narrowing floor still held).
+- `experiments/path-memory-smoketest/eval/sweep.ts`,
+  `experiments/path-memory-smoketest/eval/iterative-sweep.ts` —
+  `CONFIG_SET=phase213` filter that restricts the sweep matrix to the
+  narrow Phase-2.13 subset (BGE-era non-pruned rows only).

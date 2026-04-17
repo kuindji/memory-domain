@@ -4,15 +4,38 @@ import { OnnxEmbeddingAdapter } from "../../../src/adapters/onnx-embedding.js";
 import { CachedEmbeddingAdapter } from "../../../src/adapters/cached-embedding.js";
 import type { EmbeddingAdapter } from "../../../src/core/types.js";
 
-const here = dirname(fileURLToPath(import.meta.url));
-const MODEL_DIR = resolve(here, "../../../.memory-domain/model-bge-small");
+export type EncoderName = "bge-small" | "bge-base" | "bge-large";
 
-let cached: EmbeddingAdapter | null = null;
+export const ENCODER_DIMS: Record<EncoderName, number> = {
+    "bge-small": 384,
+    "bge-base": 768,
+    "bge-large": 1024,
+};
+
+const here = dirname(fileURLToPath(import.meta.url));
+
+const SUBDIRS: Record<EncoderName, string> = {
+    "bge-small": "model-bge-small",
+    "bge-base": "model-bge-base",
+    "bge-large": "model-bge-large",
+};
+
+export function resolveEncoder(): EncoderName {
+    const raw = (process.env.ENCODER ?? "bge-base").toLowerCase();
+    if (raw === "bge-small" || raw === "bge-base" || raw === "bge-large") return raw;
+    throw new Error(`Unknown ENCODER "${raw}" (expected one of: bge-small, bge-base, bge-large)`);
+}
+
+const cacheByEncoder = new Map<EncoderName, EmbeddingAdapter>();
 
 export async function getEmbedder(): Promise<EmbeddingAdapter> {
-    if (cached) return cached;
-    const onnx = new OnnxEmbeddingAdapter({ modelDir: MODEL_DIR, pooling: "cls" });
+    const encoder = resolveEncoder();
+    const existing = cacheByEncoder.get(encoder);
+    if (existing) return existing;
+    const modelDir = resolve(here, "../../../.memory-domain", SUBDIRS[encoder]);
+    const onnx = new OnnxEmbeddingAdapter({ modelDir, pooling: "cls" });
     await onnx.embed("warmup");
-    cached = new CachedEmbeddingAdapter(onnx);
+    const cached = new CachedEmbeddingAdapter(onnx);
+    cacheByEncoder.set(encoder, cached);
     return cached;
 }

@@ -112,16 +112,13 @@ describe("eval (B) — iterative arc convergence (tier 2)", () => {
         const baseline = await runArcs(memory, {}, "defaults (no session decay)");
         expect(baseline.narrowed).toBeGreaterThanOrEqual(Math.ceil(baseline.arcs / 2));
 
-        // Phase 2.1 (MiniLM era) locked in `decayed.coherent > baseline.coherent`.
-        // Phase 2.7 pre-flight swapped the encoder to BGE-small-en-v1.5: narrowing
-        // jumped to 4/4 at baseline (vs 2/4 with MiniLM), but session-decay's
-        // coherence lift disappeared — with a stronger encoder, "forget early
-        // turns" is no longer the right operator on tier-2 arcs. We still run
-        // the decayed config to exercise the code path and enforce the
-        // architectural floor on narrowing; the coherence direction is now an
-        // observational metric tracked by the iterative-sweep, not a unit-test
-        // invariant. See experiments/path-memory-smoketest/CONTEXT.md §
-        // Phase 2.7 pre-flight.
+        // Phase 2.1 (MiniLM) locked in `decayed.coherent > baseline.coherent`;
+        // Phase 2.7 (BGE-small) saw the lift disappear; Phase 2.13 (BGE-base,
+        // current default) brings it back: coherence rises 1/4 → 2/4 on tier-2
+        // when `decay=0.3` is paired with `bfs wfusion τ=0.2`. The coherence
+        // direction still oscillates per encoder, so it stays an observational
+        // metric tracked by iterative-sweep rather than a unit-test invariant.
+        // See experiments/path-memory-smoketest/CONTEXT.md § Phase 2.13.
         const decayed = await runArcs(
             memory,
             { sessionDecayTau: 0.3 },

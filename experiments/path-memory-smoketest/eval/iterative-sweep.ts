@@ -562,7 +562,24 @@ const CONFIGS_TIER3: Config[] = [
     },
 ];
 
-const ACTIVE_CONFIGS = TIER === "tier3" ? CONFIGS_TIER3 : CONFIGS;
+// Phase-2.13 narrow matrix for eval-B: Phase-2.1 defaults + J min-gate.
+// Pruned primitives (L, M α≥0.5, A1, H, J density) excluded per
+// path_memory_phase28 memory.
+const PHASE_213_LABELS = new Set<string>([
+    "bfs wfusion tau=0.2 (Phase 2.1 default)",
+    "bfs wfusion tau=0.2 + decay=0.3 (Phase 2.1 best)",
+    "J min-gate tau=0.1 + decay=0.3",
+    "J min-gate tau=0.2 + decay=0.3",
+]);
+
+const CONFIG_SET = (process.env.CONFIG_SET ?? "").toLowerCase();
+
+const ACTIVE_CONFIGS =
+    CONFIG_SET === "phase213"
+        ? CONFIGS.filter((c) => PHASE_213_LABELS.has(c.label))
+        : TIER === "tier3"
+          ? CONFIGS_TIER3
+          : CONFIGS;
 
 type ConfigResult = {
     narrowed: number;

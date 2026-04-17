@@ -532,7 +532,28 @@ const CONFIGS_TIER3: Config[] = [
     },
 ];
 
-const ACTIVE_CONFIGS = TIER === "tier3" ? CONFIGS_TIER3 : CONFIGS;
+// Phase-2.13 narrow matrix: baseline bfs, Phase 2.8 default
+// (dijkstra tmp=0.5 + wfusion τ=0.2), plus BGE-small's top tier-2 rows
+// (dijkstra tmp=0.5, J bfs min-gate τ ∈ {0.1, 0.2}) and bfs wfusion τ=0.2
+// for a without-Dijkstra control. Pruned primitives (L, M α≥0.5, A1, H,
+// J density, sessionDecay) are excluded per path_memory_phase28 memory.
+const PHASE_213_LABELS = new Set<string>([
+    "bfs (default)",
+    "dijkstra tmp=0.5",
+    "A3 bfs probe=weighted-fusion tau=0.2",
+    "A3 dijkstra tmp=0.5 probe=weighted-fusion tau=0.2",
+    "J bfs min-gate tau=0.1",
+    "J bfs min-gate tau=0.2",
+]);
+
+const CONFIG_SET = (process.env.CONFIG_SET ?? "").toLowerCase();
+
+const ACTIVE_CONFIGS =
+    CONFIG_SET === "phase213"
+        ? CONFIGS.filter((c) => PHASE_213_LABELS.has(c.label))
+        : TIER === "tier3"
+          ? CONFIGS_TIER3
+          : CONFIGS;
 
 type ConfigResult = {
     mean: number;

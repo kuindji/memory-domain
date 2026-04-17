@@ -9,6 +9,8 @@
  * Supported models:
  *   minilm     all-MiniLM-L6-v2           (default, 384d, ~86 MB)
  *   bge-small  BAAI/bge-small-en-v1.5     (384d, ~133 MB, CLS-pooled)
+ *   bge-base   BAAI/bge-base-en-v1.5      (768d, ~436 MB, CLS-pooled)
+ *   bge-large  BAAI/bge-large-en-v1.5     (1024d, ~1.3 GB, CLS-pooled)
  */
 
 import { createWriteStream, existsSync } from "node:fs";
@@ -52,6 +54,32 @@ const MODELS: Record<string, ModelSpec> = {
             {
                 name: "vocab.txt",
                 url: "https://huggingface.co/BAAI/bge-small-en-v1.5/resolve/main/vocab.txt",
+            },
+        ],
+    },
+    "bge-base": {
+        defaultSubdir: "model-bge-base",
+        files: [
+            {
+                name: "model.onnx",
+                url: "https://huggingface.co/BAAI/bge-base-en-v1.5/resolve/main/onnx/model.onnx",
+            },
+            {
+                name: "vocab.txt",
+                url: "https://huggingface.co/BAAI/bge-base-en-v1.5/resolve/main/vocab.txt",
+            },
+        ],
+    },
+    "bge-large": {
+        defaultSubdir: "model-bge-large",
+        files: [
+            {
+                name: "model.onnx",
+                url: "https://huggingface.co/BAAI/bge-large-en-v1.5/resolve/main/onnx/model.onnx",
+            },
+            {
+                name: "vocab.txt",
+                url: "https://huggingface.co/BAAI/bge-large-en-v1.5/resolve/main/vocab.txt",
             },
         ],
     },
