@@ -19,4 +19,17 @@ describe("embedder", () => {
         const b = await emb.embed("identical text smoke test");
         expect(a).toBe(b); // cache returns same reference
     });
+
+    test("semantically-different sentences produce materially different vectors", async () => {
+        const emb = await getEmbedder();
+        const a = await emb.embed(
+            "The photosynthesis process converts sunlight into chemical energy.",
+        );
+        const b = await emb.embed("Mount Everest is the tallest peak above sea level.");
+        let dot = 0;
+        for (let i = 0; i < a.length; i++) dot += a[i] * b[i];
+        // Both are L2-normalized so dot == cosine. A vocab/pooling mismatch
+        // tends to produce near-degenerate vectors; require real separation.
+        expect(dot).toBeLessThan(0.95);
+    });
 });

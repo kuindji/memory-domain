@@ -20,15 +20,16 @@ npm install @kuindji/memory-domain
 
 ### First-time setup: download the embedding model
 
-`OnnxEmbeddingAdapter` needs the all-MiniLM-L6-v2 ONNX model (~86 MB) and its vocab file. Fetch them with:
+`OnnxEmbeddingAdapter` needs a BERT-family ONNX encoder and its vocab file. Fetch them with:
 
 ```bash
-npx memory-domain-download-model
+npx memory-domain-download-model                     # default: all-MiniLM-L6-v2 (~86 MB, mean-pooled)
+npx memory-domain-download-model --model bge-small   # BAAI/bge-small-en-v1.5 (~133 MB, CLS-pooled)
 # or to a custom location:
 npx memory-domain-download-model --dir ./my-models
 ```
 
-By default this writes to `./.memory-domain/model/` relative to the current directory, which is where `new OnnxEmbeddingAdapter()` looks. If you download elsewhere, pass the same path to the adapter via `new OnnxEmbeddingAdapter({ modelDir: "./my-models" })`.
+By default MiniLM writes to `./.memory-domain/model/` and BGE-small writes to `./.memory-domain/model-bge-small/` relative to the current directory. `new OnnxEmbeddingAdapter()` defaults to the MiniLM path; point it elsewhere via `new OnnxEmbeddingAdapter({ modelDir: "./my-models" })`. BGE-small requires `pooling: "cls"` to match its training objective; MiniLM stays on the default `"mean"`.
 
 ## Quick Start
 

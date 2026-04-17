@@ -1,5 +1,6 @@
 /**
- * ONNX-based local embedding adapter using a BERT-family model (all-MiniLM-L6-v2).
+ * ONNX-based local embedding adapter for BERT-family encoders
+ * (e.g. all-MiniLM-L6-v2 with mean pooling, BGE-small-en-v1.5 with CLS pooling).
  * Runs entirely offline — no API calls needed.
  */
 
@@ -9,17 +10,21 @@ import { existsSync } from "node:fs";
 import type { EmbeddingAdapter } from "../core/types.js";
 import { WordPieceTokenizer } from "./wordpiece-tokenizer.js";
 
+type PoolingStrategy = "mean" | "cls";
+
 interface OnnxEmbeddingConfig {
     modelDir?: string;
     modelFile?: string;
     vocabFile?: string;
     maxSequenceLength?: number;
+    pooling?: PoolingStrategy;
 }
 
 const DEFAULT_MODEL_DIR = resolve(process.cwd(), ".memory-domain", "model");
 const DEFAULT_MODEL_FILE = "model.onnx";
 const DEFAULT_VOCAB_FILE = "vocab.txt";
 const DEFAULT_MAX_SEQ_LENGTH = 512;
+const DEFAULT_POOLING: PoolingStrategy = "mean";
 
 class OnnxEmbeddingAdapter implements EmbeddingAdapter {
     private session: ort.InferenceSession | null = null;
@@ -27,6 +32,7 @@ class OnnxEmbeddingAdapter implements EmbeddingAdapter {
     private modelPath: string;
     private vocabPath: string;
     private maxSeqLength: number;
+    private pooling: PoolingStrategy;
     private embeddingDimension: number = 0;
 
     constructor(config?: OnnxEmbeddingConfig) {
@@ -34,6 +40,7 @@ class OnnxEmbeddingAdapter implements EmbeddingAdapter {
         this.modelPath = join(dir, config?.modelFile ?? DEFAULT_MODEL_FILE);
         this.vocabPath = join(dir, config?.vocabFile ?? DEFAULT_VOCAB_FILE);
         this.maxSeqLength = config?.maxSequenceLength ?? DEFAULT_MAX_SEQ_LENGTH;
+        this.pooling = config?.pooling ?? DEFAULT_POOLING;
     }
 
     get dimension(): number {
@@ -105,29 +112,44 @@ class OnnxEmbeddingAdapter implements EmbeddingAdapter {
         const data = outputTensor.data as Float32Array;
         const dims = outputTensor.dims;
 
-        // Mean pooling over sequence dimension with attention mask
-        const results: number[][] = [];
         const hiddenSize = dims[dims.length - 1];
         const seqLength = dims.length === 3 ? dims[1] : this.maxSeqLength;
 
+        if (this.pooling === "cls" && dims.length !== 3) {
+            throw new Error(
+                `CLS pooling requires a 3-D last-hidden-state output; got dims [${dims.join(", ")}]`,
+            );
+        }
+
+        const results: number[][] = [];
+
         for (let b = 0; b < batchSize; b++) {
             const embedding = new Float32Array(hiddenSize);
-            let tokenCount = 0;
 
-            for (let s = 0; s < seqLength; s++) {
-                const maskIdx = b * this.maxSeqLength + s;
-                if (allAttentionMasks[maskIdx] === 0) continue;
-                tokenCount++;
-
-                const offset = b * seqLength * hiddenSize + s * hiddenSize;
+            if (this.pooling === "cls") {
+                // CLS token is always at position 0 of the sequence dimension.
+                const offset = b * seqLength * hiddenSize;
                 for (let h = 0; h < hiddenSize; h++) {
-                    embedding[h] += data[offset + h] ?? 0;
+                    embedding[h] = data[offset + h] ?? 0;
                 }
-            }
+            } else {
+                // Mean pooling over sequence dimension with attention mask.
+                let tokenCount = 0;
+                for (let s = 0; s < seqLength; s++) {
+                    const maskIdx = b * this.maxSeqLength + s;
+                    if (allAttentionMasks[maskIdx] === 0) continue;
+                    tokenCount++;
 
-            if (tokenCount > 0) {
-                for (let h = 0; h < hiddenSize; h++) {
-                    embedding[h] /= tokenCount;
+                    const offset = b * seqLength * hiddenSize + s * hiddenSize;
+                    for (let h = 0; h < hiddenSize; h++) {
+                        embedding[h] += data[offset + h] ?? 0;
+                    }
+                }
+
+                if (tokenCount > 0) {
+                    for (let h = 0; h < hiddenSize; h++) {
+                        embedding[h] /= tokenCount;
+                    }
                 }
             }
 

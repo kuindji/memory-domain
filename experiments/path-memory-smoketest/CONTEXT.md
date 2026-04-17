@@ -144,8 +144,9 @@ Per the approved plan (`~/.claude/plans/swirling-churning-spindle.md`):
   responsibility, not a retriever feature**, keeping the retriever
   composable.
 - `embedder.ts` wraps the parent project's `OnnxEmbeddingAdapter`
-  (all-MiniLM-L6-v2 via ONNX runtime) + cache. Deterministic, local, no
-  API calls.
+  (BGE-small-en-v1.5 via ONNX runtime, CLS-pooled + L2 normalized —
+  pre-Phase-2.7 this was MiniLM-L6-v2) + cache. Deterministic,
+  local, no API calls.
 
 ### Data model
 
@@ -1373,6 +1374,91 @@ Source: current working tree. Files touched:
   eval-A gate.
 
 84 tests pass (was 81 pre-Phase-2.6). Typecheck, lint, format clean.
+
+### Phase 2.7 pre-flight — embedder upgrade (MiniLM → BGE-small-en-v1.5)
+
+**Motivation.** Strategic review 2026-04-17 (see memory
+`path_memory_strategic_review`) flagged `all-MiniLM-L6-v2` (384d,
+2021) as the weakest link. Phase 2.6 attributed the eval-B 2/4 floor
+to within-cluster embedding granularity — an embedding-layer limit
+no anchor-scoring primitive can fix. Before committing sonnet time
+to the ~60-article tier-3 split, isolate whether a stronger encoder
+lifts the floor.
+
+**Swap.** `BAAI/bge-small-en-v1.5` — BERT-based, 384d, WordPiece
+vocab byte-identical to MiniLM (sha256 verified), CLS-pooled. New
+`pooling: "mean" | "cls"` config on `OnnxEmbeddingAdapter`. Smoke
+test now resolves `.memory-domain/model-bge-small/`; library default
+stays MiniLM. MiniLM is preserved side-by-side for A/B.
+
+**Baselines to beat** (Phase 2.6, same corpora):
+- eval-A: baseline-bfs 0.544, M α=0.5 0.566.
+- eval-B: M α=0.5 converges 2/4 narrowed + 2/4 coherent;
+  session-decay τ=0.3 paired — same eval-B, small eval-A lift.
+
+**Success conditions (tag outcome explicitly):**
+- **A.** eval-B floor moves (2/4 → 3/4 or 4/4) → encoder was the
+  bottleneck; tier-3 validation becomes meaningful.
+- **B.** Floor holds at 2/4 but eval-A lifts or at least holds →
+  better encoder, same structural ceiling; tier-3 still defensible
+  but failure-mode #3 (within-cluster) is the expected result.
+- **C.** Metrics regress or hold flat → defer encoder upgrade or
+  pick a different encoder; do not spend sonnet budget on tier-3.
+
+**Outcome: split — A on narrowing, C on Phase-2.6 primitive tuning.**
+
+eval-B (tier-2 iterative-sweep, BGE-small + CLS pooling):
+- **Narrowing lifted to 4/4 across every config** — the prior 2/4 floor
+  was an encoder-layer limit. Architectural win, condition A.
+- Coherence held at 0–1/4 across the entire swept matrix. Best rows
+  match prior best (1/4), not improved. M α ∈ {0.3, 0.5, 0.7, 1.0}
+  + decay=0.3 all converge 1/4 coherent. Phase-2.6's headline
+  (M α=0.5 → 2/4 coherent, MiniLM) did **not** replicate; the
+  anchor-scoring tuning was encoder-specific.
+
+eval-A (tier-2 sweep, BGE-small + CLS pooling):
+- Baseline bfs: 0.561 (MiniLM was 0.544) — small lift.
+- **Dijkstra-traversal variants are now the top performers at 0.627**,
+  including plain dijkstra tmp=0.5 and every A2 idf-fusion paired with
+  dijkstra. Under MiniLM the strategic review had marked Dijkstra
+  "inert or harmful" — BGE-small's geometry flips that call.
+- M α=0.5 on bfs: 0.443 (MiniLM was 0.566) — **regression**. The
+  primitive is encoder-tuned.
+- J min-gate τ ∈ {0.1, 0.2}: 0.627, on par with Dijkstra.
+
+**Implications for next session:**
+- Do **not** run the ~60-article tier-3 sonnet split on the current
+  M α=0.5 config — that tuning is stale.
+- The encoder swap is a keep. Narrowing breakthrough (2/4 → 4/4) is
+  the strongest single-primitive win in Phase 2; dijkstra lift on
+  eval-A is the secondary.
+- Before tier-3, re-sweep Phase-2-series primitives against
+  BGE-small. Dijkstra-based paths look like the new working default.
+  Option M may no longer be net-positive; re-validate at α ∈
+  {0.3, 0.5} on Dijkstra rather than BFS.
+- Coherence ceiling still at ~1/4 on tier-2 eval-B — BGE-small moved
+  narrowing, not coherence. That gap now plausibly belongs to
+  recommendation #2 (Phase 3 access tracking → well-worn paths) from
+  the strategic review, not anchor-layer primitives.
+
+**Pre-flight delivered:**
+- `src/adapters/onnx-embedding.ts` — new `pooling: "mean" | "cls"`
+  config; CLS path reads position-0 of sequence dim, then L2-norm.
+  Mean-pool path unchanged (MiniLM still default).
+- `src/bin/download-model.ts` — `--model {minilm, bge-small}` flag;
+  bge-small lands in `.memory-domain/model-bge-small/`.
+- `experiments/path-memory-smoketest/src/embedder.ts` — now points
+  at the bge-small dir with `pooling: "cls"`.
+- `experiments/path-memory-smoketest/tests/embedder.test.ts` — new
+  sanity test asserts dissimilar sentences produce cosine < 0.95
+  (catches vocab/pooling mismatch).
+- `experiments/path-memory-smoketest/tests/eval-iterative-tier2.test.ts`
+  — dropped the Phase-2.1 `decayed.coherent > baseline.coherent`
+  direction-lock (encoder-specific, now false under BGE-small).
+  Narrowing floor is still asserted.
+
+85 smoke-test tests pass. 548/549 main tests pass (one pre-existing
+flaky user-domain consolidation test, unrelated).
 
 ### Phase 2.4 delivered
 

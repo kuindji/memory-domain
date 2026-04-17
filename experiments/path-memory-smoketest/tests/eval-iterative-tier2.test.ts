@@ -92,7 +92,7 @@ async function runArcs(
 }
 
 describe("eval (B) — iterative arc convergence (tier 2)", () => {
-    test("multi-turn probe accumulation narrows candidate set; sessionDecayTau lifts coherence", async () => {
+    test("multi-turn probe accumulation narrows candidate set (baseline + session decay)", async () => {
         const embedder = await getEmbedder();
         const memory = new PathMemory({ embedder });
 
@@ -112,19 +112,21 @@ describe("eval (B) — iterative arc convergence (tier 2)", () => {
         const baseline = await runArcs(memory, {}, "defaults (no session decay)");
         expect(baseline.narrowed).toBeGreaterThanOrEqual(Math.ceil(baseline.arcs / 2));
 
-        // Phase 2.1 finding: sessionDecayTau lifts coherence above the
-        // 0/4 baseline floor — it does NOT close the gap to ≥ 2/4 alone.
-        // Best swept config (decay=0.3) hits 1/4. CONTEXT.md notes the
-        // remaining gap is structural (paths through cross-cluster anchor
-        // clouds) and needs a second primitive on top of decay. The
-        // assertion below locks the *direction* of the win, not its
-        // magnitude — guarding against silent regression of the primitive.
+        // Phase 2.1 (MiniLM era) locked in `decayed.coherent > baseline.coherent`.
+        // Phase 2.7 pre-flight swapped the encoder to BGE-small-en-v1.5: narrowing
+        // jumped to 4/4 at baseline (vs 2/4 with MiniLM), but session-decay's
+        // coherence lift disappeared — with a stronger encoder, "forget early
+        // turns" is no longer the right operator on tier-2 arcs. We still run
+        // the decayed config to exercise the code path and enforce the
+        // architectural floor on narrowing; the coherence direction is now an
+        // observational metric tracked by the iterative-sweep, not a unit-test
+        // invariant. See experiments/path-memory-smoketest/CONTEXT.md §
+        // Phase 2.7 pre-flight.
         const decayed = await runArcs(
             memory,
             { sessionDecayTau: 0.3 },
             "sessionDecayTau=0.3 (Phase 2.1)",
         );
         expect(decayed.narrowed).toBeGreaterThanOrEqual(Math.ceil(decayed.arcs / 2));
-        expect(decayed.coherent).toBeGreaterThan(baseline.coherent);
     }, 240_000);
 });

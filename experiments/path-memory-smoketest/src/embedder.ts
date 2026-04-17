@@ -5,13 +5,13 @@ import { CachedEmbeddingAdapter } from "../../../src/adapters/cached-embedding.j
 import type { EmbeddingAdapter } from "../../../src/core/types.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const MODEL_DIR = resolve(here, "../../../.memory-domain/model");
+const MODEL_DIR = resolve(here, "../../../.memory-domain/model-bge-small");
 
 let cached: EmbeddingAdapter | null = null;
 
 export async function getEmbedder(): Promise<EmbeddingAdapter> {
     if (cached) return cached;
-    const onnx = new OnnxEmbeddingAdapter({ modelDir: MODEL_DIR });
+    const onnx = new OnnxEmbeddingAdapter({ modelDir: MODEL_DIR, pooling: "cls" });
     await onnx.embed("warmup");
     cached = new CachedEmbeddingAdapter(onnx);
     return cached;
