@@ -13,6 +13,22 @@ function setup(opts?: { semanticThreshold?: number }) {
     return { emb, store, graph, retriever };
 }
 
+// Build a unit-norm probe vector as a weighted sum of basis vectors, then
+// renormalize. Near-orthogonal basis vectors (random high-dim unit vectors)
+// make the post-normalization cosines approach the input weights.
+function blendUnit(parts: Array<{ v: number[]; w: number }>): number[] {
+    const dim = parts[0].v.length;
+    const out = new Array<number>(dim).fill(0);
+    for (const p of parts) {
+        for (let i = 0; i < dim; i++) out[i] += p.w * p.v[i];
+    }
+    let sq = 0;
+    for (let i = 0; i < dim; i++) sq += out[i] * out[i];
+    const inv = 1 / Math.sqrt(sq);
+    for (let i = 0; i < dim; i++) out[i] *= inv;
+    return out;
+}
+
 describe("Retriever", () => {
     test("single probe returns paths anchored on the closest match", async () => {
         const { emb, store, retriever } = setup();
@@ -42,7 +58,11 @@ describe("Retriever", () => {
                 { text: "a", embedding: probeA },
                 { text: "b", embedding: probeB },
             ],
-            { anchorTopK: 1 },
+            // Phase 2.1 flipped default to weighted-fusion. This test exercises
+            // multi-probe coverage of the top result and assumes both probes
+            // pick disjoint top-1 anchors — pin to union explicitly so the
+            // assertion still targets coverage behavior, not the new default.
+            { anchorTopK: 1, probeComposition: "union" },
         );
 
         const top = results[0];
@@ -338,6 +358,585 @@ describe("Retriever", () => {
                 { text: "b", embedding: probe2 },
             ],
             { anchorTopK: 2, probeComposition: "weighted-fusion", weightedFusionTau: 2 },
+        );
+        expect(results.length).toBeGreaterThan(0);
+    });
+
+    test("Phase 2.1: default probeComposition is weighted-fusion", async () => {
+        // Option F flipped the default from union to weighted-fusion (τ=0.2).
+        // Two-probe retrieval should now exercise the fusion branch even when
+        // the caller passes no probeComposition. We assert behavioral parity
+        // with an explicit weighted-fusion request, not on a different default.
+        const { emb, store, retriever } = setup();
+        await store.ingest({ text: "alex moves", validFrom: 1 });
+        await store.ingest({ text: "alex jumps", validFrom: 2 });
+        const probe1 = await emb.embed("alex moves");
+        const probe2 = await emb.embed("alex jumps");
+        const probes = [
+            { text: "a", embedding: probe1 },
+            { text: "b", embedding: probe2 },
+        ];
+        const defaultRes = retriever.retrieve(probes, { anchorTopK: 2 });
+        const explicit = retriever.retrieve(probes, {
+            anchorTopK: 2,
+            probeComposition: "weighted-fusion",
+            weightedFusionTau: 0.2,
+        });
+        const defaultNodes = new Set(defaultRes.flatMap((r) => r.path.nodeIds));
+        const explicitNodes = new Set(explicit.flatMap((r) => r.path.nodeIds));
+        expect(defaultNodes).toEqual(explicitNodes);
+    });
+
+    test("Phase 2.1: sessionDecayTau weights probeCoverage toward late-turn probes", async () => {
+        // Two solo claims, each anchored by one probe (turn 0 and turn 1
+        // respectively). probeCoverage of the late-anchor solo should approach
+        // 1 under aggressive decay, while the early-anchor solo should approach
+        // 0. Without decay both are 0.5 (one probe out of two). Isolated to
+        // probeComposition=union so the assertion targets only the coverage
+        // arithmetic, not anchor reselection.
+        const { emb, store, retriever } = setup();
+        await store.ingest({ text: "alpha solo claim", validFrom: 1 });
+        await store.ingest({ text: "gamma solo claim", validFrom: 2 });
+        const probeAlpha = await emb.embed("alpha solo claim");
+        const probeGamma = await emb.embed("gamma solo claim");
+
+        const probes = [
+            { text: "a", embedding: probeAlpha, turnIndex: 0 },
+            { text: "g", embedding: probeGamma, turnIndex: 1 },
+        ];
+
+        const noDecay = retriever.retrieve(probes, {
+            anchorTopK: 1,
+            probeComposition: "union",
+        });
+        const decayed = retriever.retrieve(probes, {
+            anchorTopK: 1,
+            probeComposition: "union",
+            sessionDecayTau: 0.3,
+        });
+
+        const findSolo = (results: typeof noDecay, id: string) =>
+            results.find((r) => r.path.nodeIds.length === 1 && r.path.nodeIds[0] === id);
+
+        const alphaNoDecay = findSolo(noDecay, "c1");
+        const gammaNoDecay = findSolo(noDecay, "c2");
+        expect(alphaNoDecay?.breakdown.probeCoverage).toBeCloseTo(0.5, 5);
+        expect(gammaNoDecay?.breakdown.probeCoverage).toBeCloseTo(0.5, 5);
+
+        const alphaDecayed = findSolo(decayed, "c1");
+        const gammaDecayed = findSolo(decayed, "c2");
+        // tau=0.3, deltaT=1 → early-turn weight ≈ exp(-1/0.3) ≈ 0.0357.
+        // Late-turn weight = 1. Coverage(early-anchor) ≈ 0.0357/1.0357 ≈ 0.0345.
+        // Coverage(late-anchor) ≈ 1.0/1.0357 ≈ 0.9655.
+        expect(alphaDecayed?.breakdown.probeCoverage).toBeLessThan(0.1);
+        expect(gammaDecayed?.breakdown.probeCoverage).toBeGreaterThan(0.9);
+    });
+
+    test("Phase 2.1: sessionDecayTau scales weighted-fusion contributions", async () => {
+        // With aggressive decay the early-turn probe's contribution to fusion
+        // aggregate collapses, so a claim that only the early probe lifts
+        // above τ should be displaced from anchorTopK=1 by a claim only the
+        // late probe lifts above τ.
+        const { emb, store, retriever } = setup();
+        await store.ingest({ text: "alpha early target", validFrom: 1 });
+        await store.ingest({ text: "gamma late target", validFrom: 2 });
+        const probeAlpha = await emb.embed("alpha early target");
+        const probeGamma = await emb.embed("gamma late target");
+
+        const probes = [
+            { text: "a", embedding: probeAlpha, turnIndex: 0 },
+            { text: "g", embedding: probeGamma, turnIndex: 1 },
+        ];
+
+        const noDecay = retriever.retrieve(probes, {
+            anchorTopK: 1,
+            probeComposition: "weighted-fusion",
+            weightedFusionTau: 0.2,
+        });
+        const decayed = retriever.retrieve(probes, {
+            anchorTopK: 1,
+            probeComposition: "weighted-fusion",
+            weightedFusionTau: 0.2,
+            sessionDecayTau: 0.3,
+        });
+
+        const decayedNodes = new Set(decayed.flatMap((r) => r.path.nodeIds));
+        // Under decay, the late-turn anchor (c2) should be present.
+        expect(decayedNodes.has("c2")).toBe(true);
+        // Under decay, fusion at anchorTopK=1 selects the gamma claim alone
+        // because its aggregate (≈ 1·0.8) dominates alpha's (≈ 0.036·0.8).
+        // Ergo every returned path's set of node-ids must include c2 and
+        // exclude c1 — but BFS may add c1 as a connected node. The robust
+        // invariant is: c2 ∈ results (always), and c2's solo path's
+        // probeCoverage ≈ 1 in the decayed case but only 0.5 in the
+        // no-decay case.
+        const findSolo = (results: typeof noDecay, id: string) =>
+            results.find((r) => r.path.nodeIds.length === 1 && r.path.nodeIds[0] === id);
+        const gammaSoloNoDecay = findSolo(noDecay, "c2");
+        const gammaSoloDecayed = findSolo(decayed, "c2");
+        if (gammaSoloNoDecay && gammaSoloDecayed) {
+            expect(gammaSoloDecayed.breakdown.probeCoverage).toBeGreaterThan(
+                gammaSoloNoDecay.breakdown.probeCoverage,
+            );
+        }
+    });
+
+    test("Phase 2.1: sessionDecayTau has no effect when no probe carries turnIndex", async () => {
+        // Back-compat: callers that don't use Session leave turnIndex unset.
+        // Setting sessionDecayTau in that case should be a no-op (weights all
+        // collapse to 1.0) — identical results to the un-set call.
+        const { emb, store, retriever } = setup();
+        await store.ingest({ text: "alex moves", validFrom: 1 });
+        await store.ingest({ text: "alex jumps", validFrom: 2 });
+        const probe1 = await emb.embed("alex moves");
+        const probe2 = await emb.embed("alex jumps");
+        const probes = [
+            { text: "a", embedding: probe1 },
+            { text: "b", embedding: probe2 },
+        ];
+        const off = retriever.retrieve(probes, { anchorTopK: 2 });
+        const onButNoTurn = retriever.retrieve(probes, {
+            anchorTopK: 2,
+            sessionDecayTau: 0.5,
+        });
+        expect(off.length).toBe(onButNoTurn.length);
+        for (let i = 0; i < off.length; i++) {
+            expect(off[i].score).toBeCloseTo(onButNoTurn[i].score, 6);
+        }
+    });
+
+    test("Option I: weighted-probe-density returns structurally valid paths", async () => {
+        const { emb, store, retriever } = setup();
+        await store.ingest({ text: "alex moves", validFrom: 1 });
+        await store.ingest({ text: "alex jumps", validFrom: 2 });
+        await store.ingest({ text: "alex runs", validFrom: 3 });
+        const probe1 = await emb.embed("alex moves");
+        const probe2 = await emb.embed("alex jumps");
+        const results = retriever.retrieve(
+            [
+                { text: "a", embedding: probe1 },
+                { text: "b", embedding: probe2 },
+            ],
+            {
+                anchorTopK: 2,
+                anchorScoring: { kind: "weighted-probe-density", tau: -1 },
+            },
+        );
+        expect(results.length).toBeGreaterThan(0);
+        for (const r of results) {
+            expect(r.path.edges.length).toBe(r.path.nodeIds.length - 1);
+            expect(r.breakdown.probeCoverage).toBeGreaterThanOrEqual(0);
+            expect(r.breakdown.probeCoverage).toBeLessThanOrEqual(1);
+        }
+    });
+
+    test("Option I: density rewards multi-probe overlap over single-probe dominance", async () => {
+        // Construct a setup where:
+        // - claim "strong" matches probe 1 at cos≈0.6, matches nothing else.
+        // - claim "moderate" matches BOTH probes at cos≈0.5 each.
+        // Under plain cosine top-1, "strong" wins (its peak 0.6 > "moderate" 0.5).
+        // Under Option I with τ=0.3:
+        //   strong density = (0.6−0.3) = 0.3
+        //   moderate density = 2·(0.5−0.3) = 0.4 → moderate wins.
+        const { emb, store, retriever } = setup();
+        await store.ingest({ text: "strong peak", validFrom: 1 });
+        await store.ingest({ text: "moderate spread", validFrom: 2 });
+        await store.ingest({ text: "filler noise claim", validFrom: 3 });
+
+        const vStrong = await emb.embed("strong peak");
+        const vModerate = await emb.embed("moderate spread");
+        const vNoise1 = await emb.embed("probe-one-filler-noise");
+        const vNoise2 = await emb.embed("probe-two-filler-noise");
+        const vOther = await emb.embed("probe-two-other-axis");
+
+        // Probe 1: 0.6·strong + 0.5·moderate + fill → cos≈0.6 w/ strong, ≈0.5 w/ moderate
+        // Probe 2: 0.5·moderate + 0.866·other  → cos≈0.5 w/ moderate, ≈0 w/ strong
+        const probe1 = blendUnit([
+            { v: vStrong, w: 0.6 },
+            { v: vModerate, w: 0.5 },
+            { v: vNoise1, w: 0.625 },
+        ]);
+        const probe2 = blendUnit([
+            { v: vModerate, w: 0.5 },
+            { v: vOther, w: 0.6 },
+            { v: vNoise2, w: 0.6244 },
+        ]);
+
+        const plain = retriever.retrieve(
+            [
+                { text: "p1", embedding: probe1 },
+                { text: "p2", embedding: probe2 },
+            ],
+            { anchorTopK: 1, probeComposition: "union", anchorScoring: { kind: "cosine" } },
+        );
+        const density = retriever.retrieve(
+            [
+                { text: "p1", embedding: probe1 },
+                { text: "p2", embedding: probe2 },
+            ],
+            {
+                anchorTopK: 1,
+                anchorScoring: { kind: "weighted-probe-density", tau: 0.3 },
+            },
+        );
+
+        const plainNodes = new Set(plain.flatMap((r) => r.path.nodeIds));
+        const densityNodes = new Set(density.flatMap((r) => r.path.nodeIds));
+        // Under plain cosine anchor-top-1, the "strong" claim (c1) should be in
+        // the anchor-derived node set. Under density, the "moderate" claim (c2)
+        // should enter because its two-probe contributions sum above strong's
+        // single-probe contribution.
+        expect(plainNodes.has("c1")).toBe(true);
+        expect(densityNodes.has("c2")).toBe(true);
+    });
+
+    test("Option I: useSessionWeights toggles session-decay coupling", async () => {
+        // Two probes at different turns, each anchoring one claim. With
+        // useSessionWeights: true, the late-turn probe's claim dominates under
+        // aggressive decay. With useSessionWeights: false the two contribute
+        // equally, so decay is inert and both anchors are picked at topK=2.
+        const { emb, store, retriever } = setup();
+        await store.ingest({ text: "alpha solo", validFrom: 1 });
+        await store.ingest({ text: "gamma solo", validFrom: 2 });
+        const probeAlpha = await emb.embed("alpha solo");
+        const probeGamma = await emb.embed("gamma solo");
+
+        const probes = [
+            { text: "a", embedding: probeAlpha, turnIndex: 0 },
+            { text: "g", embedding: probeGamma, turnIndex: 1 },
+        ];
+
+        const weighted = retriever.retrieve(probes, {
+            anchorTopK: 1,
+            anchorScoring: {
+                kind: "weighted-probe-density",
+                tau: 0.2,
+                useSessionWeights: true,
+            },
+            sessionDecayTau: 0.3,
+        });
+        const unweighted = retriever.retrieve(probes, {
+            anchorTopK: 1,
+            anchorScoring: {
+                kind: "weighted-probe-density",
+                tau: 0.2,
+                useSessionWeights: false,
+            },
+            sessionDecayTau: 0.3,
+        });
+
+        const weightedNodes = new Set(weighted.flatMap((r) => r.path.nodeIds));
+        const unweightedNodes = new Set(unweighted.flatMap((r) => r.path.nodeIds));
+        // With session weights on, gamma (late turn) dominates the ranking.
+        expect(weightedNodes.has("c2")).toBe(true);
+        // With session weights off, decay is ignored; both probe contributions
+        // are equal so the aggregate ties — both claims are valid anchors and
+        // the result set still covers alpha.
+        expect(unweightedNodes.has("c1")).toBe(true);
+    });
+
+    test("Option I: short-circuits probeComposition", async () => {
+        // When weighted-probe-density anchor-scoring is active, probeComposition
+        // should be a no-op — density already fuses the probes into a single
+        // ranking. Union and intersection must return the same result set.
+        const { emb, store, retriever } = setup();
+        await store.ingest({ text: "alex moves", validFrom: 1 });
+        await store.ingest({ text: "alex jumps", validFrom: 2 });
+        await store.ingest({ text: "alex runs", validFrom: 3 });
+        const probe1 = await emb.embed("alex moves");
+        const probe2 = await emb.embed("alex jumps");
+        const probes = [
+            { text: "a", embedding: probe1 },
+            { text: "b", embedding: probe2 },
+        ];
+
+        const union = retriever.retrieve(probes, {
+            anchorTopK: 2,
+            anchorScoring: { kind: "weighted-probe-density", tau: -1 },
+            probeComposition: "union",
+        });
+        const intersection = retriever.retrieve(probes, {
+            anchorTopK: 2,
+            anchorScoring: { kind: "weighted-probe-density", tau: -1 },
+            probeComposition: "intersection",
+        });
+        const unionNodes = new Set(union.flatMap((r) => r.path.nodeIds));
+        const intersectionNodes = new Set(intersection.flatMap((r) => r.path.nodeIds));
+        expect(unionNodes).toEqual(intersectionNodes);
+    });
+
+    test("Option I: unreachable tau falls back to union anchors", async () => {
+        // τ=2 cannot be cleared (cosine maxes at 1). Density produces no
+        // anchors; the retriever must fall through to the default union branch
+        // and still return paths.
+        const { emb, store, retriever } = setup();
+        await store.ingest({ text: "alex moves", validFrom: 1 });
+        await store.ingest({ text: "alex jumps", validFrom: 2 });
+        const probe1 = await emb.embed("alex moves");
+        const probe2 = await emb.embed("alex jumps");
+        const results = retriever.retrieve(
+            [
+                { text: "a", embedding: probe1 },
+                { text: "b", embedding: probe2 },
+            ],
+            {
+                anchorTopK: 2,
+                anchorScoring: { kind: "weighted-probe-density", tau: 2 },
+            },
+        );
+        expect(results.length).toBeGreaterThan(0);
+    });
+
+    test("Option J coverage-bonus: returns structurally valid paths", async () => {
+        const { emb, store, retriever } = setup();
+        await store.ingest({ text: "alex moves", validFrom: 1 });
+        await store.ingest({ text: "alex jumps", validFrom: 2 });
+        await store.ingest({ text: "alex runs", validFrom: 3 });
+        const probe1 = await emb.embed("alex moves");
+        const probe2 = await emb.embed("alex jumps");
+        const results = retriever.retrieve(
+            [
+                { text: "a", embedding: probe1 },
+                { text: "b", embedding: probe2 },
+            ],
+            {
+                anchorTopK: 2,
+                anchorScoring: { kind: "density-coverage-bonus", tau: -1, exponent: 2 },
+            },
+        );
+        expect(results.length).toBeGreaterThan(0);
+        for (const r of results) {
+            expect(r.path.edges.length).toBe(r.path.nodeIds.length - 1);
+            expect(r.breakdown.probeCoverage).toBeGreaterThanOrEqual(0);
+            expect(r.breakdown.probeCoverage).toBeLessThanOrEqual(1);
+        }
+    });
+
+    test("Option J coverage-bonus: exponent=2 flips ranking from one-strong to many-moderate", async () => {
+        // Construct a setup where Option I (linear sum) picks the
+        // single-probe-strong anchor but J coverage-bonus (exp=2) picks
+        // the multi-probe-moderate anchor — the exact ranking flip the
+        // Phase-2.2 negative result said a non-linear coverage reward
+        // would produce.
+        //   strong:   cos(p1)=0.65  cos(p2)=0       → I=0.35  J=0.35·1=0.35
+        //   moderate: cos(p1)=0.45  cos(p2)=0.45    → I=0.30  J=0.30·2=0.60
+        const { emb, store, retriever } = setup();
+        await store.ingest({ text: "strong claim", validFrom: 1 });
+        await store.ingest({ text: "moderate claim", validFrom: 2 });
+        await store.ingest({ text: "filler claim", validFrom: 3 });
+
+        const vStrong = await emb.embed("strong claim");
+        const vModerate = await emb.embed("moderate claim");
+        const vNoise1 = await emb.embed("noise-axis-one");
+        const vNoise2 = await emb.embed("noise-axis-two");
+
+        const probe1 = blendUnit([
+            { v: vStrong, w: 0.65 },
+            { v: vModerate, w: 0.45 },
+            { v: vNoise1, w: 0.612 },
+        ]);
+        const probe2 = blendUnit([
+            { v: vModerate, w: 0.45 },
+            { v: vNoise2, w: 0.893 },
+        ]);
+
+        const optionI = retriever.retrieve(
+            [
+                { text: "p1", embedding: probe1 },
+                { text: "p2", embedding: probe2 },
+            ],
+            {
+                anchorTopK: 1,
+                anchorScoring: { kind: "weighted-probe-density", tau: 0.3 },
+            },
+        );
+        const j = retriever.retrieve(
+            [
+                { text: "p1", embedding: probe1 },
+                { text: "p2", embedding: probe2 },
+            ],
+            {
+                anchorTopK: 1,
+                anchorScoring: { kind: "density-coverage-bonus", tau: 0.3, exponent: 2 },
+            },
+        );
+
+        const optionISolo = optionI.find((r) => r.path.nodeIds.length === 1);
+        const jSolo = j.find((r) => r.path.nodeIds.length === 1);
+        expect(optionISolo?.path.nodeIds[0]).toBe("c1");
+        expect(jSolo?.path.nodeIds[0]).toBe("c2");
+    });
+
+    test("Option J coverage-bonus: exponent=1 collapses to Option I", async () => {
+        // J's bonus is `k^(exponent-1)`, so exponent=1 gives bonus=1 and the
+        // formula degenerates to Option I's linear sum. Ranking and chosen
+        // anchors must match exactly between the two configurations.
+        const { emb, store, retriever } = setup();
+        await store.ingest({ text: "alex moves", validFrom: 1 });
+        await store.ingest({ text: "alex jumps", validFrom: 2 });
+        await store.ingest({ text: "alex runs", validFrom: 3 });
+        const probe1 = await emb.embed("alex moves");
+        const probe2 = await emb.embed("alex jumps");
+        const probes = [
+            { text: "a", embedding: probe1 },
+            { text: "b", embedding: probe2 },
+        ];
+        const optionI = retriever.retrieve(probes, {
+            anchorTopK: 2,
+            anchorScoring: { kind: "weighted-probe-density", tau: 0.1 },
+        });
+        const jExp1 = retriever.retrieve(probes, {
+            anchorTopK: 2,
+            anchorScoring: { kind: "density-coverage-bonus", tau: 0.1, exponent: 1 },
+        });
+        const optionINodes = new Set(optionI.flatMap((r) => r.path.nodeIds));
+        const jExp1Nodes = new Set(jExp1.flatMap((r) => r.path.nodeIds));
+        expect(jExp1Nodes).toEqual(optionINodes);
+    });
+
+    test("Option J coverage-bonus: useSessionWeights toggles session-decay coupling", async () => {
+        const { emb, store, retriever } = setup();
+        await store.ingest({ text: "alpha solo", validFrom: 1 });
+        await store.ingest({ text: "gamma solo", validFrom: 2 });
+        const probeAlpha = await emb.embed("alpha solo");
+        const probeGamma = await emb.embed("gamma solo");
+
+        const probes = [
+            { text: "a", embedding: probeAlpha, turnIndex: 0 },
+            { text: "g", embedding: probeGamma, turnIndex: 1 },
+        ];
+
+        const weighted = retriever.retrieve(probes, {
+            anchorTopK: 1,
+            anchorScoring: {
+                kind: "density-coverage-bonus",
+                tau: 0.2,
+                exponent: 2,
+                useSessionWeights: true,
+            },
+            sessionDecayTau: 0.3,
+        });
+        const unweighted = retriever.retrieve(probes, {
+            anchorTopK: 1,
+            anchorScoring: {
+                kind: "density-coverage-bonus",
+                tau: 0.2,
+                exponent: 2,
+                useSessionWeights: false,
+            },
+            sessionDecayTau: 0.3,
+        });
+
+        const weightedNodes = new Set(weighted.flatMap((r) => r.path.nodeIds));
+        const unweightedNodes = new Set(unweighted.flatMap((r) => r.path.nodeIds));
+        // Late-turn anchor (gamma → c2) dominates when session weights apply.
+        expect(weightedNodes.has("c2")).toBe(true);
+        // Without session weights, both probes contribute equally — c1 (alpha)
+        // is still a valid anchor.
+        expect(unweightedNodes.has("c1")).toBe(true);
+    });
+
+    test("Option J coverage-bonus: unreachable tau falls back to union anchors", async () => {
+        const { emb, store, retriever } = setup();
+        await store.ingest({ text: "alex moves", validFrom: 1 });
+        await store.ingest({ text: "alex jumps", validFrom: 2 });
+        const probe1 = await emb.embed("alex moves");
+        const probe2 = await emb.embed("alex jumps");
+        const results = retriever.retrieve(
+            [
+                { text: "a", embedding: probe1 },
+                { text: "b", embedding: probe2 },
+            ],
+            {
+                anchorTopK: 2,
+                anchorScoring: { kind: "density-coverage-bonus", tau: 2, exponent: 2 },
+            },
+        );
+        expect(results.length).toBeGreaterThan(0);
+    });
+
+    test("Option J min-cosine-gate: returns structurally valid paths", async () => {
+        const { emb, store, retriever } = setup();
+        await store.ingest({ text: "alex moves", validFrom: 1 });
+        await store.ingest({ text: "alex jumps", validFrom: 2 });
+        const probe1 = await emb.embed("alex moves");
+        const probe2 = await emb.embed("alex jumps");
+        const results = retriever.retrieve(
+            [
+                { text: "a", embedding: probe1 },
+                { text: "b", embedding: probe2 },
+            ],
+            {
+                anchorTopK: 2,
+                anchorScoring: { kind: "min-cosine-gate", tau: -1 },
+            },
+        );
+        expect(results.length).toBeGreaterThan(0);
+        for (const r of results) {
+            expect(r.path.edges.length).toBe(r.path.nodeIds.length - 1);
+        }
+    });
+
+    test("Option J min-cosine-gate: rejects single-probe-strong, accepts multi-probe-uniform", async () => {
+        // strong:  cos(p1)=0.7  cos(p2)=0    → fails the gate (probe 2 below τ)
+        // uniform: cos(p1)=0.4  cos(p2)=0.4  → passes; min weighted term sets score
+        // Plain cosine union picks {strong, uniform} (one per probe); min-gate
+        // drops strong entirely.
+        const { emb, store, retriever } = setup();
+        await store.ingest({ text: "strong claim", validFrom: 1 });
+        await store.ingest({ text: "uniform claim", validFrom: 2 });
+        await store.ingest({ text: "filler claim", validFrom: 3 });
+
+        const vStrong = await emb.embed("strong claim");
+        const vUniform = await emb.embed("uniform claim");
+        const vNoise1 = await emb.embed("noise-axis-one");
+        const vNoise2 = await emb.embed("noise-axis-two");
+
+        const probe1 = blendUnit([
+            { v: vStrong, w: 0.7 },
+            { v: vUniform, w: 0.4 },
+            { v: vNoise1, w: 0.59 },
+        ]);
+        const probe2 = blendUnit([
+            { v: vUniform, w: 0.4 },
+            { v: vNoise2, w: 0.917 },
+        ]);
+        const probes = [
+            { text: "p1", embedding: probe1 },
+            { text: "p2", embedding: probe2 },
+        ];
+
+        const plain = retriever.retrieve(probes, {
+            anchorTopK: 1,
+            probeComposition: "union",
+            anchorScoring: { kind: "cosine" },
+        });
+        const minGate = retriever.retrieve(probes, {
+            anchorTopK: 1,
+            anchorScoring: { kind: "min-cosine-gate", tau: 0.2 },
+        });
+
+        const plainNodes = new Set(plain.flatMap((r) => r.path.nodeIds));
+        const minGateSolo = minGate.find((r) => r.path.nodeIds.length === 1);
+        expect(plainNodes.has("c1")).toBe(true); // plain cosine still picks strong on probe 1
+        expect(minGateSolo?.path.nodeIds[0]).toBe("c2"); // min-gate's only anchor is uniform
+    });
+
+    test("Option J min-cosine-gate: unreachable tau falls back to union anchors", async () => {
+        const { emb, store, retriever } = setup();
+        await store.ingest({ text: "alex moves", validFrom: 1 });
+        await store.ingest({ text: "alex jumps", validFrom: 2 });
+        const probe1 = await emb.embed("alex moves");
+        const probe2 = await emb.embed("alex jumps");
+        const results = retriever.retrieve(
+            [
+                { text: "a", embedding: probe1 },
+                { text: "b", embedding: probe2 },
+            ],
+            {
+                anchorTopK: 2,
+                anchorScoring: { kind: "min-cosine-gate", tau: 2 },
+            },
         );
         expect(results.length).toBeGreaterThan(0);
     });

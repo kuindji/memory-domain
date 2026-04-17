@@ -572,6 +572,462 @@ What tier-2 *adds* to the finding catalog:
   experiments (topic-conditional temporal cost, access-informed
   edge weights).
 
+### Phase 2.1 findings — Option E (session decay) + Option F (default flip)
+
+Phase 2.1 landed two coupled changes:
+
+1. **Option E — per-probe session decay.** `Probe` gained optional
+   `turnIndex?: number`. `Session` stamps each probe with a turn
+   index (one per `addProbeSentences` / `addNaturalQuery` call) and
+   resets on `reset()`. `RetrievalOptions.sessionDecayTau?: number`
+   enables per-probe weighting
+   `w(p) = exp(-(maxTurn - (p.turnIndex ?? maxTurn)) / tau)`.
+   Weights apply in three probe-consumption sites:
+   - **Intersection**: threshold is half the total probe weight
+     (matches the prior `>= ceil(P/2)` count rule when weights are
+     uniform).
+   - **Weighted-fusion**: per-probe contribution multiplied by
+     `weights[pIdx]` before summing.
+   - **probeCoverage**: covered probes' weights summed, divided by
+     total probe weight.
+   Off by default (`sessionDecayTau === undefined`); back-compat
+   preserved for one-shot callers that don't set `turnIndex`.
+2. **Option F — default composition flip.** `DEFAULTS.probeComposition`
+   moved from `"union"` to `"weighted-fusion"` (τ=0.2 unchanged).
+   Gives Option E a stable aggregation baseline that already
+   respects per-probe contribution arithmetic. Weighted-fusion's
+   fallback-to-union when nothing clears τ (defensive empty-result
+   guard) is preserved.
+
+Sweep over eval (B), 12 configs, both tiers:
+
+```
+tier-1 (38 claims, 3 traces)                                  | narrowed | coherent
+bfs union (legacy default)                                    | 3/3      | 2/3
+bfs wfusion tau=0.2 (new default)                             | 3/3      | 3/3
+bfs wfusion tau=0.2 + decay=2.0 / 1.0 / 0.5 / 0.3 / 0.05      | 3/3      | 3/3
+bfs union + decay=1.0                                         | 3/3      | 3/3
+bfs intersection + decay=1.0                                  | 3/3      | 3/3
+A2 dijkstra a=0.7 + wfusion/intersection + decay=1.0          | 3/3      | 3/3
+bfs wfusion tau=0.2 + decay=5.0 (~uniform)                    | 3/3      | 3/3
+
+tier-2 (242 claims, 4 traces)                                 | narrowed | coherent
+bfs union (legacy default)                                    | 4/4      | 0/4
+bfs wfusion tau=0.2 (new default)                             | 4/4      | 0/4
+bfs wfusion tau=0.2 + decay=2.0 / 1.0 / 0.5                   | 4/4      | 0/4
+bfs wfusion tau=0.2 + decay=0.3                               | 4/4      | 1/4
+bfs union + decay=1.0                                         | 4/4      | 0/4
+bfs intersection + decay=1.0                                  | 4/4      | 0/4
+A2 dijkstra a=0.7 + wfusion + decay=1.0                       | 4/4      | 0/4
+A2 dijkstra a=0.7 + intersection + decay=1.0                  | 4/4      | 1/4
+bfs wfusion tau=0.2 + decay=5.0 (~uniform)                    | 4/4      | 0/4
+bfs wfusion tau=0.2 + decay=0.05 (latest-only)                | 4/4      | 1/4
+```
+
+Eval (A) under the new default (weighted-fusion τ=0.2):
+
+```
+tier                 | mean-F1 | wins | losses
+tier-1 new default   | 0.510   | 3    | 2
+tier-2 new default   | 0.548   | 5    | 3
+tier-1 legacy union  | 0.530   | (Phase 1.6)
+tier-2 legacy union  | 0.526   | (Phase 2)
+```
+
+**Findings:**
+
+1. **The default flip alone fixed tier-1 eval-B.** Legacy union
+   default: 2/3 coherent (career arc failed from Phase 1 onward).
+   New default: 3/3. Every swept decay value preserves 3/3. The
+   tier-1 career-arc "fix" from Phase-1.6's A2+A3 intersection
+   is now available at defaults — which is a stronger position for
+   the architecture than Phase-1.6 reported. Cost: tier-1 eval-A
+   −0.020 F1 (0.530 → 0.510; within noise, not statistically
+   distinguishable from the previous baseline).
+
+2. **Tier-2 eval-A confirms Phase-2's leader as the right default.**
+   New default lands 0.548 mean F1 (+0.022 over legacy 0.526) at
+   5 wins / 3 losses. This closes the tier-2 "defaults are
+   suboptimal" Phase-2 finding.
+
+3. **Session decay helped tier-2 eval-B from 0/4 to 1/4 — but does
+   NOT meet Option E's ≥ 2/4 pass criterion.** Best decay configs
+   (τ=0.3 or τ=0.05) converge the *Academy arc* only. The three
+   cross-cluster arcs (philosophers → Alexander, Athens at war,
+   Alexander succession) still miss their late-turn targets
+   regardless of how aggressively we down-weight early probes —
+   even at τ→0 ("latest-turn-only") the result is 1/4, not 2/4.
+
+4. **Dijkstra + decay pulls back slightly on tier-2 intersection
+   mode** (1/4 coherent at A2 α=0.7 + intersection + decay=1.0) —
+   intersection benefits from decay on tier-2 where it was harmful
+   at Phase 1.6 without decay. Suggests decay and intersection
+   interact, but not enough to change recommendations.
+
+5. **Sanity check configs line up.** τ=5.0 (~uniform) reproduces
+   the no-decay baseline (0/4), and τ=0.05 (~latest-only) matches
+   τ=0.3 at 1/4. The decay arithmetic is mathematically correct;
+   the remaining gap is not a tuning problem.
+
+### Phase 2.1 hypothesis status — why 1/4 and not 2/4?
+
+Inspecting the three still-failing tier-2 arcs under τ=0.3:
+
+- *philosophers → Alexander*, turn 3 expected
+  `phil_aristotle_tutors_alexander`; actual top-3 =
+  `phil_aristotle_leaves_academy`, `phil_theophrastus_lyceum`,
+  `phil_aristotle_academy_joins`. The anchor cloud around
+  "Aristotle" picks up adjacent-career claims but not the specific
+  Alexander-tutoring claim, which lives on the boundary of the
+  philosophy and Alexander clusters.
+- *Athens at war*, turn 4 expected
+  `pwar_aegospotami`/`pwar_athens_surrenders`/`pwar_long_walls_demolished`;
+  actual top-3 =
+  `pwar_athens_surrenders`, `phil_socrates_delium`,
+  `pwar_peace_nicias`. One of three expected hits, but decay pulled
+  in a Socrates claim (semantically close to "defeat" via negative
+  framing) while the other two expected claims are outscored by
+  `pwar_peace_nicias` — a middle-of-the-war claim that the
+  late-turn probe "end of the Peloponnesian War" aligns with only
+  because of the word "Peloponnesian" alone.
+- *Alexander succession*, turn 3 expected Ptolemy / Seleucus /
+  Cassander; actual top-3 = `diad_wars_begin`,
+  `diad_babylon_partition`, `pw_herodotus_chronicle`. Decay
+  correctly moved the top-3 into the `diad_` cluster at turn 3 —
+  but the specific generals who *founded kingdoms* lose to
+  more-abstract `diad_*` events that share more tokens with the
+  probe.
+
+Pattern: **decay fixes session accumulation, but the remaining
+failure mode is anchor-cloud displacement** — late-turn probes land
+their top-K anchors in the *topically-correct* region but on
+*adjacent* claims rather than the expected ones. The expected
+claims are typically more specific (named persons, specific
+events) while the retrieved ones are more abstract or more
+token-overlapping. The retriever selects by raw cosine on the
+probe, so any lexically-dense abstract claim outscores the
+specific target.
+
+**Next primitive candidate** (post-Phase-2.1): anchor-boost by
+*late-turn cosine density* — rerank anchors so that claims which
+are close to *any* late-turn probe (not just the highest) gain
+priority. Conceptually: the current anchor scoring uses `max_p
+cos(p, claim)`; replace with `sum_p w(p) · max(0, cos(p, claim) - τ)`
+so a specific named claim that clears τ against two late-turn probes
+beats an abstract claim that just barely clears τ against one.
+This is an anchor-scoring primitive (the A2 slot) conditioned on
+probe weights (the E slot), not a new option. Likely slot:
+`anchorScoring: { kind: "weighted-probe-density", tau, probeWeights }`.
+
+### Phase 2.2 findings — Option I (weighted-probe-density anchor scoring)
+
+Phase 2.2 landed Option I as a new `AnchorScoring` variant:
+
+```ts
+AnchorScoring =
+    | { kind: "cosine" }
+    | { kind: "cosine-idf-mass"; alpha: number }
+    | { kind: "weighted-probe-density"; tau: number; useSessionWeights?: boolean };
+```
+
+When active, the retriever bypasses per-probe top-K ranking and scores every
+valid claim globally by `Σ_p w(p) · max(0, cos(p, c) − τ)`, taking the top-K of
+that aggregate as the single anchor set. `useSessionWeights` defaults to `true`
+(couples to `sessionDecayTau`); `probeComposition` is a no-op when Option I is
+active (density already fuses the probes). Defensive fallback to the union
+branch preserves non-empty results when τ excludes every claim.
+
+Sweep over eval (A), both tiers:
+
+```
+tier-1 (38 claims, 12 queries)             | mean-F1 | wins | losses
+bfs wfusion tau=0.2 (Phase 2.1 default)    | 0.510   | 3    | 2
+I bfs tau=0.2                              | 0.510   | 3    | 2
+I bfs tau=0.3                              | 0.489   | 2    | 2
+I bfs tau=0.4                              | 0.489   | 2    | 2
+I dijkstra tmp=0.5 tau=0.3                 | 0.468   | 4    | 3
+
+tier-2 (242 claims, 19 queries)            | mean-F1 | wins | losses
+bfs wfusion tau=0.2 (Phase 2.1 default)    | 0.548   | 5    | 3
+I bfs tau=0.2                              | 0.548   | 5    | 3
+I bfs tau=0.3                              | 0.496   | 4    | 3
+I bfs tau=0.4                              | 0.465   | 3    | 3
+I dijkstra tmp=0.5 tau=0.3                 | 0.417   | 4    | 7
+```
+
+Sweep over eval (B), 13-config matrix including a wider τ∈{0.05, 0.1, 0.15,
+0.2, 0.25, 0.3, 0.35, 0.4, 0.5} × decay∈{off, 0.05, 0.3, 0.5, 1.0} exploration:
+
+```
+tier-1 (3 arcs)                            | narrowed | coherent
+bfs union (legacy)                         | 3/3      | 2/3
+bfs wfusion tau=0.2 (Phase 2.1)            | 3/3      | 3/3
+bfs wfusion tau=0.2 + decay=0.3            | 3/3      | 3/3
+every Option I config (tau=0.05..0.5)      | 3/3      | 3/3
+
+tier-2 (4 arcs)                            | narrowed | coherent
+bfs union (legacy)                         | 4/4      | 0/4
+bfs wfusion tau=0.2 (Phase 2.1)            | 4/4      | 0/4
+bfs wfusion tau=0.2 + decay=0.3            | 4/4      | 1/4
+I tau=0.05..0.3 + decay=0.3                | 4/4      | 1/4
+I tau≥0.35 + decay=0.3                     | 4/4      | 0/4
+I tau=0.3 + decay=1.0 or no decay          | 4/4      | 0/4
+I tau=0.3 useSessionWeights=false          | 4/4      | 0/4
+I tau=0.3 + decay=0.3 on dijkstra          | 4/4      | 1/4
+```
+
+**Findings:**
+
+1. **Option I τ=0.2 is behaviorally identical to the Phase-2.1 weighted-fusion
+   default.** Mean F1 matches to three decimals on both tiers (0.510 / 0.548)
+   and eval-B matches exactly. The formula Option I applies is the same one
+   weighted-fusion already runs inside `composeAnchors`; promoting it to the
+   A2 anchor-scoring slot decouples the knob but does not introduce a new
+   ranking signal. Expected analytically; confirmed empirically.
+
+2. **τ tuning above 0.2 regresses on both tiers.** τ=0.3 drops tier-1 by −0.021
+   F1 and tier-2 by −0.052; τ=0.4 compounds the loss. The "more selective
+   density" intuition (only strongly-aligned probes contribute) prunes
+   legitimate anchors on eval-A queries where the probe cosines sit in the
+   0.2–0.35 band.
+
+3. **Eval-B ceiling on tier-2 is unmoved.** Best Option I config reaches 1/4
+   coherent — identical to Phase-2.1's best (Academy arc converges; three
+   cross-cluster arcs still miss). The `useSessionWeights=false` isolation row
+   reaches 0/4, confirming Option I's 1/4 is inherited from decay, not new
+   density-only signal. τ∈{0.05, 0.1, 0.15, 0.25} all land at 1/4; τ≥0.35
+   collapses back to 0/4.
+
+4. **Anchor-cloud displacement is not a density-aggregate problem.** The
+   failure inspection from Phase 2.1 pointed at abstract claims that clear τ
+   strongly on one late-turn probe outranking specific claims that clear τ
+   moderately on multiple. A *linear sum* aggregate — which Option I is —
+   cannot reverse that preference whenever the abstract claim's
+   single-probe contribution exceeds the specific claim's sum: with abstract
+   peak ≈0.6 and specific ≈0.35 the math is `(0.6−τ) > k·(0.35−τ)` for any
+   k achievable at tier-2's probe count × τ combinations. Reversing the
+   ranking needs a *non-linear* reward for probe coverage (e.g., count-based
+   with a `k² ` or `log(1+k)` bonus, or a minimum-cosine-across-probes gate).
+
+5. **Dijkstra still regresses with Option I anchors.** Phase 1.6's conjecture
+   that Dijkstra needs higher-IDF anchors was isolated to tier-1's `alex`
+   pollution. With Option I anchors, tier-1 F1 drops to 0.468 and tier-2 to
+   0.417. No configuration in this sweep has Dijkstra exceeding BFS; that
+   primitive remains inert as a default-shipping option.
+
+### Phase 2.2 hypothesis status
+
+**Refuted**, as the decision gate's "1/4 tier-2 again" branch. Option I ships
+as opt-in infrastructure but is not promoted to default (τ=0.2 matches
+Phase-2.1's default exactly; higher τ regresses on eval-A). The negative
+result refines the Phase-2.1 finding: anchor-cloud displacement on tier-2
+is not solvable by reshaping *how* probe contributions aggregate linearly —
+it needs either a non-linear coverage reward or a different signal
+altogether (topic-conditional edge weights, per-cluster anchor budgets).
+
+### Phase 2.3 findings — Option J (non-linear probe-coverage anchor scoring)
+
+Phase 2.3 landed two new `AnchorScoring` variants designed to flip the
+Phase-2.1/2.2 ranking pathology (abstract single-probe-strong claims
+outranking specific multi-probe-moderate claims):
+
+```ts
+AnchorScoring =
+    | { kind: "cosine" }
+    | { kind: "cosine-idf-mass"; alpha: number }
+    | { kind: "weighted-probe-density"; tau: number; useSessionWeights?: boolean }
+    | { kind: "density-coverage-bonus"; tau: number; exponent: number; useSessionWeights?: boolean }
+    | { kind: "min-cosine-gate"; tau: number; useSessionWeights?: boolean };
+```
+
+- **density-coverage-bonus**: `score(c) = Σ_p w(p)·max(0, cos − τ) · k^(exp − 1)`
+  where `k = |{p : cos > τ}|`. At `exp=1` it collapses to Option I
+  exactly — useful isolation.
+- **min-cosine-gate**: hard `k = P` gate — only claims clearing `τ`
+  against every probe contribute; score = min weighted per-probe term,
+  tie-broken by sum.
+
+Both honor `useSessionWeights?: boolean` (default `true`), short-circuit
+`probeComposition`, and defensively fall through to union when nothing
+clears.
+
+Sweep over eval (A), both tiers:
+
+```
+tier-1 (38 claims, 12 queries)             | mean-F1 | wins | losses
+bfs wfusion tau=0.2 (Phase 2.1 default)    | 0.510   | 3    | 2
+J bfs cov-bonus exp=2 tau=0.2              | 0.489   | 2    | 2
+J bfs cov-bonus exp=2 tau=0.3              | 0.489   | 2    | 2
+J bfs min-gate tau=0.1                     | 0.510   | 3    | 3
+J bfs min-gate tau=0.2                     | 0.510   | 3    | 3
+
+tier-2 (242 claims, 19 queries)            | mean-F1 | wins | losses
+bfs wfusion tau=0.2 (Phase 2.1 default)    | 0.548   | 5    | 3
+J bfs cov-bonus exp=2 tau=0.2              | 0.548   | 5    | 3
+J bfs cov-bonus exp=2 tau=0.3              | 0.548   | 5    | 3
+J bfs min-gate tau=0.1                     | 0.469   | 4    | 6
+J bfs min-gate tau=0.2                     | 0.469   | 4    | 6
+```
+
+Sweep over eval (B), 12-config matrix (including exponent sweep, decay
+isolation, session-weight isolation, Dijkstra pairing):
+
+```
+tier-1 (3 arcs)                                    | narrowed | coherent
+bfs wfusion tau=0.2 + decay=0.3 (Phase 2.1 best)   | 3/3      | 3/3
+J cov-bonus exp∈{1.5, 2, 3} tau=0.2 + decay=0.3    | 3/3      | 3/3
+J cov-bonus exp=2 tau=0.3 + decay=0.3              | 3/3      | 3/3
+J cov-bonus exp=2 tau=0.2 no decay                 | 3/3      | 3/3
+J cov-bonus exp=2 useSessionWeights=false + decay  | 3/3      | 3/3
+J cov-bonus exp=2 + decay=0.3 on dijkstra          | 3/3      | 3/3
+J min-gate tau=0.1 + decay=0.3                     | 3/3      | 2/3
+J min-gate tau=0.2 + decay=0.3                     | 3/3      | 2/3
+
+tier-2 (4 arcs)                                    | narrowed | coherent
+bfs wfusion tau=0.2 + decay=0.3 (Phase 2.1 best)   | 4/4      | 1/4
+J cov-bonus exp∈{1.5, 2, 3} tau=0.2 + decay=0.3    | 4/4      | 1/4
+J cov-bonus exp=2 tau=0.3 + decay=0.3              | 4/4      | 1/4
+J cov-bonus exp=2 tau=0.2 no decay                 | 4/4      | 0/4
+J cov-bonus exp=2 useSessionWeights=false + decay  | 4/4      | 0/4
+J cov-bonus exp=2 + decay=0.3 on dijkstra          | 4/4      | 1/4
+J min-gate tau=0.1 + decay=0.3                     | 4/4      | 0/4
+J min-gate tau=0.2 + decay=0.3                     | 4/4      | 0/4
+```
+
+**Findings:**
+
+1. **Cov-bonus does NOT lift tier-2 eval-B beyond Phase-2.1's 1/4.** The
+   super-linear reward on probe-coverage spread was hypothesized to
+   flip abstract-single-probe vs. specific-multi-probe rankings. It
+   doesn't: `exp=1.5`, `exp=2`, and `exp=3` all converge the same
+   single arc (Academy). Sharper exponents neither lift nor regress —
+   suggesting the failures of the three other arcs (*philosophers →
+   Alexander*, *Athens at war*, *Alexander succession*) are not
+   "strong-peak vs. moderate-spread" events at all. The Phase-2.1
+   failure-mode analysis mis-identified the pathology.
+
+2. **The 1/4 that cov-bonus achieves is inherited from decay, not
+   from coverage-bonus.** The isolation rows prove it:
+   `no decay` → 0/4, `useSessionWeights=false + decay=0.3` → 0/4. Any
+   coherence gain comes through `probeCoverage`'s weighted sum in the
+   score breakdown, not through the anchor-scorer. Same pattern as
+   Option I in Phase 2.2.
+
+3. **Cov-bonus preserves tier-1 3/3 and tier-2 eval-A 0.548.** Unlike
+   Option I τ>0.2 (which regressed eval-A −0.05 on tier-2), the
+   coverage-bonus keeps the Phase-2.1 default's anchor ranking intact
+   at τ=0.2 or τ=0.3 — it scales the aggregate but does not shrink
+   the candidate set, so queries with legitimate single-probe-strong
+   answers still rank correctly. Tier-1 eval-A dips to 0.489 (−0.021
+   from default); the drop comes from queries where J's `k`-scaling
+   inverts a justified strong-cosine ranking.
+
+4. **Min-gate regresses everything.** Tier-1 eval-A 0.510 preserved
+   but eval-B drops to 2/3 (career arc breaks again); tier-2 eval-A
+   drops to 0.469 (−0.079) and eval-B to 0/4. The hard `k=P` gate is
+   too strict for a corpus with genuine single-cluster queries
+   (marriage-and-Sam, Pythagorean theorem, as-of-Athenian-statesman) —
+   the defensive union fallback triggers often enough that the effective
+   behavior is "sometimes gate, sometimes union" with the union cases
+   driven by noise.
+
+5. **Dijkstra + cov-bonus is inert (same 1/4).** The Phase-1.6
+   conjecture that Dijkstra needs higher-quality anchors is fully
+   dead: every anchor primitive tried (A2 IDF-mass, Option I density,
+   J cov-bonus) leaves Dijkstra at or below BFS. The weighted
+   traversal remains opt-in infrastructure with no promotion path
+   inside this experiment.
+
+### Phase 2.3 hypothesis status
+
+**Refuted.** Neither J variant meets the ≥2/4 tier-2 eval-B pass bar.
+Cov-bonus ships as opt-in infrastructure (matches Phase-2.1 default on
+tier-2 eval-A, passes tier-1 eval-B, harmless); min-gate ships as
+opt-in infrastructure with a documented warning that it regresses on
+corpora with single-cluster queries.
+
+What Phase 2.3 **adds to the finding catalog** (the negative results
+are informative):
+
+- **The "anchor-cloud displacement" failure mode is mis-characterized
+  at the cosine/coverage level.** Three tier-2 arcs fail at turn 3 or
+  4 regardless of whether we reward spread (Option I / J cov-bonus),
+  require spread (J min-gate), or decay early probes (Phase-2.1 E).
+  Whatever's wrong with these arcs is not solvable by reshaping the
+  aggregate `cos × w × coverage` function. The Phase-2.1 failure
+  inspection identified specific vs. abstract claims, but the
+  exponent sweep (`k^(exp−1)` for `exp ∈ {1.5, 2, 3}`) shows that even
+  `k² ` and `k³` bonuses cannot surface the expected claims.
+
+- **All three still-failing arcs have cross-cluster expected answers.**
+  *Philosophers → Alexander* (tutor claim spans philosophy + Macedon
+  clusters), *Athens at war* (late-war claims tied to specific
+  battles, not the general cluster terms), *Alexander succession*
+  (named generals vs. abstract Diadochi events). The common thread is
+  a **cluster boundary** — the expected claims sit on the edge of two
+  topical regions, and none of the cosine-based primitives gives them
+  structural priority over interior-cluster claims. **This is a graph
+  problem, not a scoring problem.**
+
+- **Coverage-bonus preserves eval-A on tier-2 in a way Option I could
+  not.** The key shape: J's `k^(exp-1)` multiplier kicks in only for
+  multi-probe coverage (`k ≥ 2`), so single-strong queries ride the
+  same anchor ranking as Option I τ=0 (raw sum). This is the first
+  anchor primitive that lifts multi-probe queries without penalizing
+  single-probe ones. If a future corpus shape rewards multi-probe
+  coverage, J cov-bonus is the tool — but tier-2 doesn't.
+
+### Phase 2.3 delivered
+
+Source: current working tree. Files touched:
+- `src/types.ts` — `AnchorScoring` variants `density-coverage-bonus`
+  and `min-cosine-gate`.
+- `src/retriever.ts` — two new branches in `composeAnchors`,
+  positioned before the Option I block; both reuse `perProbe` cosine
+  cache and `probeWeights`, with defensive fall-through to union.
+- `tests/retriever.test.ts` — 8 new tests: structural validity,
+  ranking-flip vs. Option I at `exp=2`, `exp=1` equivalence to Option
+  I, session-weight toggle, high-τ fallback (cov-bonus); gate
+  rejection + fallback (min-gate).
+- `eval/iterative-sweep.ts` — Phase-2.3 12-config matrix replacing the
+  Phase-2.2 matrix.
+- `eval/sweep.ts` — four Option J rows appended.
+
+67 tests pass (was 59 pre-Phase-2.3). Typecheck, lint, format clean.
+
+### Phase 2.2 delivered
+
+Source: current working tree. Files touched:
+- `src/types.ts` — `AnchorScoring` variant `weighted-probe-density`.
+- `src/retriever.ts` — new global-density branch in `composeAnchors` with
+  defensive fallback to union.
+- `tests/retriever.test.ts` — 5 new tests: structural validity, density
+  favors multi-probe overlap over single-probe dominance,
+  `useSessionWeights` toggle, short-circuits probeComposition, high-τ
+  fallback.
+- `eval/iterative-sweep.ts` — Phase-2.2 10-config matrix replacing the
+  Phase-2.1 matrix.
+- `eval/sweep.ts` — four Option I rows appended.
+
+59 tests pass (was 54 pre-Phase-2.2). Typecheck and lint clean.
+
+### Phase 2.1 delivered
+
+Source: see current working tree. Files touched:
+- `src/types.ts` — `Probe.turnIndex?`, `RetrievalOptions.sessionDecayTau?`.
+- `src/retriever.ts` — `computeProbeWeights` helper; weighted
+  intersection / weighted-fusion / probeCoverage; default flip
+  to `"weighted-fusion"`.
+- `src/interfaces.ts` — `Session.currentTurn`, per-call turn
+  stamping, `turnCount` getter, `reset()` clears it.
+- `eval/iterative-sweep.ts` — 12-config Phase-2.1 matrix.
+- `tests/retriever.test.ts` — 4 new Phase-2.1 tests.
+- `tests/interfaces.test.ts` — Session turn-tracking tests (new file).
+- `tests/eval-iterative.test.ts` / `tests/eval-iterative-tier2.test.ts`
+  — second assertion pass under `sessionDecayTau: 1.0` / `0.3`.
+
+54 tests pass (was 46 pre-Phase-2.1). Typecheck and lint clean.
+
 ### Files delivered
 
 ```
@@ -670,6 +1126,73 @@ every combination; not recommended at this corpus shape. Defaults
 unchanged (BFS, raw cosine, union) — promotion to default deferred
 to tier-2 validation (see Phase 2).
 
+### Phase 2.1 — Option E + Option F — **done**
+
+See "Phase 2.1 findings" in Part 2. Landed:
+- `Probe.turnIndex?` + `RetrievalOptions.sessionDecayTau?`
+  (exponential decay by session turn index).
+- Weighted intersection threshold, weighted-fusion contribution,
+  weighted `probeCoverage`.
+- `Session.currentTurn` auto-stamping per add-call; `reset()`
+  clears it.
+- Default `probeComposition` flipped from `"union"` to
+  `"weighted-fusion"` (τ=0.2).
+
+Outcome: **default flip unexpectedly solved tier-1 eval-B** (2/3
+→ 3/3) and met tier-2 eval-A (+0.022). Session decay lifted
+tier-2 eval-B from 0/4 to 1/4 — below the ≥2/4 pass criterion.
+Remaining gap was hypothesized as anchor-cloud displacement;
+Option I was the natural test.
+
+### Phase 2.3 — Option J — **done, refuted**
+
+See "Phase 2.3 findings" in Part 2. Landed:
+- `AnchorScoring.kind = "density-coverage-bonus"` (`tau`, `exponent`,
+  `useSessionWeights?`) — `agg · k^(exp−1)` multiplier on Option I's
+  linear sum.
+- `AnchorScoring.kind = "min-cosine-gate"` (`tau`, `useSessionWeights?`)
+  — hard `k=P` gate with `min` score and sum tie-break.
+- Phase-2.3 12-config iterative-sweep matrix; four J rows appended to
+  eval-A sweep; 8 new unit tests.
+
+Outcome: **cov-bonus matches Phase-2.1 baselines on every axis
+(tier-1 3/3, tier-2 1/4, tier-2 eval-A 0.548 preserved, tier-1 eval-A
+dips 0.021)**; does NOT lift tier-2 eval-B beyond 1/4. The isolation
+rows (`no decay` → 0/4; `useSessionWeights=false + decay=0.3` → 0/4)
+prove the 1/4 is inherited from `probeCoverage`'s decay weighting, not
+from the coverage-bonus signal itself. `exp ∈ {1.5, 2, 3}` all converge
+the same single arc — sharper non-linearity neither helps nor hurts,
+which is strong evidence the failing tier-2 arcs are not
+"strong-peak-vs-moderate-spread" events. Min-gate regresses everywhere
+(tier-1 eval-B 3/3 → 2/3, tier-2 eval-A −0.079, tier-2 eval-B 1/4 →
+0/4) — too strict for a corpus with genuine single-cluster queries.
+Both variants ship as opt-in infrastructure; neither promoted to
+default. The Phase-2.1 "anchor-cloud displacement" pathology is
+**mis-characterized**: the three still-failing arcs all have
+cross-cluster expected answers, so the pathology is graph-structural
+(cluster boundary handling), not cosine-aggregate shape.
+
+### Phase 2.2 — Option I — **done, refuted**
+
+See "Phase 2.2 findings" in Part 2. Landed:
+- `AnchorScoring.kind = "weighted-probe-density"` with `tau` and
+  optional `useSessionWeights` (default `true`).
+- New branch in `composeAnchors` that computes
+  `Σ_p w(p) · max(0, cos(p, c) − τ)` globally and short-circuits
+  probeComposition; defensive fall-through to union when τ
+  excludes everything.
+- 5 new unit tests; Phase-2.2 10-config iterative-sweep matrix;
+  four Option I rows added to eval-A sweep.
+
+Outcome: **τ=0.2 is behaviorally identical to the Phase-2.1
+default** (same formula, same eval-A/eval-B numbers). Higher τ
+regresses eval-A. Tier-2 eval-B ceiling stays at 1/4. Option I
+ships as opt-in infrastructure; not promoted to default. The
+Phase-2.1 hypothesis that linear density aggregation would fix
+anchor-cloud displacement is refuted — reversing
+single-probe-strong vs. multi-probe-moderate rankings requires
+a non-linear coverage reward (see Option J, below).
+
 ### Phase 2 — Tier-2 dataset (Greek history) — medium scope
 
 Larger, more topically-diverse corpus than Alex. Tier-2 will expose whether:
@@ -762,54 +1285,75 @@ tier-3 results are in.
 
 ### Recommended next-session entry point
 
-Tier-2 closed the A2 question definitively: it does not generalize.
-The productive next moves are about *probe dynamics* (eval B
-coherence) and *robustness across corpora* (A3 weighted-fusion
-looks like a candidate default). Three plausible directions:
+**Option E — done (Phase 2.1).** Per-probe session decay.
+Lifted tier-2 eval-B from 0/4 to 1/4 (best τ=0.3).
 
-**Option E — session-mode probe weighting (addresses eval-B
-coherence gap, recommended).** Tier-2's eval (B) fails 0/4
-across every Phase-1.6 config because `Session.addProbeSentences`
-appends to an unweighted list and the retriever treats all
-probes equally. Broad early-turn probes outvote narrow later-turn
-probes. The primitive change is per-probe weighting at retrieval:
-exponential decay by turn index (e.g. `w(t) = exp(-(T-t) / tau)`
-with T = current turn, tau ~ 1.5-2.0), or simple recency-biased
-top-K where later-turn probes get priority. This is a *retriever*
-change, not a graph or store change, and slots in without
-altering any existing API. Pass criterion: ≥2/4 tier-2 arcs
-coherent without tier-1 regression.
+**Option F — done (Phase 2.1).** Weighted-fusion τ=0.2 as the
+default `probeComposition`. Lifted tier-1 eval-B from 2/3 to 3/3
+at defaults.
 
-**Option F — promote A3 weighted-fusion to default + add probe-
-composition infrastructure for Option E.** Weighted-fusion at
-τ=0.2 wins at tier-2 (+0.022) and is neutral-to-positive at
-tier-1 (0.510 vs 0.530 BFS, within noise). Making it the default
-closes the "defaults are suboptimal" tier-2 finding and gives
-Option E a stable composition baseline to build on. Low risk,
-cheap to sweep once more to confirm.
+**Option I — done (Phase 2.2), refuted.** Weighted-probe-density
+anchor-scoring. Mathematically identical to the Phase-2.1 default
+at τ=0.2; higher τ regresses.
 
-**Option G — tier-3 now, accept A2's corpus-specificity.** Skip
-the rescue work and go directly to the Wikipedia-scale test. The
-argument: if A2+A3 doesn't generalize from tier-1 to tier-2, it
-probably won't generalize to tier-3 either, and we'd rather
-discover *architectural* limits at tier-3 (e.g. "BFS doesn't
-scale past 5K claims") than keep tuning on mid-sized datasets.
-Counter-argument: without eval (B) coherence working at tier-2,
-tier-3 iterative evaluation will be uninterpretable noise.
+**Option J — done (Phase 2.3), refuted.** Density-coverage-bonus
+(`agg · k^(exp−1)`) and min-cosine-gate (`k=P` gate). Cov-bonus
+preserves baselines but does not lift tier-2 eval-B past 1/4; the
+exponent sweep (1.5 / 2 / 3) is behaviorally flat on coherence.
+Min-gate regresses. The "anchor-cloud displacement" pathology
+identified in Phase 2.1 is now known to be mis-characterized: the
+three still-failing tier-2 arcs are **cross-cluster expected
+answers**, not specific-vs-abstract at a fixed cosine band —
+re-shaping the per-claim cosine aggregate does not help because
+the expected claims themselves sit on topical cluster boundaries
+that the embedding + edge weights do not privilege. This is a
+graph-structural problem, not a scoring-shape problem.
 
-**Option H — topic-conditional temporal cost (A1 redux, still
-pending).** Phase 1.6 flagged this as the natural follow-up to
-A1's failure; tier-2's A1 results (−0.05 F1) don't change that
-conjecture — the failure mode is still "adjacency regardless of
-topic" and a cosine-gated version is still worth trying. But
-after tier-2, the priority is lower: topic-conditional temporal
-cost is a refinement, not a fix for the now-identified coherence
-gap.
+**Option H — topic-conditional temporal/edge cost (new
+recommended).** Phase-2.3's cluster-boundary finding promotes
+Option H from fallback to primary candidate. The structural move:
+re-weight edges (or gate traversal / anchor selection) by
+**topical cohesion**, so cross-cluster hops/anchors carry cost
+unless the endpoints share a cluster signal. Concrete design
+sketch:
+- Compute per-node **cluster membership vector**: cosine-based
+  soft membership to k discovered clusters (e.g., k-means over
+  claim embeddings at ingest, or use the existing IDF-weighted
+  lexical edges to form communities via connected-component /
+  label-propagation on the `edge.weight > floor` subgraph).
+- Expose a new anchor/traversal signal `clusterAffinity(p, c)` =
+  similarity of probe `p`'s soft-cluster distribution to claim
+  `c`'s, and add one of:
+  - `AnchorScoring.kind = "cluster-affinity-boost"` — score(c) =
+    `cosAgg(c) · (1 + β · clusterMatch(c))` where
+    `clusterMatch(c) = max_p sim(clusters(p), clusters(c))`. Boosts
+    cross-cluster claims only when the probe set itself spans the
+    clusters.
+  - Edge-weight rescaling in `GraphIndex`: lexical/semantic edge
+    weight multiplied by a cluster-agreement factor; Dijkstra then
+    pays more for cross-cluster hops.
+- Pass criterion: ≥ 2/4 tier-2 eval-B coherent, tier-1 3/3
+  preserved, eval-A within ±0.02 of Phase-2.1 default on both
+  tiers.
 
-Recommendation: **Option E first** — the eval-B gap is the
-biggest open scientific question after tier-2, and it's the only
-one with a clear primitive change (probe weighting) that hasn't
-been touched in Phases 1–1.6. Option F can land alongside or
-immediately after. Option H is still interesting but sits behind
-E in priority. Option G is the "scale or die" move — plausible
-but trades information for ambition.
+**Option K (new, experimental alternative to H) — probe-conditional
+anchor fusion.** Instead of scoring anchors against the union of
+probes, score each probe's top-K *independently* and union them
+only if their chosen anchors span compatible clusters. Equivalent
+to intersection at the *cluster* level rather than the *claim*
+level. Cheaper than H (no cluster computation on ingest) but
+relies on late-turn probes being specific enough to anchor their
+own cluster; may underperform on conversational turns that stay
+topical.
+
+**Option G — tier-3 now, accept tier-2 1/4.** Unchanged argument.
+Counter-argument sharpens: the same cross-cluster failure mode
+will dominate tier-3, and diagnosing it in a 5000-claim corpus is
+harder than in tier-2's 242. Wait for H (or a positive K) before
+scaling.
+
+Recommendation: **Option H — cluster-affinity primitive** is the
+next entry point. Phase-2.3's negative results pin down that the
+remaining tier-2 gap is structural (cluster-boundary handling), not
+aggregate-shape. Option K is the backup if H's cluster computation
+adds too much ingest cost. Option G still waits for eval-B ≥ 2/4.

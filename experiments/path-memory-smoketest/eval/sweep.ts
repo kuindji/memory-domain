@@ -246,6 +246,69 @@ const CONFIGS: Config[] = [
             weightedFusionTau: 0.2,
         },
     },
+    // --- Phase 2.2 Option I (weighted-probe-density anchor scoring) ---
+    {
+        label: "I bfs tau=0.2",
+        options: {
+            traversal: "bfs",
+            probeComposition: "union",
+            anchorScoring: { kind: "weighted-probe-density", tau: 0.2 },
+        },
+    },
+    {
+        label: "I bfs tau=0.3",
+        options: {
+            traversal: "bfs",
+            probeComposition: "union",
+            anchorScoring: { kind: "weighted-probe-density", tau: 0.3 },
+        },
+    },
+    {
+        label: "I bfs tau=0.4",
+        options: {
+            traversal: "bfs",
+            probeComposition: "union",
+            anchorScoring: { kind: "weighted-probe-density", tau: 0.4 },
+        },
+    },
+    {
+        label: "I dijkstra tmp=0.5 tau=0.3",
+        options: {
+            traversal: "dijkstra",
+            temporalHopCost: 0.5,
+            probeComposition: "union",
+            anchorScoring: { kind: "weighted-probe-density", tau: 0.3 },
+        },
+    },
+    // --- Phase 2.3 Option J (non-linear probe-coverage anchor scoring) ---
+    {
+        label: "J bfs cov-bonus exp=2 tau=0.2",
+        options: {
+            traversal: "bfs",
+            anchorScoring: { kind: "density-coverage-bonus", tau: 0.2, exponent: 2 },
+        },
+    },
+    {
+        label: "J bfs cov-bonus exp=2 tau=0.3",
+        options: {
+            traversal: "bfs",
+            anchorScoring: { kind: "density-coverage-bonus", tau: 0.3, exponent: 2 },
+        },
+    },
+    {
+        label: "J bfs min-gate tau=0.1",
+        options: {
+            traversal: "bfs",
+            anchorScoring: { kind: "min-cosine-gate", tau: 0.1 },
+        },
+    },
+    {
+        label: "J bfs min-gate tau=0.2",
+        options: {
+            traversal: "bfs",
+            anchorScoring: { kind: "min-cosine-gate", tau: 0.2 },
+        },
+    },
 ];
 
 async function runConfig(config: Config): Promise<{ mean: number; wins: number; losses: number }> {

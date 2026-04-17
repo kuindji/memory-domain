@@ -3,7 +3,7 @@ import { getEmbedder } from "../src/embedder.js";
 import { PathMemory } from "../src/interfaces.js";
 import { tier2Greek } from "../data/tier2-greek.js";
 import { tracesTier2 } from "../eval/conversation-traces-tier2.js";
-import type { ClaimId, ScoredPath } from "../src/types.js";
+import type { ClaimId, RetrievalOptions, ScoredPath } from "../src/types.js";
 
 function rankClaims(paths: ScoredPath[]): ClaimId[] {
     const best = new Map<ClaimId, number>();
@@ -24,8 +24,75 @@ function intersectionSize<T>(a: Set<T>, b: Set<T>): number {
     return n;
 }
 
+async function runArcs(
+    memory: PathMemory,
+    options: RetrievalOptions,
+    label: string,
+): Promise<{ arcs: number; narrowed: number; coherent: number }> {
+    let totalNarrowing = 0;
+    let totalArcs = 0;
+    let coherentArcs = 0;
+
+    console.log(`\n### ${label} ###`);
+
+    for (const trace of tracesTier2) {
+        console.log(`--- trace: ${trace.name} ---`);
+        const session = memory.createSession();
+        const sizeAcrossTurns: number[] = [];
+        let lastTopClaims: Set<ClaimId> = new Set();
+
+        for (let t = 0; t < trace.turns.length; t++) {
+            const turn = trace.turns[t];
+            await session.addProbeSentences(turn.probes);
+            const results = session.retrieve({
+                mode: trace.mode,
+                anchorTopK: 5,
+                resultTopN: 10,
+                ...options,
+            });
+            const ranked = rankClaims(results);
+            const expected = new Set(turn.expectedClaimsAfterThisTurn);
+            const topK = Math.max(expected.size, 3);
+            const topClaims = new Set(ranked.slice(0, topK));
+            const overlap = intersectionSize(expected, topClaims);
+
+            sizeAcrossTurns.push(results.length);
+            lastTopClaims = topClaims;
+
+            console.log(
+                `  turn ${t + 1}  probes=${session.probeCount}  paths=${results.length}  top@${topK}=[${[...topClaims].slice(0, 5).join(",")}]  expect-overlap=${overlap}/${expected.size}`,
+            );
+        }
+
+        const first = sizeAcrossTurns[0];
+        const last = sizeAcrossTurns[sizeAcrossTurns.length - 1];
+        const narrowed = last <= first;
+        totalNarrowing += narrowed ? 1 : 0;
+
+        const finalExpected = new Set(
+            trace.turns[trace.turns.length - 1].expectedClaimsAfterThisTurn,
+        );
+        const coverage =
+            finalExpected.size > 0
+                ? intersectionSize(finalExpected, lastTopClaims) / finalExpected.size
+                : 0;
+        const coherent = coverage >= 0.5;
+        if (coherent) coherentArcs++;
+        totalArcs++;
+        console.log(
+            `  → narrowed: ${narrowed}    final-coverage: ${coverage.toFixed(2)}    coherent: ${coherent}`,
+        );
+    }
+
+    console.log(
+        `=== ${label} summary: arcs=${totalArcs}  narrowed=${totalNarrowing}  coherent=${coherentArcs} ===`,
+    );
+
+    return { arcs: totalArcs, narrowed: totalNarrowing, coherent: coherentArcs };
+}
+
 describe("eval (B) — iterative arc convergence (tier 2)", () => {
-    test("multi-turn probe accumulation narrows candidate set toward expected claims", async () => {
+    test("multi-turn probe accumulation narrows candidate set; sessionDecayTau lifts coherence", async () => {
         const embedder = await getEmbedder();
         const memory = new PathMemory({ embedder });
 
@@ -38,70 +105,26 @@ describe("eval (B) — iterative arc convergence (tier 2)", () => {
             });
         }
 
-        let totalNarrowing = 0;
-        let totalArcs = 0;
-        let coherentArcs = 0;
+        // Defaults (post-Phase-2.1: weighted-fusion τ=0.2, no session decay).
+        // At defaults across every Phase-1.6 config, tier-2 coherence ran 0/4;
+        // narrowing held 4/4. We still assert narrowing as the architectural
+        // floor; coherence at defaults is observational.
+        const baseline = await runArcs(memory, {}, "defaults (no session decay)");
+        expect(baseline.narrowed).toBeGreaterThanOrEqual(Math.ceil(baseline.arcs / 2));
 
-        for (const trace of tracesTier2) {
-            console.log(`\n--- trace: ${trace.name} ---`);
-            const session = memory.createSession();
-            const sizeAcrossTurns: number[] = [];
-            let lastTopClaims: Set<ClaimId> = new Set();
-
-            for (let t = 0; t < trace.turns.length; t++) {
-                const turn = trace.turns[t];
-                await session.addProbeSentences(turn.probes);
-                const results = session.retrieve({
-                    mode: trace.mode,
-                    anchorTopK: 5,
-                    resultTopN: 10,
-                });
-                const ranked = rankClaims(results);
-                const expected = new Set(turn.expectedClaimsAfterThisTurn);
-                const topK = Math.max(expected.size, 3);
-                const topClaims = new Set(ranked.slice(0, topK));
-                const overlap = intersectionSize(expected, topClaims);
-
-                sizeAcrossTurns.push(results.length);
-                lastTopClaims = topClaims;
-
-                console.log(
-                    `  turn ${t + 1}  probes=${session.probeCount}  paths=${results.length}  top@${topK}=[${[...topClaims].slice(0, 5).join(",")}]  expect-overlap=${overlap}/${expected.size}`,
-                );
-            }
-
-            const first = sizeAcrossTurns[0];
-            const last = sizeAcrossTurns[sizeAcrossTurns.length - 1];
-            const narrowed = last <= first;
-            totalNarrowing += narrowed ? 1 : 0;
-
-            const finalExpected = new Set(
-                trace.turns[trace.turns.length - 1].expectedClaimsAfterThisTurn,
-            );
-            const coverage =
-                finalExpected.size > 0
-                    ? intersectionSize(finalExpected, lastTopClaims) / finalExpected.size
-                    : 0;
-            const coherent = coverage >= 0.5;
-            if (coherent) coherentArcs++;
-            totalArcs++;
-            console.log(
-                `  → narrowed: ${narrowed}    final-coverage: ${coverage.toFixed(2)}    coherent: ${coherent}`,
-            );
-        }
-
-        console.log(`\n=== Tier 2 iterative summary ===`);
-        console.log(
-            `Arcs: ${totalArcs}    narrowed: ${totalNarrowing}    coherent (≥0.5): ${coherentArcs}`,
+        // Phase 2.1 finding: sessionDecayTau lifts coherence above the
+        // 0/4 baseline floor — it does NOT close the gap to ≥ 2/4 alone.
+        // Best swept config (decay=0.3) hits 1/4. CONTEXT.md notes the
+        // remaining gap is structural (paths through cross-cluster anchor
+        // clouds) and needs a second primitive on top of decay. The
+        // assertion below locks the *direction* of the win, not its
+        // magnitude — guarding against silent regression of the primitive.
+        const decayed = await runArcs(
+            memory,
+            { sessionDecayTau: 0.3 },
+            "sessionDecayTau=0.3 (Phase 2.1)",
         );
-
-        // Tier-2's iterative arcs exercise a harder pattern than tier-1:
-        // no shared anchor token like tier-1's `alex`, so broad early-turn
-        // probes continue to dominate narrow later-turn probes in the
-        // accumulated session. At defaults (and across every Phase-1.6
-        // config) coherence runs 0/4 on tier-2; narrowing still holds
-        // 4/4. Narrowing is the gate the test asserts — coherence is
-        // logged as an observational metric and tracked in CONTEXT.md.
-        expect(totalNarrowing).toBeGreaterThanOrEqual(Math.ceil(totalArcs / 2));
-    }, 180_000);
+        expect(decayed.narrowed).toBeGreaterThanOrEqual(Math.ceil(decayed.arcs / 2));
+        expect(decayed.coherent).toBeGreaterThan(baseline.coherent);
+    }, 240_000);
 });

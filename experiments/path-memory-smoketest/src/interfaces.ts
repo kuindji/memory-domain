@@ -78,6 +78,7 @@ export class PathMemory {
 
 export class Session {
     private readonly accumulated: Probe[] = [];
+    private currentTurn = 0;
 
     constructor(private readonly memory: PathMemory) {}
 
@@ -85,18 +86,24 @@ export class Session {
         return this.accumulated.length;
     }
 
+    get turnCount(): number {
+        return this.currentTurn;
+    }
+
     async addProbeSentences(sentences: string[]): Promise<void> {
+        const turnIndex = this.currentTurn++;
         for (const text of sentences) {
             const embedding = await this.memory.embedder.embed(text);
-            this.accumulated.push({ text, embedding });
+            this.accumulated.push({ text, embedding, turnIndex });
         }
     }
 
     async addNaturalQuery(query: string): Promise<void> {
+        const turnIndex = this.currentTurn++;
         const tokens = tokenize(query);
         for (const text of tokens) {
             const embedding = await this.memory.embedder.embed(text);
-            this.accumulated.push({ text, embedding });
+            this.accumulated.push({ text, embedding, turnIndex });
         }
     }
 
@@ -106,5 +113,6 @@ export class Session {
 
     reset(): void {
         this.accumulated.length = 0;
+        this.currentTurn = 0;
     }
 }

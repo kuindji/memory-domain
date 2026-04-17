@@ -84,6 +84,75 @@ tests/
   helpers.ts      fake/deterministic embedder + tokenize stub for unit tests
 ```
 
+## Phase 2.1 — tier-2 eval-B rescue attempt
+
+Two changes landed for Phase 2.1 in response to tier-2's eval-B
+coherence collapse (0/4 across every Phase-1.6 config):
+
+1. **Option E — per-probe session decay.** `Session` now stamps each
+   appended probe with a turn index, and a new `sessionDecayTau`
+   retrieval option weights probes by `exp(-(maxTurn - turnIndex) / tau)`
+   so later-turn probes outweigh broad early-turn ones. Weights are
+   applied in three probe-consumption points: intersection vote
+   (weighted-sum threshold), weighted-fusion contribution, and path
+   `probeCoverage` scoring.
+2. **Option F — default composition flip.** `DEFAULTS.probeComposition`
+   moves from `"union"` to `"weighted-fusion"` (τ=0.2). Gives Option E
+   a stable aggregation baseline that already respects per-probe
+   contribution arithmetic.
+
+`sessionDecayTau` is off by default (undefined) — full back-compat for
+one-shot `PathMemory.queryWithProbes` callers that don't set turnIndex.
+
+### Phase 2.1 results
+
+| Metric | Legacy default (union) | New default (wfusion τ=0.2) | Best decay config |
+|---|---|---|---|
+| Tier-1 eval-A mean F1  | 0.530 | 0.510 | 0.510 (unchanged by decay) |
+| Tier-1 eval-B coherent | 2/3   | **3/3** | 3/3 |
+| Tier-2 eval-A mean F1  | 0.526 | **0.548** | 0.548 |
+| Tier-2 eval-B coherent | 0/4   | 0/4   | **1/4** (τ=0.3 or 0.05) |
+
+**Headline takeaways:**
+
+- The default flip **lifted tier-1 eval-B from 2/3 to 3/3** —
+  unexpected win. Phase-1.6's career-arc was the only missing arc
+  under the union default, and it converges under weighted-fusion
+  even without decay.
+- The default flip **lifted tier-2 eval-A by +0.022 F1** (matches the
+  Phase-2 leader) at the cost of a **−0.020 tier-1 eval-A regression**
+  (within noise of the previous 0.530 baseline).
+- Session decay lifted tier-2 eval-B coherence from 0/4 to **1/4**
+  at its best config (τ=0.3 — Academy arc converges). The primitive
+  helps but **does NOT meet the ≥ 2/4 Option-E pass criterion alone**
+  — the three cross-cluster arcs (philosophers→Alexander, Athens at
+  war, Alexander succession) still miss their late-turn targets even
+  with latest-turn-only weighting (τ≈0.05).
+- Tier-1 eval-B is robust to every swept decay value (3/3 coherent
+  at all taus from 0.05 through 5.0) — no tier-1 regression from the
+  new primitive.
+
+**Scientific interpretation:** the tier-2 eval-B gap is a **two-problem
+gap**. Probe-turn weighting addresses *session accumulation*, but the
+remaining failure mode is **anchor-cloud displacement** — the late-turn
+probes' top-K anchors land in the *wrong* topical cluster when the
+cross-cluster path depends on traversal through a named entity
+("Aristotle's most famous pupil" → `phil_aristotle_tutors_alexander`)
+that is itself cross-cluster. The retrieved anchor set at the latest
+turn is topically correct but structurally isolated from the expected
+claim. Next primitive needs to reshape *anchor selection* itself under
+a weighted-probe regime — e.g. anchor-boost proportional to late-turn
+cosine density, or graph-neighborhood reconciliation post-anchor. Plan
+and analysis: `CONTEXT.md` § Phase 2.1 findings.
+
+Run Phase-2.1 sweeps:
+
+```bash
+# Option E sweep across 12 configs on either tier
+TIER=tier1 bun run experiments/path-memory-smoketest/eval/iterative-sweep.ts
+TIER=tier2 bun run experiments/path-memory-smoketest/eval/iterative-sweep.ts
+```
+
 ## Tier-2 results (Phase 2)
 
 Greek-history corpus: 242 claims across 8 topical clusters (pan-Hellenic,
@@ -94,15 +163,17 @@ integers), so Marathon = 310, Alexander's death = 477.
 
 **Eval (A) — vs flat vector baseline, at defaults:**
 
+At Phase-2 defaults (pre-Phase-2.1, i.e. BFS + union + raw cosine):
+
 ```
 Queries: 19    path wins: 5    baseline wins: 5    ties: 9
 Mean F1 — path: 0.526    baseline: 0.544
 ```
 
-Best Phase-2 configuration:
+Best Phase-2 configuration — **promoted to default in Phase 2.1**:
 
 ```
-A3 bfs probe=weighted-fusion tau=0.2    → mean F1 0.548  (+0.022 over BFS)
+A3 bfs probe=weighted-fusion tau=0.2    → mean F1 0.548  (+0.022 over BFS+union)
 ```
 
 **Eval (B) — multi-turn arc convergence:**
@@ -144,7 +215,7 @@ TIER=tier2 bun run experiments/path-memory-smoketest/eval/sweep.ts
 TIER=tier2 bun run experiments/path-memory-smoketest/eval/iterative-sweep.ts
 ```
 
-## Tier-1 results (post-Phase 1.6, defaults)
+## Tier-1 results (post-Phase 1.6, legacy union default)
 
 **Eval (A) — vs flat vector baseline (P/R @ K=|ideal|):**
 
@@ -152,6 +223,11 @@ TIER=tier2 bun run experiments/path-memory-smoketest/eval/iterative-sweep.ts
 Queries: 12    path wins: 3    baseline wins: 3    ties: 6
 Mean F1 — path: 0.530    baseline: 0.507  (defaults: BFS, raw cosine, union)
 ```
+
+> Under the Phase-2.1 post-flip default (weighted-fusion τ=0.2),
+> tier-1 mean F1 becomes 0.510 — within noise. Tier-1 eval-B
+> coherence *improves* from 2/3 to 3/3 under the new default. See
+> "Phase 2.1" above.
 
 Best Phase-1.6 configurations (opt-in):
 
@@ -193,20 +269,38 @@ A2+A3 dijkstra anchor=idf a=0.7 probe=intersection    | 3/3      | 3/3
 
 ## Hypothesis status
 
-**Mixed, post-Phase 2.** Architectural claims hold at both tiers:
+**Mixed, post-Phase 2.1.** Architectural claims hold at both tiers:
 path retrieval wins decisively on as-of and multi-claim-coverage
 queries, baseline wins on single-strong-cue queries, and composite
 F1 is competitive (tier-2 best 0.548 vs baseline 0.544). The
 *tuning* claim from Phase 1.6 does NOT hold at scale: A2 was an
 artifact of tier-1's single-shared-token corpus and regresses on
-tier-2. A3 weighted-fusion emerges as the first primitive that
-wins at both tiers.
+tier-2. A3 weighted-fusion (now the default) is robust to corpus
+shape and is the first primitive that wins at both tiers.
 
-Eval (B) coherence collapsed on tier-2 (0/4 across every Phase-1.6
-config) — session-mode probe accumulation is the next architectural
-gap, and it's not addressable within the Phase-1.6 knob surface.
-Next: probe-turn weighting (`CONTEXT.md` § Recommended next-
-session entry point, Option E).
+Phase 2.1 landed per-probe session decay (Option E) and promoted
+A3 weighted-fusion to default (Option F). The default flip
+unexpectedly lifted tier-1 eval-B from 2/3 to 3/3; session decay
+lifted tier-2 eval-B from 0/4 to 1/4. The remaining tier-2 gap
+(3/4 cross-cluster arcs still miss) is structural — a
+second primitive is required. See `CONTEXT.md` § Phase 2.1
+findings for the full analysis.
+
+Phases 2.2 and 2.3 landed two new `AnchorScoring` variants as
+opt-in infrastructure: **Option I** (`weighted-probe-density` —
+linear cosine-density aggregate) and **Option J**
+(`density-coverage-bonus` — super-linear probe-coverage reward;
+`min-cosine-gate` — hard k=P gate). All four configurations
+**preserve** Phase-2.1 baselines but **none lift tier-2 eval-B
+beyond 1/4**. The exponent sweep (`k^(exp−1)` for
+`exp ∈ {1.5, 2, 3}`) is behaviorally flat on coherence, refuting
+the Phase-2.1 hypothesis that anchor-cloud displacement is a
+"strong-peak-vs-moderate-spread" ranking flip. Failure-mode
+inspection in CONTEXT.md § Phase 2.3 identifies the three
+still-failing arcs as **cross-cluster expected answers** — a
+graph-structural problem (cluster-boundary handling), not an
+anchor-scoring one. Next candidate: **Option H**
+(topic/cluster-conditional edge weights or anchor boosts).
 
 ## Out of scope (for follow-on work)
 

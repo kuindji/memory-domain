@@ -35,6 +35,7 @@ export type HistoryEvent =
 export type Probe = {
     text: string;
     embedding: number[];
+    turnIndex?: number;
 };
 
 export type Path = {
@@ -60,7 +61,17 @@ export type RetrievalMode = "current" | { kind: "asOf"; at: Timestamp };
 
 export type TraversalMode = "bfs" | "dijkstra";
 
-export type AnchorScoring = { kind: "cosine" } | { kind: "cosine-idf-mass"; alpha: number };
+export type AnchorScoring =
+    | { kind: "cosine" }
+    | { kind: "cosine-idf-mass"; alpha: number }
+    | { kind: "weighted-probe-density"; tau: number; useSessionWeights?: boolean }
+    | {
+          kind: "density-coverage-bonus";
+          tau: number;
+          exponent: number;
+          useSessionWeights?: boolean;
+      }
+    | { kind: "min-cosine-gate"; tau: number; useSessionWeights?: boolean };
 
 export type ProbeComposition = "union" | "intersection" | "weighted-fusion";
 
@@ -74,6 +85,7 @@ export type RetrievalOptions = {
     anchorScoring?: AnchorScoring;
     probeComposition?: ProbeComposition;
     weightedFusionTau?: number;
+    sessionDecayTau?: number;
     weights?: {
         probeCoverage?: number;
         edgeTypeDiversity?: number;

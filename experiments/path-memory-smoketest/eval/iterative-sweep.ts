@@ -37,36 +37,24 @@ type Config = {
     options: RetrievalOptions;
 };
 
+// Phase 2.3 sweep — Option J (non-linear probe-coverage anchor scoring).
+// Compares Phase-2.1/2.2 baselines against two J variants:
+//   • density-coverage-bonus: `Σ w(p)·max(0, cos − τ) · k^(exp − 1)` —
+//     super-linear reward on probe-coverage count.
+//   • min-cosine-gate: hard k=P gate, score = min weighted per-probe
+//     contribution (strict-AND analogue of intersection).
+// Isolation rows sweep the exponent, decay on/off, session-weight toggle,
+// and Dijkstra pairing so any lift can be attributed to the coverage-
+// bonus signal vs. Phase-2.1 decay or Phase-1.5 traversal.
 const CONFIGS: Config[] = [
-    { label: "bfs (default)", options: {} },
     {
-        label: "A2 dijkstra tmp=0.5 anchor=idf alpha=0.7",
-        options: {
-            traversal: "dijkstra",
-            temporalHopCost: 0.5,
-            anchorScoring: { kind: "cosine-idf-mass", alpha: 0.7 },
-        },
+        // Legacy pre-Phase-2.1 default — explicit union so the comparison
+        // against the new default isn't masked by the silent default flip.
+        label: "bfs union (legacy default)",
+        options: { traversal: "bfs", probeComposition: "union" },
     },
     {
-        label: "A2 dijkstra tmp=0.5 anchor=idf alpha=0.8",
-        options: {
-            traversal: "dijkstra",
-            temporalHopCost: 0.5,
-            anchorScoring: { kind: "cosine-idf-mass", alpha: 0.8 },
-        },
-    },
-    {
-        label: "A2+A3 dijkstra anchor=idf a=0.7 probe=intersection",
-        options: {
-            traversal: "dijkstra",
-            temporalHopCost: 0.5,
-            anchorScoring: { kind: "cosine-idf-mass", alpha: 0.7 },
-            probeComposition: "intersection",
-        },
-    },
-    // Tier-2 eval-A lead: weighted-fusion at tau=0.2 on plain BFS.
-    {
-        label: "A3 bfs probe=weighted-fusion tau=0.2",
+        label: "bfs wfusion tau=0.2 (Phase 2.1 default)",
         options: {
             traversal: "bfs",
             probeComposition: "weighted-fusion",
@@ -74,16 +62,100 @@ const CONFIGS: Config[] = [
         },
     },
     {
-        label: "A3 bfs probe=weighted-fusion tau=0.3",
+        label: "bfs wfusion tau=0.2 + decay=0.3 (Phase 2.1 best)",
         options: {
             traversal: "bfs",
             probeComposition: "weighted-fusion",
-            weightedFusionTau: 0.3,
+            weightedFusionTau: 0.2,
+            sessionDecayTau: 0.3,
         },
     },
     {
-        label: "A3 bfs probe=intersection",
-        options: { traversal: "bfs", probeComposition: "intersection" },
+        label: "J cov-bonus exp=2 tau=0.2 + decay=0.3",
+        options: {
+            traversal: "bfs",
+            anchorScoring: { kind: "density-coverage-bonus", tau: 0.2, exponent: 2 },
+            sessionDecayTau: 0.3,
+        },
+    },
+    {
+        label: "J cov-bonus exp=2 tau=0.3 + decay=0.3",
+        options: {
+            traversal: "bfs",
+            anchorScoring: { kind: "density-coverage-bonus", tau: 0.3, exponent: 2 },
+            sessionDecayTau: 0.3,
+        },
+    },
+    {
+        label: "J cov-bonus exp=1.5 tau=0.2 + decay=0.3",
+        options: {
+            traversal: "bfs",
+            anchorScoring: { kind: "density-coverage-bonus", tau: 0.2, exponent: 1.5 },
+            sessionDecayTau: 0.3,
+        },
+    },
+    {
+        label: "J cov-bonus exp=3 tau=0.2 + decay=0.3",
+        options: {
+            traversal: "bfs",
+            anchorScoring: { kind: "density-coverage-bonus", tau: 0.2, exponent: 3 },
+            sessionDecayTau: 0.3,
+        },
+    },
+    {
+        // Decay-isolation row: any lift here is attributable to the
+        // coverage-bonus signal, not Phase-2.1 decay. At exp=1 this
+        // reduces to Option I (same formula) — makes the per-exponent
+        // comparison legible.
+        label: "J cov-bonus exp=2 tau=0.2 no decay",
+        options: {
+            traversal: "bfs",
+            anchorScoring: { kind: "density-coverage-bonus", tau: 0.2, exponent: 2 },
+        },
+    },
+    {
+        // Session-weight isolation: decay is on but the anchor-scorer
+        // ignores it. If this row matches the no-decay row, decay is
+        // inert inside J; if it matches the with-decay row, it stayed
+        // active via probeCoverage weighting only.
+        label: "J cov-bonus exp=2 tau=0.2 useSessionWeights=false + decay=0.3",
+        options: {
+            traversal: "bfs",
+            anchorScoring: {
+                kind: "density-coverage-bonus",
+                tau: 0.2,
+                exponent: 2,
+                useSessionWeights: false,
+            },
+            sessionDecayTau: 0.3,
+        },
+    },
+    {
+        label: "J min-gate tau=0.1 + decay=0.3",
+        options: {
+            traversal: "bfs",
+            anchorScoring: { kind: "min-cosine-gate", tau: 0.1 },
+            sessionDecayTau: 0.3,
+        },
+    },
+    {
+        label: "J min-gate tau=0.2 + decay=0.3",
+        options: {
+            traversal: "bfs",
+            anchorScoring: { kind: "min-cosine-gate", tau: 0.2 },
+            sessionDecayTau: 0.3,
+        },
+    },
+    {
+        // Phase 1.6 predicted Dijkstra needs higher-quality anchors to
+        // lift F1 — J's coverage-bonus is the strongest candidate so far.
+        label: "J cov-bonus exp=2 tau=0.2 + decay=0.3 on dijkstra",
+        options: {
+            traversal: "dijkstra",
+            temporalHopCost: 0.5,
+            anchorScoring: { kind: "density-coverage-bonus", tau: 0.2, exponent: 2 },
+            sessionDecayTau: 0.3,
+        },
     },
 ];
 

@@ -24,7 +24,7 @@ const DEFAULTS = {
     traversal: "bfs" as TraversalMode,
     temporalHopCost: 0.5,
     anchorScoring: { kind: "cosine" } as AnchorScoring,
-    probeComposition: "union" as ProbeComposition,
+    probeComposition: "weighted-fusion" as ProbeComposition,
     weightedFusionTau: 0.2,
     weights: {
         probeCoverage: 1.0,
@@ -69,8 +69,13 @@ export class Retriever {
             .map((id) => this.graph.getNode(id))
             .filter((c): c is Claim => c !== undefined && isValid(c));
 
+        const probeWeights = computeProbeWeights(probes, options.sessionDecayTau);
+        const totalProbeWeight = probeWeights.reduce((s, w) => s + w, 0);
+
         const probesByAnchor = this.composeAnchors({
             probes,
+            probeWeights,
+            totalProbeWeight,
             validClaims,
             anchorTopK,
             anchorScoring,
@@ -101,11 +106,17 @@ export class Retriever {
         }
 
         const now = this.computeNow();
-        const numProbes = probes.length;
         const scored: ScoredPath[] = [];
 
         for (const path of candidatePaths.values()) {
-            const breakdown = this.scorePath(path, probesByAnchor, numProbes, now, bfsMaxDepth);
+            const breakdown = this.scorePath(
+                path,
+                probesByAnchor,
+                probeWeights,
+                totalProbeWeight,
+                now,
+                bfsMaxDepth,
+            );
             const score =
                 breakdown.probeCoverage * weights.probeCoverage +
                 breakdown.edgeTypeDiversity * weights.edgeTypeDiversity +
@@ -166,13 +177,23 @@ export class Retriever {
      */
     private composeAnchors(args: {
         probes: Probe[];
+        probeWeights: number[];
+        totalProbeWeight: number;
         validClaims: Claim[];
         anchorTopK: number;
         anchorScoring: AnchorScoring;
         probeComposition: ProbeComposition;
         weightedFusionTau: number;
     }): Map<ClaimId, Set<number>> {
-        const { probes, validClaims, anchorTopK, anchorScoring, probeComposition } = args;
+        const {
+            probes,
+            probeWeights,
+            totalProbeWeight,
+            validClaims,
+            anchorTopK,
+            anchorScoring,
+            probeComposition,
+        } = args;
 
         const perProbe = probes.map((p) =>
             this.scoreAnchorsForProbe(p.embedding, validClaims, anchorTopK, anchorScoring),
@@ -188,6 +209,153 @@ export class Retriever {
             s.add(pIdx);
         };
 
+        // Option J (Phase 2.3): density-coverage-bonus. Same per-probe
+        // aggregate as Option I but multiplied by `k^(exponent - 1)`, where
+        // `k` is the number of probes whose cosine clears `tau`. Designed
+        // to flip the ranking when one strong probe (`k=1`, large raw)
+        // would otherwise outscore many moderate probes (`k>1`, smaller
+        // raws). At `exponent = 1` the bonus is `1` and the formula
+        // collapses to Option I exactly. Defensive fall-through to union
+        // when `tau` excludes everything matches Option I's pattern.
+        if (anchorScoring.kind === "density-coverage-bonus") {
+            const tau = anchorScoring.tau;
+            const exponent = anchorScoring.exponent;
+            const useWeights = anchorScoring.useSessionWeights ?? true;
+            const aggregate = new Map<ClaimId, number>();
+            const probesAboveTau = new Map<ClaimId, Set<number>>();
+            for (const claim of validClaims) {
+                let agg = 0;
+                let k = 0;
+                const above = new Set<number>();
+                perProbe.forEach((pp, pIdx) => {
+                    const cos = pp.cosineByAnchor.get(claim.id) ?? 0;
+                    const raw = Math.max(0, cos - tau);
+                    if (raw > 0) {
+                        const w = useWeights ? probeWeights[pIdx] : 1;
+                        agg += w * raw;
+                        k += 1;
+                        above.add(pIdx);
+                    }
+                });
+                if (agg > 0 && k > 0) {
+                    const score = agg * Math.pow(k, exponent - 1);
+                    aggregate.set(claim.id, score);
+                    probesAboveTau.set(claim.id, above);
+                }
+            }
+            const ranked = Array.from(aggregate.entries())
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, anchorTopK)
+                .map(([id]) => id);
+            for (const aid of ranked) {
+                const above = probesAboveTau.get(aid);
+                if (!above || above.size === 0) {
+                    remember(aid, 0);
+                    continue;
+                }
+                for (const pIdx of above) remember(aid, pIdx);
+            }
+            if (probesByAnchor.size > 0) return probesByAnchor;
+            // Fall through to the union path if τ excluded everything.
+        }
+
+        // Option J (Phase 2.3): min-cosine-gate. Hard k=P gate — only
+        // claims that clear `tau` against EVERY probe contribute. Score is
+        // the minimum per-probe weighted contribution (the strict-AND
+        // analogue of intersection retrieval); ties break by sum so the
+        // ordering is total. Single-probe input degenerates to a cosine-
+        // with-floor anchor scorer. Defensive fall-through to union when
+        // no claim passes the gate (common at tier-2 with broad probes).
+        if (anchorScoring.kind === "min-cosine-gate") {
+            const tau = anchorScoring.tau;
+            const useWeights = anchorScoring.useSessionWeights ?? true;
+            const aggregate = new Map<ClaimId, number>();
+            const probesAboveTau = new Map<ClaimId, Set<number>>();
+            for (const claim of validClaims) {
+                let mn = Infinity;
+                let sumAgg = 0;
+                let above = 0;
+                const aboveSet = new Set<number>();
+                for (let pIdx = 0; pIdx < perProbe.length; pIdx++) {
+                    const cos = perProbe[pIdx].cosineByAnchor.get(claim.id) ?? 0;
+                    const raw = Math.max(0, cos - tau);
+                    if (raw <= 0) {
+                        mn = 0;
+                        break;
+                    }
+                    const w = useWeights ? probeWeights[pIdx] : 1;
+                    const term = w * raw;
+                    if (term < mn) mn = term;
+                    sumAgg += term;
+                    above += 1;
+                    aboveSet.add(pIdx);
+                }
+                if (above === perProbe.length && mn > 0) {
+                    aggregate.set(claim.id, mn + 1e-6 * sumAgg);
+                    probesAboveTau.set(claim.id, aboveSet);
+                }
+            }
+            const ranked = Array.from(aggregate.entries())
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, anchorTopK)
+                .map(([id]) => id);
+            for (const aid of ranked) {
+                const above = probesAboveTau.get(aid);
+                if (!above || above.size === 0) {
+                    remember(aid, 0);
+                    continue;
+                }
+                for (const pIdx of above) remember(aid, pIdx);
+            }
+            if (probesByAnchor.size > 0) return probesByAnchor;
+            // Fall through to the union path if no claim cleared the gate.
+        }
+
+        // Option I (Phase 2.2): weighted-probe-density anchor scoring. When
+        // active, bypass per-probe top-K and rank every valid claim by
+        // `sum_p w(p) · max(0, cos(p, c) - tau)` — the same aggregate that
+        // A3 weighted-fusion computes in probeComposition, but promoted to
+        // the anchor-selection slot so its `tau` and session-weight toggle
+        // tune independently of probeComposition. Composition is effectively
+        // a no-op on the resulting anchor set (density already fuses).
+        if (anchorScoring.kind === "weighted-probe-density") {
+            const tau = anchorScoring.tau;
+            const useWeights = anchorScoring.useSessionWeights ?? true;
+            const aggregate = new Map<ClaimId, number>();
+            const probesAboveTau = new Map<ClaimId, Set<number>>();
+            for (const claim of validClaims) {
+                let agg = 0;
+                const above = new Set<number>();
+                perProbe.forEach((pp, pIdx) => {
+                    const cos = pp.cosineByAnchor.get(claim.id) ?? 0;
+                    const raw = Math.max(0, cos - tau);
+                    if (raw > 0) {
+                        const w = useWeights ? probeWeights[pIdx] : 1;
+                        agg += w * raw;
+                        above.add(pIdx);
+                    }
+                });
+                if (agg > 0) {
+                    aggregate.set(claim.id, agg);
+                    probesAboveTau.set(claim.id, above);
+                }
+            }
+            const ranked = Array.from(aggregate.entries())
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, anchorTopK)
+                .map(([id]) => id);
+            for (const aid of ranked) {
+                const above = probesAboveTau.get(aid);
+                if (!above || above.size === 0) {
+                    remember(aid, 0);
+                    continue;
+                }
+                for (const pIdx of above) remember(aid, pIdx);
+            }
+            if (probesByAnchor.size > 0) return probesByAnchor;
+            // Fall through to the default union path if τ excluded everything.
+        }
+
         if (probeComposition === "intersection" && probes.length > 1) {
             const counts = new Map<ClaimId, Set<number>>();
             perProbe.forEach((pp, pIdx) => {
@@ -200,9 +368,15 @@ export class Retriever {
                     s.add(pIdx);
                 }
             });
-            const minProbes = Math.ceil(probes.length / 2);
+            // Threshold is half the total probe weight; with uniform weights this
+            // matches the prior `>= ceil(P/2)` count rule. With session decay it
+            // lets a hit by late-turn (high-weight) probes pass even when fewer
+            // probes are involved.
+            const threshold = 0.5 * totalProbeWeight;
             for (const [aid, hitProbes] of counts) {
-                if (hitProbes.size >= minProbes) {
+                let voteWeight = 0;
+                for (const pIdx of hitProbes) voteWeight += probeWeights[pIdx];
+                if (voteWeight >= threshold) {
                     for (const pIdx of hitProbes) remember(aid, pIdx);
                 }
             }
@@ -220,9 +394,9 @@ export class Retriever {
                 const above = new Set<number>();
                 perProbe.forEach((pp, pIdx) => {
                     const cos = pp.cosineByAnchor.get(claim.id) ?? 0;
-                    const contribution = Math.max(0, cos - tau);
-                    if (contribution > 0) {
-                        agg += contribution;
+                    const raw = Math.max(0, cos - tau);
+                    if (raw > 0) {
+                        agg += probeWeights[pIdx] * raw;
                         above.add(pIdx);
                     }
                 });
@@ -379,7 +553,8 @@ export class Retriever {
     private scorePath(
         path: Path,
         probesByAnchor: Map<ClaimId, Set<number>>,
-        numProbes: number,
+        probeWeights: number[],
+        totalProbeWeight: number,
         now: Timestamp,
         maxDepth: number,
     ): ScoreBreakdown {
@@ -388,7 +563,9 @@ export class Retriever {
             const p = probesByAnchor.get(nid);
             if (p) for (const idx of p) coveredProbes.add(idx);
         }
-        const probeCoverage = numProbes > 0 ? coveredProbes.size / numProbes : 0;
+        let coveredWeight = 0;
+        for (const idx of coveredProbes) coveredWeight += probeWeights[idx];
+        const probeCoverage = totalProbeWeight > 0 ? coveredWeight / totalProbeWeight : 0;
 
         const edgeTypes = new Set<EdgeType>();
         for (const e of path.edges) edgeTypes.add(e.type);
@@ -433,4 +610,30 @@ function makeValidityFilter(mode: RetrievalMode): (c: Claim) => boolean {
 function canonicalPathKey(path: Path): string {
     const sorted = [...path.nodeIds].sort();
     return `path:${sorted.join(",")}`;
+}
+
+/**
+ * Per-probe weights for session-mode multi-turn retrieval.
+ *
+ * When `sessionDecayTau` is undefined or no probe carries a `turnIndex`,
+ * every probe contributes equally (weight 1.0) — matching pre-Phase-2.1
+ * behavior. Otherwise weights follow `exp(-(maxTurn - turnIndex) / tau)`
+ * relative to the latest observed turn, so later-turn probes outweigh
+ * earlier-turn probes. Probes without a turnIndex are treated as belonging
+ * to the latest turn (weight 1.0), which matches one-shot
+ * `PathMemory.queryWithProbes` callers that never set the field.
+ */
+function computeProbeWeights(probes: Probe[], sessionDecayTau?: number): number[] {
+    if (sessionDecayTau === undefined || sessionDecayTau <= 0) {
+        return probes.map(() => 1);
+    }
+    let maxTurn = -Infinity;
+    for (const p of probes) {
+        if (p.turnIndex !== undefined && p.turnIndex > maxTurn) maxTurn = p.turnIndex;
+    }
+    if (!Number.isFinite(maxTurn)) return probes.map(() => 1);
+    return probes.map((p) => {
+        const t = p.turnIndex ?? maxTurn;
+        return Math.exp(-(maxTurn - t) / sessionDecayTau);
+    });
 }
