@@ -511,6 +511,52 @@ const CONFIGS: Config[] = [
         }
         return rows;
     })(),
+    // Phase 2.14 — retune anchor primitives under bge-base (new default).
+    // Phase 2.13 landed bge-base at 2/4 eval-B coherence (bfs wfusion τ=0.2 +
+    // decay=0.3). Failing arcs: "Athens at war" (cov 0.33) and "Alexander
+    // succession" (cov 0.33). Stage 1: 1D knob sweeps to push 2/4 → 3/4.
+    // Control row lives at label "bfs wfusion tau=0.2 + decay=0.3 (Phase 2.1 best)".
+    ...(() => {
+        const rows: Config[] = [];
+        // sessionDecayTau sweep on bfs wfusion τ=0.2 (0.3 is current best; untested neighbours).
+        for (const decay of [0.1, 0.2, 0.4, 0.5]) {
+            rows.push({
+                label: `2.14 bfs wfusion τ=0.2 + decay=${decay}`,
+                options: {
+                    traversal: "bfs",
+                    probeComposition: "weighted-fusion",
+                    weightedFusionTau: 0.2,
+                    sessionDecayTau: decay,
+                },
+            });
+        }
+        // weightedFusionTau sweep at decay=0.3 (gate may want to move under bge-base).
+        for (const tau of [0.1, 0.15, 0.3]) {
+            rows.push({
+                label: `2.14 bfs wfusion τ=${tau} + decay=0.3`,
+                options: {
+                    traversal: "bfs",
+                    probeComposition: "weighted-fusion",
+                    weightedFusionTau: tau,
+                    sessionDecayTau: 0.3,
+                },
+            });
+        }
+        // anchorTopK sweep on current best (K=5 is default; K≥10 ruled out as Option L).
+        for (const topK of [3, 7]) {
+            rows.push({
+                label: `2.14 bfs wfusion τ=0.2 + decay=0.3 + K=${topK}`,
+                options: {
+                    traversal: "bfs",
+                    probeComposition: "weighted-fusion",
+                    weightedFusionTau: 0.2,
+                    sessionDecayTau: 0.3,
+                    anchorTopK: topK,
+                },
+            });
+        }
+        return rows;
+    })(),
 ];
 
 // Tier-3 validation matrix (Phase 2.7). Narrow sweep per CONTEXT.md §1828 —
@@ -572,14 +618,31 @@ const PHASE_213_LABELS = new Set<string>([
     "J min-gate tau=0.2 + decay=0.3",
 ]);
 
+// Phase-2.14 narrow matrix: control + Stage-1 1D sweeps on decay / wfusion τ
+// / anchorTopK under bge-base. See CONFIGS entries labelled "2.14 ...".
+const PHASE_214_LABELS = new Set<string>([
+    "bfs wfusion tau=0.2 + decay=0.3 (Phase 2.1 best)",
+    "2.14 bfs wfusion τ=0.2 + decay=0.1",
+    "2.14 bfs wfusion τ=0.2 + decay=0.2",
+    "2.14 bfs wfusion τ=0.2 + decay=0.4",
+    "2.14 bfs wfusion τ=0.2 + decay=0.5",
+    "2.14 bfs wfusion τ=0.1 + decay=0.3",
+    "2.14 bfs wfusion τ=0.15 + decay=0.3",
+    "2.14 bfs wfusion τ=0.3 + decay=0.3",
+    "2.14 bfs wfusion τ=0.2 + decay=0.3 + K=3",
+    "2.14 bfs wfusion τ=0.2 + decay=0.3 + K=7",
+]);
+
 const CONFIG_SET = (process.env.CONFIG_SET ?? "").toLowerCase();
 
 const ACTIVE_CONFIGS =
     CONFIG_SET === "phase213"
         ? CONFIGS.filter((c) => PHASE_213_LABELS.has(c.label))
-        : TIER === "tier3"
-          ? CONFIGS_TIER3
-          : CONFIGS;
+        : CONFIG_SET === "phase214"
+          ? CONFIGS.filter((c) => PHASE_214_LABELS.has(c.label))
+          : TIER === "tier3"
+            ? CONFIGS_TIER3
+            : CONFIGS;
 
 type ConfigResult = {
     narrowed: number;
@@ -611,6 +674,7 @@ async function runConfig(config: Config): Promise<ConfigResult> {
     let narrowed = 0;
     let coherent = 0;
     let arcs = 0;
+    const perArc: { name: string; narrowed: boolean; coherent: boolean; coverage: number }[] = [];
 
     for (const trace of DATASET.traces) {
         const session = memory.createSession();
@@ -635,7 +699,8 @@ async function runConfig(config: Config): Promise<ConfigResult> {
 
         const first = sizeAcrossTurns[0];
         const last = sizeAcrossTurns[sizeAcrossTurns.length - 1];
-        if (last <= first) narrowed++;
+        const arcNarrowed = last <= first;
+        if (arcNarrowed) narrowed++;
 
         const finalExpected = new Set(
             trace.turns[trace.turns.length - 1].expectedClaimsAfterThisTurn,
@@ -644,8 +709,23 @@ async function runConfig(config: Config): Promise<ConfigResult> {
             finalExpected.size > 0
                 ? intersectionSize(finalExpected, lastTopClaims) / finalExpected.size
                 : 0;
-        if (coverage >= 0.5) coherent++;
+        const arcCoherent = coverage >= 0.5;
+        if (arcCoherent) coherent++;
         arcs++;
+        perArc.push({
+            name: trace.name,
+            narrowed: arcNarrowed,
+            coherent: arcCoherent,
+            coverage,
+        });
+    }
+
+    if (process.env.PER_ARC === "1") {
+        for (const a of perArc) {
+            console.log(
+                `    · ${a.name.padEnd(48)} narrow=${a.narrowed ? "Y" : "n"} coh=${a.coherent ? "Y" : "n"} cov=${a.coverage.toFixed(2)}`,
+            );
+        }
     }
 
     const snap = memory.graph.accessStatsSnapshot();

@@ -486,6 +486,29 @@ const CONFIGS: Config[] = [
         }
         return rows;
     })(),
+    // Phase 2.14 — winner rows from the eval-B decay sweep (bfs wfusion τ=0.2
+    // + decay ∈ {0.1, 0.2}). Single-turn eval-A doesn't exercise
+    // sessionDecayTau directly, but including these rows confirms no silent
+    // regression vs the Phase-2.13 BGE-base eval-A floor (0.627 baseline,
+    // 0.649 best).
+    {
+        label: "2.14 bfs wfusion τ=0.2 + decay=0.2",
+        options: {
+            traversal: "bfs",
+            probeComposition: "weighted-fusion",
+            weightedFusionTau: 0.2,
+            sessionDecayTau: 0.2,
+        },
+    },
+    {
+        label: "2.14 bfs wfusion τ=0.2 + decay=0.1",
+        options: {
+            traversal: "bfs",
+            probeComposition: "weighted-fusion",
+            weightedFusionTau: 0.2,
+            sessionDecayTau: 0.1,
+        },
+    },
 ];
 
 // Tier-3 validation sweep (Phase 2.7). Per CONTEXT.md §1828 this is a
@@ -546,14 +569,26 @@ const PHASE_213_LABELS = new Set<string>([
     "J bfs min-gate tau=0.2",
 ]);
 
+// Phase-2.14 eval-A regression matrix: Phase-2.13 baselines + winner rows
+// (bfs wfusion τ=0.2 + decay ∈ {0.1, 0.2}) to verify no eval-A regression
+// below Phase-2.13's 0.649 floor.
+const PHASE_214_LABELS = new Set<string>([
+    "bfs (default)",
+    "A3 bfs probe=weighted-fusion tau=0.2",
+    "2.14 bfs wfusion τ=0.2 + decay=0.2",
+    "2.14 bfs wfusion τ=0.2 + decay=0.1",
+]);
+
 const CONFIG_SET = (process.env.CONFIG_SET ?? "").toLowerCase();
 
 const ACTIVE_CONFIGS =
     CONFIG_SET === "phase213"
         ? CONFIGS.filter((c) => PHASE_213_LABELS.has(c.label))
-        : TIER === "tier3"
-          ? CONFIGS_TIER3
-          : CONFIGS;
+        : CONFIG_SET === "phase214"
+          ? CONFIGS.filter((c) => PHASE_214_LABELS.has(c.label))
+          : TIER === "tier3"
+            ? CONFIGS_TIER3
+            : CONFIGS;
 
 type ConfigResult = {
     mean: number;

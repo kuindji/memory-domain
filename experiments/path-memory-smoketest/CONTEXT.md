@@ -2576,3 +2576,109 @@ downstream-consumer back-compat — library consumers pass their own
   `experiments/path-memory-smoketest/eval/iterative-sweep.ts` —
   `CONFIG_SET=phase213` filter that restricts the sweep matrix to the
   narrow Phase-2.13 subset (BGE-era non-pruned rows only).
+
+## Phase 2.14 — Anchor-primitive retune under bge-base (2026-04-17)
+
+Phase 2.13 left three open questions. We picked the top one: "can bge-base
+lift coherence from 2/4 → 3/4 by re-tuning anchor primitives against its
+geometry?" The answer is **yes, via `sessionDecayTau` alone** — the Phase 2.13
+choice of `decay=0.3` sits on the edge of a narrow sweet-spot, not its
+interior.
+
+### Stage 0 — per-arc diagnostic
+
+Before sweeping, `eval/iterative-sweep.ts:runConfig` now records per-arc
+narrow/coherent/coverage (gated behind `PER_ARC=1`). Under the Phase-2.13
+best (`bfs wfusion τ=0.2 + decay=0.3`), the 2-of-4 coherence breakdown is:
+
+- ✅ `philosophers to Alexander arc`   cov=1.00
+- ❌ `Athens at war arc`               cov=0.33
+- ✅ `Academy arc (asOf 360 BCE)`      cov=0.67
+- ❌ `Alexander succession arc`        cov=0.33
+
+Both failures sit at 0.33 — the retriever is one-correct-claim-short of the
+0.5 pass threshold on each. Not a structural wall.
+
+### Stage 1 — 1D sweeps on currently-live knobs
+
+Narrow matrix under `CONFIG_SET=phase214` (10 rows, ~6 min on bge-base):
+control + `sessionDecayTau ∈ {0.1, 0.2, 0.4, 0.5}` + `weightedFusionTau ∈ {0.1, 0.15, 0.3}` + `anchorTopK ∈ {3, 7}`.
+
+| Row                                        | Coherence | Per-arc |
+|--------------------------------------------|-----------|---------|
+| control `decay=0.3` (Phase 2.13)           | **2/4**   | Ph✅ Ath❌ Ac✅ AxS❌ |
+| **`decay=0.1`**                            | **3/4**   | Ph✅ **Ath✅** Ac✅ AxS❌ |
+| **`decay=0.2`**                            | **3/4**   | Ph✅ **Ath✅** Ac✅ AxS❌ |
+| `decay=0.4`                                | 1/4       | Ph❌ Ath❌ Ac✅ AxS❌ |
+| `decay=0.5`                                | 1/4       | Ph❌ Ath❌ Ac✅ AxS❌ |
+| `wfusion τ ∈ {0.1, 0.15, 0.3}`             | 2/4 (flat)| unchanged |
+| `anchorTopK=3`                             | 2/4       | unchanged (but arcs shift) |
+| `anchorTopK=7`                             | 0/4       | all regress |
+
+Key observations:
+- Decay curve is **non-monotonic** under bge-base: 0.1/0.2 lift, 0.3 is
+  a 2/4 plateau, ≥0.4 collapses coherence back toward 0.
+- Both winners flip the **same** failing arc (Athens at war, 0.33 → 0.67);
+  they do not cycle arcs, so the 3/4 is real, not a reshuffle.
+- Alexander-succession stays at 0.33 on every row tested — it is the new
+  eval-B ceiling and a candidate for question-3 claim-level inspection.
+- `weightedFusionTau` and `anchorTopK` are both flat or regressive under
+  bge-base — the signal is concentrated in `sessionDecayTau`.
+
+### Stage 2/3 skipped
+
+Stage-1 already produced a clean 3/4 winner with an arc flip and no
+cycling. Stage 2 (re-test Options H / A1 under bge-base) and Stage 3
+(combination runs) were unnecessary.
+
+### Outcome: A' — new default `sessionDecayTau=0.2`
+
+- 3/4 coherence reached on tier-2 eval-B without eval-A regression
+  (eval-A `CONFIG_SET=phase214` shows decay=0.1/0.2 match the
+  wfusion-τ=0.2 baseline at mean-F1 0.581 — confirmed inert on
+  single-turn queries).
+- The failing arc flip (Athens at war, 0.33 → 0.67) is a real gain, not
+  a metric reshuffle.
+- New recommended session knob under bge-base: **`sessionDecayTau: 0.2`**
+  (was 0.3 under Phase 2.13). The prior Phase-2.8 "decay off" default
+  was MiniLM/BGE-small-era; Phase 2.13 re-enabled at 0.3; Phase 2.14
+  narrows to 0.2.
+- 0.1 is equally good on tier-2 eval-B; 0.2 chosen as the more
+  conservative move (smaller delta from the prior 0.3 default, in
+  the interior of the {0.1, 0.2} pass band, and symmetric with the
+  failure wall at 0.4).
+
+### Updated prune list (post Phase 2.14)
+
+No changes vs Phase 2.13 — `weightedFusionTau` and `anchorTopK` variations
+all fell flat under bge-base but don't cross the "harmful" line for the
+default (0.2 stays as wfusion τ).
+
+### Next session — three open questions
+
+1. **Lift 3/4 → 4/4 (Alexander-succession arc).** This arc stayed at
+   0.33 on every Stage-1 row and every `decay ∈ [0, 0.5]` value tested.
+   Needs *either* a different anchor-scoring family (H / A1 under
+   bge-base), *or* claim-level inspection to see what the arc's expected
+   claims look like under bge-base's embedding geometry (likely a
+   Diadochi-era cluster problem: probes fan into ambiguous succession
+   claims).
+2. Phase 2.13 question 3 reheated: for the Alexander-succession arc
+   specifically, *which* of the 3 expected claims is the retriever
+   missing on the final turn? If it's a single consistent claim across
+   runs, that claim's embedding may need re-inspection. Implementation:
+   extend runArcs `PER_ARC=1` logging to also dump the missing
+   `expectedClaims` for the final turn.
+3. Phase 2.13 question 2 (bge-large BFS-flip retune) still parked.
+
+### Files touched
+
+- `experiments/path-memory-smoketest/eval/iterative-sweep.ts` — per-arc
+  breakdown under `PER_ARC=1`; Phase-2.14 config block (decay / wfusion
+  τ / anchorTopK rows); `CONFIG_SET=phase214` filter.
+- `experiments/path-memory-smoketest/eval/sweep.ts` — winner rows
+  (`decay ∈ {0.1, 0.2}`) + `CONFIG_SET=phase214` filter for regression
+  check.
+- `experiments/path-memory-smoketest/tests/eval-iterative-tier2.test.ts`
+  — decay default `0.3 → 0.2`; comment block updated with Phase-2.14
+  history. Assertion unchanged (narrowing floor only).

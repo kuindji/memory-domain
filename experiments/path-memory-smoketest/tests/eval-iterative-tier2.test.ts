@@ -113,16 +113,18 @@ describe("eval (B) — iterative arc convergence (tier 2)", () => {
         expect(baseline.narrowed).toBeGreaterThanOrEqual(Math.ceil(baseline.arcs / 2));
 
         // Phase 2.1 (MiniLM) locked in `decayed.coherent > baseline.coherent`;
-        // Phase 2.7 (BGE-small) saw the lift disappear; Phase 2.13 (BGE-base,
-        // current default) brings it back: coherence rises 1/4 → 2/4 on tier-2
-        // when `decay=0.3` is paired with `bfs wfusion τ=0.2`. The coherence
-        // direction still oscillates per encoder, so it stays an observational
-        // metric tracked by iterative-sweep rather than a unit-test invariant.
-        // See experiments/path-memory-smoketest/CONTEXT.md § Phase 2.13.
+        // Phase 2.7 (BGE-small) saw the lift disappear; Phase 2.13 (BGE-base)
+        // brought it back at `decay=0.3` → 2/4 coherence; Phase 2.14 found
+        // the decay curve under bge-base is non-monotonic — `decay=0.2`
+        // lifts coherence to 3/4 (Athens-at-war arc flips from 0.33 → 0.67
+        // coverage) while 0.3 stays at 2/4 and ≥0.4 regresses to 1/4. The
+        // coherence direction still oscillates per encoder, so it stays an
+        // observational metric tracked by iterative-sweep rather than a
+        // unit-test invariant. See CONTEXT.md § Phase 2.14.
         const decayed = await runArcs(
             memory,
-            { sessionDecayTau: 0.3 },
-            "sessionDecayTau=0.3 (Phase 2.1)",
+            { sessionDecayTau: 0.2 },
+            "sessionDecayTau=0.2 (Phase 2.14)",
         );
         expect(decayed.narrowed).toBeGreaterThanOrEqual(Math.ceil(decayed.arcs / 2));
     }, 240_000);
