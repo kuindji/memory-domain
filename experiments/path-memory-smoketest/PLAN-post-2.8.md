@@ -431,7 +431,7 @@ runs per phase become cheap.
 | 1 | **2.9** Corpus-shape experiment (Option R) | Small | **DONE** (PASS 8/8) | — |
 | 2a | **4a pre-experiment** Edge-hotness soft-gate | Small (½ sess.) | **DONE — refuted** (eval-A hold; +35% eval-C latency regress on 8/8 traces). Ships disabled-only | — |
 | 2 | **2.10** Spreading activation (Option O) | Medium | **DONE — killed, opt-in only** | — |
-| 3 | **7 retarget** LongMemEval harness | Small | **NEXT** | Promoted past 2.11 after router dry-run refuted probe-level routing on current evals. Enables external comparison + gives Phase 2.12 labels; also re-measures 2.9 edge-concentration at scale; unblocks 2.11 retry |
+| 3 | **7 retarget** LongMemEval harness + rule-based scoring | Small | **LANDED** (adapter + loader + rule-based scorer; LLM judge = Phase 7.2, deferred). Enables external comparison once judge lands; gives Phase 2.12 labels; re-measures 2.9 edge-concentration at scale; unblocks 2.11 retry |
 | 4 | **2.11** Per-view routing (Option P) | Medium | **DEFERRED — retry after Phase 7** | Router module in-tree as checkpoint; not wired. Retry on LongMemEval where router has genuine temporal/entity probes to partition |
 | 5 | **2.12** Differentiable scorer (Option Q) | Large | Deferred | Only after Phase 7 + 2.11 retry |
 | 6 | **Phase 4** (hard-prune 4a, or new shape after 2.11) | Small–medium | Soft-gate refuted; slot open | Execution depends on 2.11 retry outcome |
