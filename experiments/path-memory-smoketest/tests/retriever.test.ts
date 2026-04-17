@@ -1309,4 +1309,55 @@ describe("Retriever", () => {
             expect(first[i].score).toBe(second[i].score);
         }
     });
+
+    test("accessTracking=false leaves node and edge counters at zero (BFS)", async () => {
+        const { emb, store, graph, retriever } = setup();
+        await store.ingest({ text: "alex moves to la", validFrom: 1 });
+        await store.ingest({ text: "alex starts a job", validFrom: 2 });
+        const probe = await emb.embed("alex moves to la");
+        retriever.retrieve([{ text: "p", embedding: probe }], { traversal: "bfs" });
+        const snap = graph.accessStatsSnapshot();
+        expect(snap.totals.nodeBumps).toBe(0);
+        expect(snap.totals.edgeBumps).toBe(0);
+    });
+
+    test("accessTracking=true populates counters on BFS traversal", async () => {
+        const { emb, store, graph, retriever } = setup();
+        await store.ingest({ text: "alex moves to la", validFrom: 1 });
+        await store.ingest({ text: "alex starts a job", validFrom: 2 });
+        await store.ingest({ text: "alex changes jobs", validFrom: 3 });
+        const probe = await emb.embed("alex moves to la");
+        retriever.retrieve([{ text: "p", embedding: probe }], {
+            traversal: "bfs",
+            accessTracking: true,
+        });
+        const snap = graph.accessStatsSnapshot();
+        expect(snap.totals.nodeBumps).toBeGreaterThan(0);
+        expect(snap.totals.edgeBumps).toBeGreaterThan(0);
+        // At least one of the ingested claims must appear in the node bumps.
+        const bumpedNodes = new Set(snap.nodes.map((n) => n.id));
+        expect(bumpedNodes.size).toBeGreaterThan(0);
+        // Every bumped edge's endpoints must exist as nodes in the graph.
+        for (const e of snap.edges) {
+            expect(graph.getNode(e.from)).toBeDefined();
+            expect(graph.getNode(e.to)).toBeDefined();
+            expect(e.count).toBeGreaterThan(0);
+        }
+    });
+
+    test("accessTracking=true populates counters on Dijkstra traversal", async () => {
+        const { emb, store, graph, retriever } = setup();
+        await store.ingest({ text: "alex moves to la", validFrom: 1 });
+        await store.ingest({ text: "alex starts a job", validFrom: 2 });
+        await store.ingest({ text: "alex changes jobs", validFrom: 3 });
+        const probe = await emb.embed("alex moves to la");
+        retriever.retrieve([{ text: "p", embedding: probe }], {
+            traversal: "dijkstra",
+            temporalHopCost: 0.5,
+            accessTracking: true,
+        });
+        const snap = graph.accessStatsSnapshot();
+        expect(snap.totals.nodeBumps).toBeGreaterThan(0);
+        expect(snap.totals.edgeBumps).toBeGreaterThan(0);
+    });
 });

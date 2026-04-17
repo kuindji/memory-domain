@@ -67,6 +67,7 @@ export class Retriever {
         const anchorScoring = options.anchorScoring ?? DEFAULTS.anchorScoring;
         const probeComposition = options.probeComposition ?? DEFAULTS.probeComposition;
         const weightedFusionTau = options.weightedFusionTau ?? DEFAULTS.weightedFusionTau;
+        const accessTracking = options.accessTracking ?? false;
         const weights = { ...DEFAULTS.weights, ...options.weights };
 
         const isValid = makeValidityFilter(mode);
@@ -99,8 +100,14 @@ export class Retriever {
         for (let i = 0; i < allAnchors.length; i++) {
             const reachable =
                 traversal === "dijkstra"
-                    ? this.shortestCostPaths(allAnchors[i], bfsMaxDepth, isValid, temporalHopCost)
-                    : this.bfsShortestPaths(allAnchors[i], bfsMaxDepth, isValid);
+                    ? this.shortestCostPaths(
+                          allAnchors[i],
+                          bfsMaxDepth,
+                          isValid,
+                          temporalHopCost,
+                          accessTracking,
+                      )
+                    : this.bfsShortestPaths(allAnchors[i], bfsMaxDepth, isValid, accessTracking);
             for (let j = i + 1; j < allAnchors.length; j++) {
                 const path = reachable.get(allAnchors[j]);
                 if (!path) continue;
@@ -582,6 +589,7 @@ export class Retriever {
         start: ClaimId,
         maxDepth: number,
         isValid: (c: Claim) => boolean,
+        accessTracking: boolean,
     ): Map<ClaimId, Path> {
         const result = new Map<ClaimId, Path>();
         type QItem = { id: ClaimId; depth: number; nodes: ClaimId[]; edges: Edge[] };
@@ -591,6 +599,7 @@ export class Retriever {
 
         while (head < queue.length) {
             const cur = queue[head++];
+            if (accessTracking) this.graph.bumpNode(cur.id);
             if (cur.depth >= maxDepth) continue;
             const neighbors = this.graph.neighbors(cur.id);
             for (const e of neighbors) {
@@ -603,6 +612,7 @@ export class Retriever {
                     edges: [...cur.edges, e],
                 };
                 result.set(e.to, path);
+                if (accessTracking) this.graph.bumpEdge(e.from, e.to, e.type);
                 queue.push({
                     id: e.to,
                     depth: cur.depth + 1,
@@ -628,6 +638,7 @@ export class Retriever {
         maxDepth: number,
         isValid: (c: Claim) => boolean,
         temporalHopCost: number,
+        accessTracking: boolean,
     ): Map<ClaimId, Path> {
         type State = { id: ClaimId; cost: number; depth: number; path: Path };
         const bestCost = new Map<ClaimId, number>();
@@ -645,6 +656,8 @@ export class Retriever {
 
             const known = bestCost.get(cur.id);
             if (known !== undefined && cur.cost > known) continue;
+
+            if (accessTracking) this.graph.bumpNode(cur.id);
 
             if (cur.id !== start && !result.has(cur.id)) {
                 result.set(cur.id, cur.path);
@@ -674,6 +687,7 @@ export class Retriever {
                 if (prev !== undefined && prev <= newCost) continue;
 
                 bestCost.set(e.to, newCost);
+                if (accessTracking) this.graph.bumpEdge(e.from, e.to, e.type);
                 pq.push({
                     id: e.to,
                     cost: newCost,

@@ -101,6 +101,12 @@ export type RetrievalOptions = {
     probeComposition?: ProbeComposition;
     weightedFusionTau?: number;
     sessionDecayTau?: number;
+    /**
+     * Phase 3 — when true, traversal loops bump per-node and per-edge
+     * read counters on the underlying `GraphIndex`. Observability-only;
+     * counters are not consumed by any scoring path. Default: false.
+     */
+    accessTracking?: boolean;
     weights?: {
         probeCoverage?: number;
         edgeTypeDiversity?: number;

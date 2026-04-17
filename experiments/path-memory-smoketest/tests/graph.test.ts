@@ -237,4 +237,67 @@ describe("GraphIndex", () => {
         // sanity: equals manual sum
         expect(massA).toBeCloseTo(g.idf("alex") + g.idf("moves"), 6);
     });
+
+    test("access counters default to zero and round-trip through bump/read", () => {
+        const g = new GraphIndex({ semanticThreshold: 99 });
+        g.addClaim(makeClaim("a", "alex moves", ["alex", "moves"], [1, 0, 0], 1));
+        g.addClaim(makeClaim("b", "alex jumps", ["alex", "jumps"], [0, 1, 0], 2));
+        expect(g.nodeReadCount("a")).toBe(0);
+        expect(g.edgeReadCount("a", "b", "lexical")).toBe(0);
+        g.bumpNode("a");
+        g.bumpNode("a");
+        g.bumpNode("b");
+        g.bumpEdge("a", "b", "lexical");
+        g.bumpEdge("a", "b", "temporal");
+        g.bumpEdge("a", "b", "temporal");
+        expect(g.nodeReadCount("a")).toBe(2);
+        expect(g.nodeReadCount("b")).toBe(1);
+        expect(g.edgeReadCount("a", "b", "lexical")).toBe(1);
+        expect(g.edgeReadCount("a", "b", "temporal")).toBe(2);
+        // Different direction/type keys are distinct counters.
+        expect(g.edgeReadCount("b", "a", "lexical")).toBe(0);
+        expect(g.edgeReadCount("a", "b", "semantic")).toBe(0);
+    });
+
+    test("accessStatsSnapshot sorts descending and aggregates totals", () => {
+        const g = new GraphIndex({ semanticThreshold: 99 });
+        g.addClaim(makeClaim("a", "a", ["a"], [1, 0, 0], 1));
+        g.addClaim(makeClaim("b", "b", ["b"], [0, 1, 0], 2));
+        g.addClaim(makeClaim("c", "c", ["c"], [0, 0, 1], 3));
+        g.bumpNode("a");
+        g.bumpNode("a");
+        g.bumpNode("a");
+        g.bumpNode("b");
+        g.bumpNode("c");
+        g.bumpNode("c");
+        g.bumpEdge("a", "b", "lexical");
+        g.bumpEdge("a", "b", "lexical");
+        g.bumpEdge("b", "c", "temporal");
+        const snap = g.accessStatsSnapshot();
+        expect(snap.nodes.map((n) => n.id)).toEqual(["a", "c", "b"]);
+        expect(snap.nodes[0].count).toBe(3);
+        expect(snap.edges[0]).toEqual({ from: "a", to: "b", type: "lexical", count: 2 });
+        expect(snap.totals).toEqual({
+            nodeBumps: 6,
+            edgeBumps: 3,
+            distinctNodes: 3,
+            distinctEdges: 2,
+        });
+    });
+
+    test("resetAccessStats clears both counter maps", () => {
+        const g = new GraphIndex({ semanticThreshold: 99 });
+        g.addClaim(makeClaim("a", "a", ["a"], [1, 0, 0], 1));
+        g.addClaim(makeClaim("b", "b", ["b"], [0, 1, 0], 2));
+        g.bumpNode("a");
+        g.bumpEdge("a", "b", "lexical");
+        g.resetAccessStats();
+        expect(g.nodeReadCount("a")).toBe(0);
+        expect(g.edgeReadCount("a", "b", "lexical")).toBe(0);
+        const snap = g.accessStatsSnapshot();
+        expect(snap.totals.nodeBumps).toBe(0);
+        expect(snap.totals.edgeBumps).toBe(0);
+        expect(snap.nodes).toEqual([]);
+        expect(snap.edges).toEqual([]);
+    });
 });

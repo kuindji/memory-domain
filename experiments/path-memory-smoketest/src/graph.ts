@@ -16,6 +16,19 @@ export type GraphConfig = {
 const DEFAULT_SEMANTIC_THRESHOLD = 0.65;
 const DEFAULT_LEXICAL_IDF_FLOOR = 0;
 
+export type EdgeAccessKey = `${ClaimId}->${ClaimId}:${EdgeType}`;
+
+export type AccessStatsSnapshot = {
+    nodes: Array<{ id: ClaimId; count: number }>;
+    edges: Array<{ from: ClaimId; to: ClaimId; type: EdgeType; count: number }>;
+    totals: {
+        nodeBumps: number;
+        edgeBumps: number;
+        distinctNodes: number;
+        distinctEdges: number;
+    };
+};
+
 export class GraphIndex {
     private readonly nodes = new Map<ClaimId, Claim>();
     private readonly adjacency = new Map<ClaimId, Edge[]>();
@@ -26,6 +39,9 @@ export class GraphIndex {
     private readonly similarity: (a: number[], b: number[]) => number;
     private readonly lexicalIdfFloor: number;
     private readonly temporalDecayTau: number | undefined;
+
+    private readonly nodeAccess = new Map<ClaimId, number>();
+    private readonly edgeAccess = new Map<EdgeAccessKey, number>();
 
     constructor(config: GraphConfig = {}) {
         this.semanticThreshold = config.semanticThreshold ?? DEFAULT_SEMANTIC_THRESHOLD;
@@ -99,6 +115,75 @@ export class GraphIndex {
         let sum = 0;
         for (const t of new Set(node.tokens)) sum += this.idf(t);
         return sum;
+    }
+
+    /**
+     * Phase 3 — read-access instrumentation (observability-only).
+     *
+     * `bumpNode` / `bumpEdge` are the only writers. They are called from
+     * `Retriever` traversal loops when `RetrievalOptions.accessTracking`
+     * is enabled. With tracking disabled (default) the counters stay at
+     * zero and no scoring path touches them.
+     *
+     * The premise under test: do access patterns concentrate (well-worn
+     * paths emerge), or is access roughly uniform? See strategic-review
+     * memory § "Phase 3 access tracking".
+     */
+    bumpNode(id: ClaimId): void {
+        this.nodeAccess.set(id, (this.nodeAccess.get(id) ?? 0) + 1);
+    }
+
+    bumpEdge(from: ClaimId, to: ClaimId, type: EdgeType): void {
+        const key: EdgeAccessKey = `${from}->${to}:${type}`;
+        this.edgeAccess.set(key, (this.edgeAccess.get(key) ?? 0) + 1);
+    }
+
+    nodeReadCount(id: ClaimId): number {
+        return this.nodeAccess.get(id) ?? 0;
+    }
+
+    edgeReadCount(from: ClaimId, to: ClaimId, type: EdgeType): number {
+        const key: EdgeAccessKey = `${from}->${to}:${type}`;
+        return this.edgeAccess.get(key) ?? 0;
+    }
+
+    accessStatsSnapshot(): AccessStatsSnapshot {
+        const nodes: Array<{ id: ClaimId; count: number }> = [];
+        let nodeBumps = 0;
+        for (const [id, count] of this.nodeAccess) {
+            nodes.push({ id, count });
+            nodeBumps += count;
+        }
+        nodes.sort((a, b) => b.count - a.count);
+
+        const edges: Array<{ from: ClaimId; to: ClaimId; type: EdgeType; count: number }> = [];
+        let edgeBumps = 0;
+        for (const [key, count] of this.edgeAccess) {
+            const sepIdx = key.indexOf("->");
+            const typeIdx = key.lastIndexOf(":");
+            const from = key.slice(0, sepIdx);
+            const to = key.slice(sepIdx + 2, typeIdx);
+            const type = key.slice(typeIdx + 1) as EdgeType;
+            edges.push({ from, to, type, count });
+            edgeBumps += count;
+        }
+        edges.sort((a, b) => b.count - a.count);
+
+        return {
+            nodes,
+            edges,
+            totals: {
+                nodeBumps,
+                edgeBumps,
+                distinctNodes: nodes.length,
+                distinctEdges: edges.length,
+            },
+        };
+    }
+
+    resetAccessStats(): void {
+        this.nodeAccess.clear();
+        this.edgeAccess.clear();
     }
 
     private lexicalWeight(sharedTokens: string[], unionTokens: string[]): number {
