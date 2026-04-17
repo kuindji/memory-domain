@@ -2122,3 +2122,116 @@ not a re-opening of the rest of the sweep. If G confirms, draft
 the public API migration (promote `idf-weighted-fusion` to default
 or recommended tier-2 config). If G refutes, that's the signal to
 invest in Option N / embedding upgrades.
+
+---
+
+## Phase 2.9 — eval-C repeat-user corpus-shape experiment (2026-04-17)
+
+**Question.** Phase 3 measured flat access on eval-A synthetic
+scatters and eval-B 3-4-turn arcs. Was flatness an *architectural*
+property or an *eval-shape* property? This phase answers it under
+repeat-user traffic.
+
+**Method.** 8 multi-session traces on tier-2 Greek (242 claims),
+each simulating a single user returning across 4-6 sessions that
+revisit overlapping cluster neighborhoods. 22-29 turns per trace,
+~200 turns total. Retrieval config = Phase-2.8 default (Dijkstra
+`tmp=0.5` + weighted-fusion `τ=0.2`, session-decay off).
+
+Per trace: fresh `PathMemory` instance (access counters isolated
+per-trace); within a trace, one `memory.createSession()` per
+"session" block (probe/decay state resets, graph shared → access
+counters accumulate across all sessions of that trace).
+
+Metrics: top-5 node/edge share of bumps, ratio against a uniform
+baseline (`5/distinct`), and the count of repeated top-3 path-
+node-set signatures across sessions of a trace.
+
+See `eval/traces-repeat-user.ts` and `eval/eval-c-access.ts`.
+Pass criterion (from PLAN-post-2.8.md § "Phase 2.9"):
+**edgeRatio ≥ 5.0 on ≥ half of traces**.
+
+### Results
+
+| trace                          | sess | turns | distinctN | distinctE | top5NodeShare | nodeRatio | top5EdgeShare | edgeRatio | repeatPaths |
+|--------------------------------|------|-------|-----------|-----------|---------------|-----------|---------------|-----------|-------------|
+| plato-academy-returning        | 5    | 25    | 233       | 2589      | 0.022         | 1.00      | 0.011         | 5.53      | 0           |
+| athens-at-war-returning        | 6    | 26    | 233       | 4651      | 0.022         | 1.00      | 0.011         | 10.28     | 0           |
+| alexander-campaigns-returning  | 5    | 25    | 233       | 3566      | 0.022         | 1.01      | 0.010         | 7.35      | 0           |
+| diadochi-succession-returning  | 5    | 22    | 233       | 3798      | 0.022         | 1.01      | 0.010         | 7.58      | 0           |
+| religion-oracles-returning     | 4    | 23    | 233       | 4252      | 0.022         | 1.02      | 0.009         | 7.72      | 0           |
+| theatre-historians-returning   | 5    | 25    | 233       | 4284      | 0.022         | 1.01      | 0.010         | 8.66      | 0           |
+| athens-politics-returning      | 5    | 25    | 233       | 3049      | 0.022         | 1.00      | 0.011         | 6.49      | 0           |
+| schools-philosophy-returning   | 5    | 29    | 233       | 4064      | 0.022         | 1.01      | 0.010         | 8.16      | 0           |
+
+**Pass count: 8/8 traces with edgeRatio ≥ 5.0. Verdict: PASS.**
+Mean ratios across traces: nodeRatio = 1.01, edgeRatio = 7.72.
+
+### Interpretation
+
+The result is more nuanced than a simple "well-worn paths exist":
+
+1. **Nodes are uniformly accessed.** `nodeRatio ≈ 1.00` across every
+   trace. The Phase-2.8 finding (top-5 node share ≈ uniform)
+   survives the traffic-shape change. Every reachable claim is
+   visited roughly equally; Dijkstra + BFS fanout at this graph
+   density saturates node coverage.
+
+2. **Edges concentrate sharply.** `edgeRatio = 5.5-10.3×` uniform.
+   A small subset of edges (likely temporal-chain spine + a few
+   high-weight lexical bridges) carry a disproportionate share of
+   traversal bumps. This is the real "well-worn path" signal — but
+   it lives at the *edge* level, not the *node* level.
+
+3. **Path-as-returned signatures do not repeat.** Every one of 40
+   sessions (5 avg × 8) produced a unique top-3 path-node-set. So
+   retrieval *does* surface different final paths to the user even
+   when the underlying traversal repeatedly visits the same edges.
+   The edge concentration is "common substructure on the way to
+   different answers," not "same answer keeps being returned."
+
+### Consequences for Phase 4
+
+The naïve Phase-4 design (PLAN-post-2.8.md § "Phase 4 redesign"
+option 1: "cache on `(probe-cluster, session-recency)`") now has a
+target — but the target is an **edge-subgraph cache**, not a path
+cache. Concretely:
+
+- A per-trace "hot edge set" of 50-200 edges (top ~5% by access
+  count) could substantially prune Dijkstra fanout without losing
+  coverage — the other 4000+ edges are traversed rarely.
+- A path-as-key cache (original Phase-4 shape) would miss
+  essentially every lookup — confirmed by `repeatingPaths = 0`
+  across every trace.
+- The edge concentration is also exactly what Phase-2.10's
+  spreading-activation primitive would accumulate into an activation
+  profile (§ "Phase 4 redesign" option 2). Option O now has two
+  independent motivations: anchor-layer reranker (tier-2 coherence)
+  AND persistence substrate for the observed edge concentration.
+
+### Retire from roadmap
+
+- **Path-cache (original Phase 4)** — deprecated; zero hit rate on
+  tier-2 repeat-user traces.
+
+### Promote to roadmap
+
+- **Edge-hotness cache (Phase 4 redesign option 1)** — real signal,
+  worth pursuing if Phase 2.10 doesn't subsume.
+- **Phase 2.10 (Option O) priority ↑** — activation profile is the
+  natural substrate for the edge concentration we just measured.
+
+### Limitations
+
+- Tier-2 only. Unknown whether the ratios scale linearly with corpus
+  size; tier-3 (which would re-center on a larger graph) is the
+  obvious stress test, but PLAN-post-2.8.md already retargets tier-3
+  to LongMemEval, so we'll get this measurement for free there.
+- Traces are hand-authored to revisit clusters. The ratios would
+  presumably be lower under pure topic-switching traffic. That's
+  fine — the question was "can concentration emerge", answered yes;
+  "is concentration the dominant regime" is a separate question that
+  LongMemEval will illuminate.
+- `distinctNodes = 233` across all traces (tier2 has 242 claims, 9
+  presumably isolated / un-reachable at `bfsMaxDepth=3`). Not
+  investigated — not load-bearing for the pass criterion.
