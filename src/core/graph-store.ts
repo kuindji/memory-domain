@@ -4,7 +4,28 @@ import type { Node, GraphApi } from "./types.js";
 
 type Queryable = Surreal | SurrealTransaction;
 
+/**
+ * Valid SurrealDB unquoted record-id part (alphanumeric + underscore). Anything
+ * else — hyphens, slashes, spaces, dots — must be backtick-escaped or the parser
+ * silently truncates at the first invalid char (e.g. `memory:abw-fdi-2001` →
+ * `memory:abw`). We escape here at the single chokepoint so every code path
+ * that constructs a record id (tag creation, topic memories, domains, meta
+ * keys) is safe.
+ */
+const SAFE_IDENT = /^[A-Za-z0-9_]+$/;
+
 function toRecordId(id: string): StringRecordId {
+    const colonIdx = id.indexOf(":");
+    if (colonIdx > 0) {
+        const idPart = id.slice(colonIdx + 1);
+        // Already wrapped (backticks or angle brackets) — trust the caller.
+        const firstChar = idPart.charCodeAt(0);
+        const alreadyWrapped = firstChar === 0x60 /* ` */ || firstChar === 0x27e8; /* ⟨ */
+        if (!alreadyWrapped && idPart.length > 0 && !SAFE_IDENT.test(idPart)) {
+            const table = id.slice(0, colonIdx);
+            return new StringRecordId(`${table}:\`${idPart}\``);
+        }
+    }
     return new StringRecordId(id);
 }
 

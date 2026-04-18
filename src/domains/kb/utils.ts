@@ -1,4 +1,5 @@
 import type { DomainContext, OwnedMemory } from "../../core/types.js";
+import { formatTagId } from "../../core/tag-utils.js";
 import type { KbClassification, QueryIntent } from "./types.js";
 import {
     CLASSIFICATION_TAGS,
@@ -130,7 +131,7 @@ function logKbWarning(scope: string, error: unknown): void {
  * Ensures a tag node exists in the graph with the given label.
  */
 export async function ensureTag(context: DomainContext, label: string): Promise<string> {
-    const tagId = label.includes("/") ? `tag:\`${label}\`` : `tag:${label}`;
+    const tagId = formatTagId(label);
     try {
         await context.graph.createNodeWithId(tagId, { label, created_at: Date.now() });
     } catch {

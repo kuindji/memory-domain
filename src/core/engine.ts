@@ -4,6 +4,7 @@ import { GraphStore } from "./graph-store.js";
 import { TunableParamRegistry } from "./tunable-params.js";
 import type { TunableParamDefinition } from "./tunable-params.js";
 import { SchemaRegistry } from "./schema-registry.js";
+import { formatTagId, tagLabel } from "./tag-utils.js";
 import { SearchEngine } from "./search-engine.js";
 import { InboxProcessor } from "./inbox-processor.js";
 import type { InboxProcessorOptions } from "./inbox-processor.js";
@@ -349,8 +350,8 @@ class MemoryEngine {
 
     async tagMemory(id: string, tag: string): Promise<void> {
         const now = Date.now();
-        const tagId = tag.startsWith("tag:") ? tag : `tag:${tag}`;
-        const label = tag.startsWith("tag:") ? tag.slice(4) : tag;
+        const tagId = formatTagId(tag);
+        const label = tagLabel(tag);
         try {
             await this.graph.createNodeWithId(tagId, { label, created_at: now });
         } catch {
@@ -360,7 +361,7 @@ class MemoryEngine {
     }
 
     async untagMemory(id: string, tag: string): Promise<void> {
-        const tagId = tag.startsWith("tag:") ? tag : `tag:${tag}`;
+        const tagId = formatTagId(tag);
         await this.graph.unrelate(id, "tagged", tagId);
     }
 
@@ -645,6 +646,9 @@ class MemoryEngine {
         if (options?.structuredData) {
             memData.structured_data = options.structuredData;
         }
+        if (options?.metadata && Object.keys(options.metadata).length > 0) {
+            memData.metadata = options.metadata;
+        }
         const memId = await this.graph.createNode("memory", memData);
 
         // Tag with inbox
@@ -656,10 +660,10 @@ class MemoryEngine {
                 "ingest.tagLoop",
                 async () => {
                     for (const tag of options.tags!) {
-                        const tagId = tag.startsWith("tag:") ? tag : `tag:${tag}`;
+                        const tagId = formatTagId(tag);
                         try {
                             await this.graph.createNodeWithId(tagId, {
-                                label: tag.startsWith("tag:") ? tag.slice(4) : tag,
+                                label: tagLabel(tag),
                                 created_at: now,
                             });
                         } catch {

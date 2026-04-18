@@ -1,4 +1,5 @@
 import type { DomainContext } from "../../core/types.js";
+import { formatTagId } from "../../core/tag-utils.js";
 import type { MemoryClassification } from "./types.js";
 import {
     CLASSIFICATION_TAGS,
@@ -212,7 +213,7 @@ export async function batchGenerateQuestions(
  * Ensures a tag node exists in the graph with the given label.
  */
 export async function ensureTag(context: DomainContext, label: string): Promise<string> {
-    const tagId = label.includes("/") ? `tag:\`${label}\`` : `tag:${label}`;
+    const tagId = formatTagId(label);
     try {
         await context.graph.createNodeWithId(tagId, { label, created_at: Date.now() });
     } catch {

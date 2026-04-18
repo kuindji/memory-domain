@@ -29,6 +29,7 @@ class SchemaRegistry {
       DEFINE FIELD IF NOT EXISTS token_count ON memory TYPE int DEFAULT 0;
       DEFINE FIELD IF NOT EXISTS request_context ON memory TYPE option<object> FLEXIBLE;
       DEFINE FIELD IF NOT EXISTS structured_data ON memory TYPE option<object> FLEXIBLE;
+      DEFINE FIELD IF NOT EXISTS metadata ON memory TYPE option<object> FLEXIBLE;
       DEFINE FIELD IF NOT EXISTS answers_question ON memory TYPE option<string>;
     `);
 
