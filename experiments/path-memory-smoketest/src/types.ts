@@ -5,6 +5,13 @@ export type Claim = {
     id: ClaimId;
     text: string;
     embedding: number[];
+    /**
+     * Phase 2.16 — optional per-encoder embeddings keyed by encoder name.
+     * Populated when `PathMemory` is constructed with `secondaryEmbedders`.
+     * The primary encoder's vector remains in `embedding` for all Phase ≤2.15
+     * code paths; `embeddings[primary]` mirrors it when secondaries are set.
+     */
+    embeddings?: Record<string, number[]>;
     tokens: string[];
     validFrom: Timestamp;
     validUntil: Timestamp;
@@ -35,6 +42,11 @@ export type HistoryEvent =
 export type Probe = {
     text: string;
     embedding: number[];
+    /**
+     * Phase 2.16 — optional per-encoder probe embeddings. Same shape rule as
+     * `Claim.embeddings`: present iff multi-encoder fusion is active.
+     */
+    embeddings?: Record<string, number[]>;
     turnIndex?: number;
 };
 
@@ -112,6 +124,16 @@ export type AnchorScoring =
 
 export type ProbeComposition = "union" | "intersection" | "weighted-fusion";
 
+/**
+ * Phase 2.16 — cross-encoder fusion policy. `single` is identity (the retriever
+ * uses `Probe.embedding` + `Claim.embedding`, unchanged from Phase ≤2.15).
+ * `rrf` runs `scoreAnchorsForProbe` once per encoder using the matching
+ * per-encoder vectors on both sides, then fuses the per-encoder rankings via
+ * reciprocal-rank fusion (`1/(k+rank)`). `encoders` names must have
+ * corresponding entries in `Probe.embeddings` / `Claim.embeddings`.
+ */
+export type EncoderFusion = { kind: "single" } | { kind: "rrf"; k: number; encoders: string[] };
+
 export type RetrievalOptions = {
     mode?: RetrievalMode;
     anchorTopK?: number;
@@ -140,6 +162,14 @@ export type RetrievalOptions = {
      */
     hotEdgeTopK?: number;
     hotEdgeColdPenalty?: number;
+    /**
+     * Phase 2.16 — cross-encoder fusion. Default is `{ kind: "single" }`
+     * (behaviour unchanged from Phase ≤2.15). Set to `{ kind: "rrf", k,
+     * encoders }` to run per-encoder anchor scoring and RRF-fuse the
+     * rankings. `encoders` names must be present in `Probe.embeddings` and
+     * `Claim.embeddings`; otherwise the retriever falls back to single.
+     */
+    encoderFusion?: EncoderFusion;
     weights?: {
         probeCoverage?: number;
         edgeTypeDiversity?: number;

@@ -11,6 +11,16 @@ export type StoreDeps = {
     embed: (text: string) => Promise<number[]>;
     tokenize: (text: string) => string[];
     idGen?: () => ClaimId;
+    /**
+     * Phase 2.16 — optional secondary encoders. When set, each ingest embeds
+     * the text with every named adapter in parallel and attaches the map as
+     * `claim.embeddings`. The primary `embed` output still populates
+     * `claim.embedding` (unchanged) and is mirrored into `claim.embeddings`
+     * under the matching `primaryEncoderName` so downstream code can treat
+     * the map as the complete set.
+     */
+    secondaryEmbedders?: Record<string, { embed: (text: string) => Promise<number[]> }>;
+    primaryEncoderName?: string;
 };
 
 export type StoreEvent =
@@ -23,6 +33,11 @@ export class MemoryStore {
     private readonly embed: (text: string) => Promise<number[]>;
     private readonly tokenize: (text: string) => string[];
     private readonly idGen: () => ClaimId;
+    private readonly secondaryEmbedders?: Record<
+        string,
+        { embed: (text: string) => Promise<number[]> }
+    >;
+    private readonly primaryEncoderName?: string;
     private readonly claims = new Map<ClaimId, Claim>();
     private readonly history: HistoryEvent[] = [];
     private readonly listeners = new Set<StoreListener>();
@@ -32,6 +47,8 @@ export class MemoryStore {
         this.embed = deps.embed;
         this.tokenize = deps.tokenize;
         this.idGen = deps.idGen ?? (() => `c${++this.counter}`);
+        this.secondaryEmbedders = deps.secondaryEmbedders;
+        this.primaryEncoderName = deps.primaryEncoderName;
     }
 
     async ingest(input: IngestInput): Promise<Claim> {
@@ -53,12 +70,18 @@ export class MemoryStore {
             old.validUntil = input.validFrom;
         }
 
-        const [embedding, tokens] = [await this.embed(input.text), this.tokenize(input.text)];
+        const [embedding, tokens, embeddings] = [
+            await this.embed(input.text),
+            this.tokenize(input.text),
+            await this.embedSecondaries(input.text),
+        ];
+        const allEmbeddings = this.assembleEmbeddings(embedding, embeddings);
 
         const claim: Claim = {
             id,
             text: input.text,
             embedding,
+            embeddings: allEmbeddings,
             tokens,
             validFrom: input.validFrom,
             validUntil: Number.POSITIVE_INFINITY,
@@ -122,5 +145,29 @@ export class MemoryStore {
 
     private emit(event: StoreEvent): void {
         for (const l of this.listeners) l(event);
+    }
+
+    private async embedSecondaries(text: string): Promise<Record<string, number[]> | undefined> {
+        if (!this.secondaryEmbedders) return undefined;
+        const names = Object.keys(this.secondaryEmbedders);
+        if (names.length === 0) return undefined;
+        const vectors = await Promise.all(
+            names.map((name) => this.secondaryEmbedders![name].embed(text)),
+        );
+        const out: Record<string, number[]> = {};
+        names.forEach((name, i) => {
+            out[name] = vectors[i];
+        });
+        return out;
+    }
+
+    private assembleEmbeddings(
+        primary: number[],
+        secondaries: Record<string, number[]> | undefined,
+    ): Record<string, number[]> | undefined {
+        if (!secondaries && !this.primaryEncoderName) return undefined;
+        const out: Record<string, number[]> = { ...(secondaries ?? {}) };
+        if (this.primaryEncoderName !== undefined) out[this.primaryEncoderName] = primary;
+        return Object.keys(out).length > 0 ? out : undefined;
     }
 }

@@ -1,4 +1,5 @@
-import { getEmbedder } from "../src/embedder.js";
+import type { EmbeddingAdapter } from "../../../src/core/types.js";
+import { type EncoderName, getEmbedder, getEmbedders, resolveEncoder } from "../src/embedder.js";
 import { PathMemory } from "../src/interfaces.js";
 import { FlatVectorBaseline } from "./baseline.js";
 import { tier1Alex } from "../data/tier1-alex.js";
@@ -533,6 +534,36 @@ const CONFIGS: Config[] = [
             weightedFusionTau: 0.2,
         },
     },
+    // --- Phase 2.16: same-family RRF ensemble {bge-base, bge-large} -----
+    // Mirrors the iterative-sweep rows for eval-A F1 measurement. Identity
+    // row (RRF with one encoder) must produce byte-identical F1 to the
+    // corresponding non-RRF row — that's the pipeline sanity gate.
+    {
+        label: "2.16 rrf identity k=60 (single-encoder sanity)",
+        options: {
+            traversal: "bfs",
+            probeComposition: "weighted-fusion",
+            weightedFusionTau: 0.2,
+            encoderFusion: { kind: "rrf", k: 60, encoders: ["__primary__"] },
+        },
+    },
+    ...([20, 40, 60, 80].map((k) => ({
+        label: `2.16 rrf k=${k} {bge-base,bge-large} + wfusion τ=0.2`,
+        options: {
+            traversal: "bfs",
+            probeComposition: "weighted-fusion",
+            weightedFusionTau: 0.2,
+            encoderFusion: { kind: "rrf", k, encoders: ["bge-base", "bge-large"] },
+        },
+    })) as Config[]),
+    {
+        label: "2.16 rrf k=60 {bge-base,bge-large} + union",
+        options: {
+            traversal: "bfs",
+            probeComposition: "union",
+            encoderFusion: { kind: "rrf", k: 60, encoders: ["bge-base", "bge-large"] },
+        },
+    },
 ];
 
 // Tier-3 validation sweep (Phase 2.7). Per CONTEXT.md §1828 this is a
@@ -618,6 +649,20 @@ const PHASE_215_LABELS = new Set<string>([
     "2.15 dijkstra tmp=0.7 wfusion τ=0.2",
 ]);
 
+// Phase-2.16 eval-A regression matrix. Control row = Phase-2.13 bge-large
+// baseline ("A3 bfs probe=weighted-fusion tau=0.2"). Identity row proves
+// the fusion path is a true no-op at N=1. k-sweep + union row mirror the
+// iterative-sweep Phase-2.16 matrix.
+const PHASE_216_LABELS = new Set<string>([
+    "A3 bfs probe=weighted-fusion tau=0.2",
+    "2.16 rrf identity k=60 (single-encoder sanity)",
+    "2.16 rrf k=20 {bge-base,bge-large} + wfusion τ=0.2",
+    "2.16 rrf k=40 {bge-base,bge-large} + wfusion τ=0.2",
+    "2.16 rrf k=60 {bge-base,bge-large} + wfusion τ=0.2",
+    "2.16 rrf k=80 {bge-base,bge-large} + wfusion τ=0.2",
+    "2.16 rrf k=60 {bge-base,bge-large} + union",
+]);
+
 const CONFIG_SET = (process.env.CONFIG_SET ?? "").toLowerCase();
 
 const ACTIVE_CONFIGS =
@@ -627,9 +672,11 @@ const ACTIVE_CONFIGS =
           ? CONFIGS.filter((c) => PHASE_214_LABELS.has(c.label))
           : CONFIG_SET === "phase215"
             ? CONFIGS.filter((c) => PHASE_215_LABELS.has(c.label))
-            : TIER === "tier3"
-              ? CONFIGS_TIER3
-              : CONFIGS;
+            : CONFIG_SET === "phase216"
+              ? CONFIGS.filter((c) => PHASE_216_LABELS.has(c.label))
+              : TIER === "tier3"
+                ? CONFIGS_TIER3
+                : CONFIGS;
 
 type ConfigResult = {
     mean: number;
@@ -643,12 +690,41 @@ type ConfigResult = {
     edgeTop5Share: number;
 };
 
+function resolveEncoderFusion(config: Config): {
+    options: RetrievalOptions;
+    rewrittenFusion?: RetrievalOptions["encoderFusion"];
+} {
+    const fusion = config.options.encoderFusion;
+    if (!fusion || fusion.kind !== "rrf") {
+        return { options: config.options, rewrittenFusion: fusion };
+    }
+    const primary = resolveEncoder();
+    const encoders = fusion.encoders.map((e) => (e === "__primary__" ? primary : e));
+    const rewrittenFusion = { ...fusion, encoders };
+    return {
+        options: { ...config.options, encoderFusion: rewrittenFusion },
+        rewrittenFusion,
+    };
+}
+
 async function runConfig(config: Config): Promise<ConfigResult> {
     const embedder = await getEmbedder();
+    const { options, rewrittenFusion } = resolveEncoderFusion(config);
+    const primary = resolveEncoder();
+    let secondaryEmbedders: Record<string, EmbeddingAdapter> | undefined;
+    if (rewrittenFusion && rewrittenFusion.kind === "rrf") {
+        const fusionEncoders = rewrittenFusion.encoders as EncoderName[];
+        const secondaryNames = fusionEncoders.filter((e) => e !== primary);
+        if (secondaryNames.length > 0) {
+            secondaryEmbedders = await getEmbedders(secondaryNames);
+        }
+    }
     const memory = new PathMemory({
         embedder,
         lexicalIdfFloor: config.lexicalIdfFloor,
         temporalDecayTau: config.temporalDecayTau,
+        secondaryEmbedders,
+        primaryEncoderName: rewrittenFusion ? primary : undefined,
     });
     const baseline = new FlatVectorBaseline(embedder, memory.store);
 
@@ -672,7 +748,7 @@ async function runConfig(config: Config): Promise<ConfigResult> {
             anchorTopK: 5,
             resultTopN: 10,
             accessTracking: true,
-            ...config.options,
+            ...options,
         });
         const pathClaims = rankClaims(paths).slice(0, k);
         const baseRanks = await baseline.query(q.naturalQuery, { topK: k, mode: q.mode });

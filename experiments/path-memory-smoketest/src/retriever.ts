@@ -12,6 +12,7 @@ import type {
     ClaimId,
     Edge,
     EdgeType,
+    EncoderFusion,
     Path,
     Probe,
     ProbeComposition,
@@ -67,6 +68,7 @@ export class Retriever {
         const anchorScoring = options.anchorScoring ?? DEFAULTS.anchorScoring;
         const probeComposition = options.probeComposition ?? DEFAULTS.probeComposition;
         const weightedFusionTau = options.weightedFusionTau ?? DEFAULTS.weightedFusionTau;
+        const encoderFusion: EncoderFusion = options.encoderFusion ?? { kind: "single" };
         const accessTracking = options.accessTracking ?? false;
         const hotEdgeTopK = options.hotEdgeTopK;
         const hotEdgeColdPenalty = options.hotEdgeColdPenalty;
@@ -99,6 +101,7 @@ export class Retriever {
             anchorScoring,
             probeComposition,
             weightedFusionTau,
+            encoderFusion,
         });
 
         const allAnchors = Array.from(probesByAnchor.keys());
@@ -192,6 +195,96 @@ export class Retriever {
     }
 
     /**
+     * Phase 2.16 — multi-encoder anchor scoring with RRF rank fusion.
+     *
+     * For each named encoder, we rank all valid claims by cosine under that
+     * encoder's probe/claim vectors. Rankings are fused via reciprocal-rank
+     * fusion (`Σ_e 1/(k + rank_e(c))`, 1-indexed ranks). The fused top-K
+     * becomes `ranked`. `cosineByAnchor` is the per-claim mean cosine across
+     * encoders — a monotonic [0,1] drop-in for downstream τ-gated composition
+     * (`weighted-fusion`, `density-coverage-bonus`, etc.), so the existing
+     * tuning for cosine-scale thresholds keeps its semantics.
+     *
+     * Requires `probe.embeddings[e]` and `claim.embeddings[e]` for every
+     * encoder `e` in `fusion.encoders`. Throws otherwise — silent fallback
+     * would mask config errors in sweeps.
+     *
+     * Anchor-scoring branches beyond `cosine` and `cosine-idf-mass` still
+     * read `cosineByAnchor` downstream and will compose the mean cosine as
+     * their similarity signal. That is a known approximation for Stage A;
+     * tighter per-encoder handling for other scorers is out of scope.
+     */
+    private scoreAnchorsForProbeRRF(
+        probe: Probe,
+        claims: Claim[],
+        topK: number,
+        scoring: AnchorScoring,
+        fusion: Extract<EncoderFusion, { kind: "rrf" }>,
+    ): { ranked: ClaimId[]; cosineByAnchor: Map<ClaimId, number> } {
+        const encoders = fusion.encoders;
+        if (encoders.length === 0) {
+            throw new Error("encoderFusion.encoders must be non-empty");
+        }
+
+        const probeVecs: Record<string, number[]> = {};
+        for (const name of encoders) {
+            const v = probe.embeddings?.[name];
+            if (!v) throw new Error(`probe missing embedding for encoder "${name}"`);
+            probeVecs[name] = v;
+        }
+
+        const sumCos = new Map<ClaimId, number>();
+        const rrfScore = new Map<ClaimId, number>();
+        const E = encoders.length;
+        const kConst = fusion.k;
+
+        for (const name of encoders) {
+            const probeVec = probeVecs[name];
+            const scored: { id: ClaimId; cos: number }[] = [];
+            for (const c of claims) {
+                const cv = c.embeddings?.[name];
+                if (!cv) throw new Error(`claim ${c.id} missing embedding for encoder "${name}"`);
+                const s = this.similarity(probeVec, cv);
+                scored.push({ id: c.id, cos: s });
+                sumCos.set(c.id, (sumCos.get(c.id) ?? 0) + s);
+            }
+            scored.sort((a, b) => b.cos - a.cos);
+            for (let i = 0; i < scored.length; i++) {
+                const rrf = 1 / (kConst + (i + 1));
+                rrfScore.set(scored[i].id, (rrfScore.get(scored[i].id) ?? 0) + rrf);
+            }
+        }
+
+        const cosineByAnchor = new Map<ClaimId, number>();
+        for (const c of claims) {
+            cosineByAnchor.set(c.id, (sumCos.get(c.id) ?? 0) / E);
+        }
+
+        let ranked: ClaimId[];
+        if (scoring.kind === "cosine-idf-mass") {
+            let maxNodeIdf = 0;
+            for (const c of claims) {
+                const m = this.graph.nodeIdfMass(c.id);
+                if (m > maxNodeIdf) maxNodeIdf = m;
+            }
+            const rescored = claims.map((c) => {
+                const meanCos = cosineByAnchor.get(c.id) ?? 0;
+                const norm = maxNodeIdf > 0 ? this.graph.nodeIdfMass(c.id) / maxNodeIdf : 0;
+                return { id: c.id, score: meanCos * (1 + scoring.alpha * norm) };
+            });
+            rescored.sort((a, b) => b.score - a.score);
+            ranked = rescored.slice(0, topK).map((s) => s.id);
+        } else {
+            ranked = Array.from(rrfScore.entries())
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, topK)
+                .map(([id]) => id);
+        }
+
+        return { ranked, cosineByAnchor };
+    }
+
+    /**
      * Compose per-probe anchor sets into a single `probesByAnchor` map.
      * - "union" (default): every probe's top-K contributes; an anchor records
      *   which probe(s) chose it.
@@ -210,6 +303,7 @@ export class Retriever {
         anchorScoring: AnchorScoring;
         probeComposition: ProbeComposition;
         weightedFusionTau: number;
+        encoderFusion: EncoderFusion;
     }): Map<ClaimId, Set<number>> {
         const {
             probes,
@@ -219,11 +313,28 @@ export class Retriever {
             anchorTopK,
             anchorScoring,
             probeComposition,
+            encoderFusion,
         } = args;
 
-        const perProbe = probes.map((p) =>
-            this.scoreAnchorsForProbe(p.embedding, validClaims, anchorTopK, anchorScoring),
-        );
+        const perProbe =
+            encoderFusion.kind === "rrf"
+                ? probes.map((p) =>
+                      this.scoreAnchorsForProbeRRF(
+                          p,
+                          validClaims,
+                          anchorTopK,
+                          anchorScoring,
+                          encoderFusion,
+                      ),
+                  )
+                : probes.map((p) =>
+                      this.scoreAnchorsForProbe(
+                          p.embedding,
+                          validClaims,
+                          anchorTopK,
+                          anchorScoring,
+                      ),
+                  );
 
         const probesByAnchor = new Map<ClaimId, Set<number>>();
         const remember = (aid: ClaimId, pIdx: number): void => {

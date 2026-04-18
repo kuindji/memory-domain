@@ -28,14 +28,35 @@ export function resolveEncoder(): EncoderName {
 
 const cacheByEncoder = new Map<EncoderName, EmbeddingAdapter>();
 
-export async function getEmbedder(): Promise<EmbeddingAdapter> {
-    const encoder = resolveEncoder();
-    const existing = cacheByEncoder.get(encoder);
+async function loadEncoder(name: EncoderName): Promise<EmbeddingAdapter> {
+    const existing = cacheByEncoder.get(name);
     if (existing) return existing;
-    const modelDir = resolve(here, "../../../.memory-domain", SUBDIRS[encoder]);
+    const modelDir = resolve(here, "../../../.memory-domain", SUBDIRS[name]);
     const onnx = new OnnxEmbeddingAdapter({ modelDir, pooling: "cls" });
     await onnx.embed("warmup");
     const cached = new CachedEmbeddingAdapter(onnx);
-    cacheByEncoder.set(encoder, cached);
+    cacheByEncoder.set(name, cached);
     return cached;
+}
+
+export async function getEmbedder(): Promise<EmbeddingAdapter> {
+    return loadEncoder(resolveEncoder());
+}
+
+/**
+ * Phase 2.16 — load N encoders concurrently. Returned map is keyed by encoder
+ * name. Callers can iterate map entries to embed the same text under each
+ * encoder in parallel. Subsequent calls reuse `cacheByEncoder` so repeated
+ * invocations are cheap.
+ */
+export async function getEmbedders(
+    names: EncoderName[],
+): Promise<Record<EncoderName, EmbeddingAdapter>> {
+    const unique = Array.from(new Set(names));
+    const loaded = await Promise.all(unique.map((name) => loadEncoder(name)));
+    const out = {} as Record<EncoderName, EmbeddingAdapter>;
+    unique.forEach((name, i) => {
+        out[name] = loaded[i];
+    });
+    return out;
 }

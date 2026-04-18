@@ -1,4 +1,5 @@
-import { getEmbedder } from "../src/embedder.js";
+import type { EmbeddingAdapter } from "../../../src/core/types.js";
+import { type EncoderName, getEmbedder, getEmbedders, resolveEncoder } from "../src/embedder.js";
 import { PathMemory } from "../src/interfaces.js";
 import { tier1Alex } from "../data/tier1-alex.js";
 import { tier2Greek } from "../data/tier2-greek.js";
@@ -670,6 +671,45 @@ const CONFIGS: Config[] = [
         }
         return rows;
     })(),
+
+    // --- Phase 2.16: same-family RRF ensemble {bge-base, bge-large} -----
+    // Control row reuses the Phase-2.14 best (wfusion τ=0.2 + decay=0.2).
+    // Identity row (RRF with one encoder) proves the fusion path is a true
+    // no-op at N=1 — any delta there is a pipeline bug, not an ensemble
+    // effect. The four k-sweeps probe RRF's sensitivity to its only
+    // hyperparameter. The union-composition row takes ensemble into the
+    // code path where RRF rank-fusion directly drives the anchor set,
+    // rather than being laundered through the τ-gated mean-cosine in
+    // weighted-fusion.
+    {
+        label: "2.16 rrf identity k=60 (single-encoder sanity)",
+        options: {
+            traversal: "bfs",
+            probeComposition: "weighted-fusion",
+            weightedFusionTau: 0.2,
+            sessionDecayTau: 0.2,
+            encoderFusion: { kind: "rrf", k: 60, encoders: ["__primary__"] },
+        },
+    },
+    ...([20, 40, 60, 80].map((k) => ({
+        label: `2.16 rrf k=${k} {bge-base,bge-large} + wfusion τ=0.2 + decay=0.2`,
+        options: {
+            traversal: "bfs",
+            probeComposition: "weighted-fusion",
+            weightedFusionTau: 0.2,
+            sessionDecayTau: 0.2,
+            encoderFusion: { kind: "rrf", k, encoders: ["bge-base", "bge-large"] },
+        },
+    })) as Config[]),
+    {
+        label: "2.16 rrf k=60 {bge-base,bge-large} + union",
+        options: {
+            traversal: "bfs",
+            probeComposition: "union",
+            sessionDecayTau: 0.2,
+            encoderFusion: { kind: "rrf", k: 60, encoders: ["bge-base", "bge-large"] },
+        },
+    },
 ];
 
 // Tier-3 validation matrix (Phase 2.7). Narrow sweep per CONTEXT.md §1828 —
@@ -761,6 +801,21 @@ const PHASE_214_STAGE2_LABELS = new Set<string>([
     "2.14s2 A1 temporalDecayTau=10 + wfusion τ=0.2 + decay=0.2",
 ]);
 
+// Phase-2.16 narrow matrix: same-family RRF ensemble over {bge-base,
+// bge-large}. Defaults come from Phase 2.14 best (wfusion τ=0.2 +
+// decay=0.2). Identity row (single-encoder RRF) proves fusion is a true
+// no-op at N=1. Union-composition row probes RRF rank-fusion outside the
+// τ-gated weighted-fusion path. See CONFIGS entries labelled "2.16 ...".
+const PHASE_216_LABELS = new Set<string>([
+    "2.14 bfs wfusion τ=0.2 + decay=0.2",
+    "2.16 rrf identity k=60 (single-encoder sanity)",
+    "2.16 rrf k=20 {bge-base,bge-large} + wfusion τ=0.2 + decay=0.2",
+    "2.16 rrf k=40 {bge-base,bge-large} + wfusion τ=0.2 + decay=0.2",
+    "2.16 rrf k=60 {bge-base,bge-large} + wfusion τ=0.2 + decay=0.2",
+    "2.16 rrf k=80 {bge-base,bge-large} + wfusion τ=0.2 + decay=0.2",
+    "2.16 rrf k=60 {bge-base,bge-large} + union",
+]);
+
 // Phase-2.15 narrow matrix: Phase-2.13 bge-large control + Stage-1 1D
 // sweeps (decay / wfusion τ / anchorTopK / dijkstra-tmp) under bge-large.
 // See CONFIGS entries labelled "2.15 ...".
@@ -791,9 +846,11 @@ const ACTIVE_CONFIGS =
             ? CONFIGS.filter((c) => PHASE_214_STAGE2_LABELS.has(c.label))
             : CONFIG_SET === "phase215"
               ? CONFIGS.filter((c) => PHASE_215_LABELS.has(c.label))
-              : TIER === "tier3"
-                ? CONFIGS_TIER3
-                : CONFIGS;
+              : CONFIG_SET === "phase216"
+                ? CONFIGS.filter((c) => PHASE_216_LABELS.has(c.label))
+                : TIER === "tier3"
+                  ? CONFIGS_TIER3
+                  : CONFIGS;
 
 type ConfigResult = {
     narrowed: number;
@@ -807,12 +864,48 @@ type ConfigResult = {
     edgeTop5Share: number;
 };
 
+/**
+ * Phase 2.16 — rewrite `__primary__` sentinel in `encoderFusion.encoders`
+ * so the identity row adapts to whatever encoder ENCODER env var selects.
+ * Returns the possibly-rewritten options plus the fusion object actually
+ * used (or undefined when the config has no fusion).
+ */
+function resolveEncoderFusion(config: Config): {
+    options: RetrievalOptions;
+    rewrittenFusion?: RetrievalOptions["encoderFusion"];
+} {
+    const fusion = config.options.encoderFusion;
+    if (!fusion || fusion.kind !== "rrf") {
+        return { options: config.options, rewrittenFusion: fusion };
+    }
+    const primary = resolveEncoder();
+    const encoders = fusion.encoders.map((e) => (e === "__primary__" ? primary : e));
+    const rewrittenFusion = { ...fusion, encoders };
+    return {
+        options: { ...config.options, encoderFusion: rewrittenFusion },
+        rewrittenFusion,
+    };
+}
+
 async function runConfig(config: Config): Promise<ConfigResult> {
     const embedder = await getEmbedder();
+    const { options, rewrittenFusion } = resolveEncoderFusion(config);
+    const primary = resolveEncoder();
+    let secondaryEmbedders: Record<string, EmbeddingAdapter> | undefined;
+    if (rewrittenFusion && rewrittenFusion.kind === "rrf") {
+        const fusionEncoders = rewrittenFusion.encoders as EncoderName[];
+        const secondaryNames = fusionEncoders.filter((e) => e !== primary);
+        if (secondaryNames.length > 0) {
+            secondaryEmbedders = await getEmbedders(secondaryNames);
+        }
+    }
     const memory = new PathMemory({
         embedder,
         temporalDecayTau: config.temporalDecayTau,
+        secondaryEmbedders,
+        primaryEncoderName: rewrittenFusion ? primary : undefined,
     });
+    const effectiveOptions = options;
     for (const c of DATASET.claims) {
         await memory.ingest({
             id: c.id,
@@ -847,7 +940,7 @@ async function runConfig(config: Config): Promise<ConfigResult> {
                 anchorTopK: 5,
                 resultTopN: 10,
                 accessTracking: true,
-                ...config.options,
+                ...effectiveOptions,
             });
             const ranked = rankClaims(results);
             const expected = new Set(turn.expectedClaimsAfterThisTurn);

@@ -11,6 +11,16 @@ export type PathMemoryConfig = {
     similarity?: GraphConfig["similarity"];
     lexicalIdfFloor?: number;
     temporalDecayTau?: number;
+    /**
+     * Phase 2.16 — secondary encoders keyed by name. When set, `ingest` and
+     * `embedProbes` additionally embed with each secondary and populate the
+     * per-encoder `embeddings` map on Claims and Probes. `primaryEncoderName`
+     * is the stable key for the primary `embedder`; if set, its vector also
+     * lands in `embeddings[primaryEncoderName]` so downstream multi-encoder
+     * consumers can treat the map as the full encoder set.
+     */
+    secondaryEmbedders?: Record<string, EmbeddingAdapter>;
+    primaryEncoderName?: string;
 };
 
 export class PathMemory {
@@ -18,12 +28,18 @@ export class PathMemory {
     readonly graph: GraphIndex;
     readonly retriever: Retriever;
     readonly embedder: EmbeddingAdapter;
+    readonly secondaryEmbedders?: Record<string, EmbeddingAdapter>;
+    readonly primaryEncoderName?: string;
 
     constructor(config: PathMemoryConfig) {
         this.embedder = config.embedder;
+        this.secondaryEmbedders = config.secondaryEmbedders;
+        this.primaryEncoderName = config.primaryEncoderName;
         this.store = new MemoryStore({
             embed: (t) => config.embedder.embed(t),
             tokenize,
+            secondaryEmbedders: config.secondaryEmbedders,
+            primaryEncoderName: config.primaryEncoderName,
         });
         this.graph = new GraphIndex({
             semanticThreshold: config.semanticThreshold,
@@ -70,9 +86,33 @@ export class PathMemory {
     private async embedProbes(sentences: string[]): Promise<Probe[]> {
         const out: Probe[] = [];
         for (const text of sentences) {
-            out.push({ text, embedding: await this.embedder.embed(text) });
+            const embedding = await this.embedder.embed(text);
+            const embeddings = await this.embedSecondaryProbe(text, embedding);
+            out.push(embeddings ? { text, embedding, embeddings } : { text, embedding });
         }
         return out;
+    }
+
+    async embedSecondaryProbe(
+        text: string,
+        primary: number[],
+    ): Promise<Record<string, number[]> | undefined> {
+        const hasSecondaries =
+            this.secondaryEmbedders !== undefined &&
+            Object.keys(this.secondaryEmbedders).length > 0;
+        if (!hasSecondaries && this.primaryEncoderName === undefined) return undefined;
+
+        const out: Record<string, number[]> = {};
+        const secondaries = this.secondaryEmbedders;
+        if (hasSecondaries && secondaries) {
+            const names = Object.keys(secondaries);
+            const vectors = await Promise.all(names.map((name) => secondaries[name].embed(text)));
+            names.forEach((name, i) => {
+                out[name] = vectors[i];
+            });
+        }
+        if (this.primaryEncoderName !== undefined) out[this.primaryEncoderName] = primary;
+        return Object.keys(out).length > 0 ? out : undefined;
     }
 }
 
@@ -94,7 +134,12 @@ export class Session {
         const turnIndex = this.currentTurn++;
         for (const text of sentences) {
             const embedding = await this.memory.embedder.embed(text);
-            this.accumulated.push({ text, embedding, turnIndex });
+            const embeddings = await this.memory.embedSecondaryProbe(text, embedding);
+            this.accumulated.push(
+                embeddings
+                    ? { text, embedding, embeddings, turnIndex }
+                    : { text, embedding, turnIndex },
+            );
         }
     }
 
@@ -103,7 +148,12 @@ export class Session {
         const tokens = tokenize(query);
         for (const text of tokens) {
             const embedding = await this.memory.embedder.embed(text);
-            this.accumulated.push({ text, embedding, turnIndex });
+            const embeddings = await this.memory.embedSecondaryProbe(text, embedding);
+            this.accumulated.push(
+                embeddings
+                    ? { text, embedding, embeddings, turnIndex }
+                    : { text, embedding, turnIndex },
+            );
         }
     }
 
