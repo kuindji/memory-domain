@@ -2,6 +2,7 @@ import { PathMemory } from "../src/interfaces.js";
 import type { EmbeddingAdapter } from "../../../src/core/types.js";
 import type { ClaimId, RetrievalOptions, ScoredPath } from "../src/types.js";
 import { turnsToClaims, type LocomoConversation, type LocomoQA } from "../data/locomo-loader.js";
+import type { LlmSynthesizer } from "../src/llm-synthesizer.js";
 
 // Phase 7.5 — LOCOMO harness adapter.
 //
@@ -16,6 +17,10 @@ export type LocomoAdapterOptions = {
     // Cap on retrieved-claim texts surfaced per question. Defaults to the union
     // of nodeIds across top paths; unbounded if omitted.
     maxClaimsPerQuestion?: number;
+    // Optional post-retrieval answer synthesizer. When set, each question's
+    // retrieved claim texts are passed to the synthesizer and the result is
+    // stored on the question. Phase 8.0.
+    synthesizer?: LlmSynthesizer;
 };
 
 export type LocomoQuestionResult = {
@@ -35,6 +40,10 @@ export type LocomoQuestionResult = {
     retrievedDiaIds: string[];
     ingestMs: number;
     retrieveMs: number;
+    // Phase 8.0 — only populated when `synthesizer` is provided.
+    synthesizedAnswer?: string;
+    synthAbstained?: boolean;
+    synthMs?: number;
 };
 
 export type LocomoConversationResult = {
@@ -88,6 +97,16 @@ export async function runLocomoConversation(
             retrievedDiaIds.push(id.startsWith(samplePrefix) ? id.slice(samplePrefix.length) : id);
         }
 
+        let synthesizedAnswer: string | undefined;
+        let synthAbstained: boolean | undefined;
+        let synthMs: number | undefined;
+        if (opts.synthesizer !== undefined) {
+            const res = await opts.synthesizer.synthesize(qa.question, retrievedClaimTexts);
+            synthesizedAnswer = res.answer;
+            synthAbstained = res.abstained;
+            synthMs = res.ms;
+        }
+
         questions.push({
             sampleId: conversation.sampleId,
             questionIndex: qIdx,
@@ -103,6 +122,9 @@ export async function runLocomoConversation(
             retrievedDiaIds,
             ingestMs: 0, // per-conversation ingestion is shared; recorded on parent
             retrieveMs,
+            synthesizedAnswer,
+            synthAbstained,
+            synthMs,
         });
     }
 
