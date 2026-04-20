@@ -13,12 +13,10 @@
  *   bge-large  BAAI/bge-large-en-v1.5     (1024d, ~1.3 GB, CLS-pooled)
  */
 
-import { createWriteStream, existsSync } from "node:fs";
-import { mkdir, rename, rm, stat } from "node:fs/promises";
+import { mkdir, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { Readable } from "node:stream";
-import { finished } from "node:stream/promises";
 import { argv, cwd, exit, stdout } from "node:process";
+import { downloadFile, formatMB } from "./_download.js";
 
 interface ModelFile {
     name: string;
@@ -158,51 +156,6 @@ function parseOptions(args: string[]): Options {
     return { model, dir, force };
 }
 
-function formatMB(bytes: number): string {
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-async function downloadFile(file: ModelFile, dir: string): Promise<void> {
-    const target = join(dir, file.name);
-    const partial = `${target}.partial`;
-
-    const res = await fetch(file.url);
-    if (!res.ok || !res.body) {
-        throw new Error(`Failed to fetch ${file.url}: ${res.status} ${res.statusText}`);
-    }
-
-    const totalHeader = res.headers.get("content-length");
-    const total = totalHeader ? Number(totalHeader) : null;
-
-    let downloaded = 0;
-    let lastLogged = 0;
-    const source = Readable.fromWeb(res.body as import("stream/web").ReadableStream<Uint8Array>);
-    source.on("data", (chunk: Buffer) => {
-        downloaded += chunk.length;
-        if (total && stdout.isTTY && downloaded - lastLogged > 512 * 1024) {
-            lastLogged = downloaded;
-            stdout.write(`\r  ${file.name}  ${formatMB(downloaded)} / ${formatMB(total)}`);
-        }
-    });
-
-    const sink = createWriteStream(partial);
-
-    try {
-        await finished(source.pipe(sink));
-    } catch (err) {
-        await rm(partial, { force: true });
-        throw err;
-    }
-
-    if (stdout.isTTY && total) {
-        stdout.write(`\r  ${file.name}  ${formatMB(downloaded)} / ${formatMB(total)}\n`);
-    } else {
-        stdout.write(`  ${file.name}  ${formatMB(downloaded)}\n`);
-    }
-
-    await rename(partial, target);
-}
-
 async function main(): Promise<void> {
     const opts = parseOptions(argv.slice(2));
     const spec = MODELS[opts.model];
@@ -211,12 +164,7 @@ async function main(): Promise<void> {
     await mkdir(opts.dir, { recursive: true });
 
     for (const file of spec.files) {
-        const target = join(opts.dir, file.name);
-        if (!opts.force && existsSync(target)) {
-            stdout.write(`  ${file.name} already exists, skipping\n`);
-            continue;
-        }
-        await downloadFile(file, opts.dir);
+        await downloadFile(file, opts.dir, opts.force);
     }
 
     stdout.write("\nDone. Files:\n");
