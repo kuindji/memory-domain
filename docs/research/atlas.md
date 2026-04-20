@@ -614,3 +614,30 @@ Mechanisms tried in this repo (or adjacent work) that are not cleanly captured b
 - **Conflicts with:** external retrieval (they're alternatives, not additives)
 - **Paper(s):** GRACE-style parametric memory literature; framework-internal Phase 0.4.
 - **Prior-art note:** §E lm_as_memory_phase04 — 23/23 exact-form recall, 0/20 Q&A-form recall. Codebook learned perfectly but L2 lookup defeated by template wrapping. Parametric line survives as exploratory; not in the current retrieval-stack conversation. Next external analog: WISE (Phase 0.5).
+
+## Appendix — Miss-mode coverage
+
+| Miss-mode | Entries that claim to kill it |
+|---|---|
+| paraphrase | Atomic-fact extraction; Contradiction supersession; LLM-extracted graph; Synonym edges; Entity-anchored retrieval; ColBERT MaxSim; Cross-encoder rerank; Step-Back; SPIRES/KGGen; HyDE; Query2Doc; Temporal-graph retrieval; GRACE |
+| temporal | Contradiction supersession; Valid-time intervals; Forgetting curve; Bi-temporal edges; Event-valid-interval gating; Supersession-by-valid-time; Exponential decay; Ebbinghaus; Temporal-graph retrieval; MemTree |
+| aggregation | Contradiction supersession; Reflection rollup; Community summaries; Map-reduce global query; Dual-index; Listwise LLM rerank; Sub-question fanout; MMR; RAPTOR; MemTree |
+| context | Context-preserving decomposition; MemGPT paging; Passage nodes; Recognition-memory triple filter; IRCoT; Self-RAG; FLARE; GRACE |
+| schema | SPIRES/KGGen; Triplex; Topic-linking |
+| lexical | LLM-extracted graph; Synonym edges; Entity-anchored retrieval; Recognition-memory triple filter; ColBERT MaxSim; Cross-encoder rerank; RRF; Score-space weighted fusion; SPIRES/KGGen; Query2Doc |
+| decomposition | Atomic-fact extraction; Context-preserving decomposition; LLM-extracted graph; Entity-anchored retrieval; Personalized PageRank |
+| granularity | Atomic-fact extraction; Passage nodes; Dual-index |
+| analogy | Context-preserving decomposition; Dual-index; Step-Back |
+| sparse-precedent | MemGPT paging; Reflection rollup; Personalized PageRank; CRAG |
+| compositional | Personalized PageRank; Sub-question fanout; IRCoT; PlanRAG; FLARE |
+| scale | MemGPT paging; Reflection rollup; Forgetting curve; Community summaries; Map-reduce; Incremental graph update; PlanRAG; Exponential decay; Self-RAG; RAPTOR; MemTree; Topic-linking |
+
+### Research gaps
+
+_Miss-modes with zero entries:_ none — every miss-mode in the taxonomy has ≥3 atlas entries claiming to kill it.
+
+_Coverage observations:_
+
+- **paraphrase** and **scale** are the most-covered miss-modes (13 and 12 entries respectively) — these are the "classic" retrieval problems attacked from many angles.
+- **schema**, **granularity**, and **analogy** are the least-covered (3 entries each). If any domain recipe leans on these, the supporting evidence is thin; consider pulling survey-stub entries into deep entries before committing.
+- **sparse-precedent** has only 4 entries and no pure-algorithmic kill — MemGPT paging, reflection, PPR, and CRAG all require at least one LLM call. If Silentium's analogy queries fall into this bucket, the "LLM only as last resort" principle faces its sharpest test here.
