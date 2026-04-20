@@ -6,6 +6,7 @@
 import { spawn } from "node:child_process";
 import type { LLMAdapter, ScoredMemory, ModelLevel } from "../../core/types.js";
 import { parseJsonResponse } from "./json-response.js";
+import { runWithRetry } from "./retry.js";
 
 interface ClaudeCliConfig {
     command?: string;
@@ -18,8 +19,6 @@ interface ClaudeCliConfig {
 const DEFAULT_COMMAND = "claude";
 const DEFAULT_TIMEOUT = 120_000;
 const ERROR_OUTPUT_PREVIEW_LIMIT = 500;
-const MAX_RETRIES = 3;
-const RETRY_BASE_DELAY_MS = 30_000;
 
 function compactOutput(text: string): string {
     return text.replace(/\s+/g, " ").trim();
@@ -67,28 +66,10 @@ class ClaudeCliAdapter implements LLMAdapter {
     }
 
     private async run(prompt: string): Promise<string> {
-        let lastError: Error | undefined;
-
-        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-            if (attempt > 0) {
-                const delay = RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1);
-                console.log(
-                    `[Claude CLI] Retry ${attempt}/${MAX_RETRIES} after ${delay / 1000}s...`,
-                );
-                await new Promise((resolve) => setTimeout(resolve, delay));
-            }
-
-            try {
-                return await this.runOnce(prompt);
-            } catch (err) {
-                lastError = err as Error;
-                if (!this.isRetryable(lastError.message) || attempt === MAX_RETRIES) {
-                    throw lastError;
-                }
-            }
-        }
-
-        throw lastError ?? new Error("Claude CLI failed after retries");
+        return runWithRetry(() => this.runOnce(prompt), {
+            isRetryable: (err) => err instanceof Error && this.isRetryable(err.message),
+            label: "[Claude CLI]",
+        });
     }
 
     private async runOnce(prompt: string): Promise<string> {

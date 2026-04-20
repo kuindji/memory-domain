@@ -13,11 +13,10 @@ import type {
     ScoredMemory,
 } from "../../core/types.js";
 import { parseJsonResponse } from "./json-response.js";
+import { runWithRetry } from "./retry.js";
 
 const DEFAULT_TIMEOUT = 120_000;
 const DEFAULT_MAX_TOKENS = 4096;
-const MAX_RETRIES = 3;
-const RETRY_BASE_DELAY_MS = 30_000;
 
 class BedrockAdapter implements LLMAdapter {
     private client: AnthropicBedrock;
@@ -71,28 +70,10 @@ class BedrockAdapter implements LLMAdapter {
     }
 
     private async run(prompt: string): Promise<string> {
-        let lastError: unknown;
-
-        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-            if (attempt > 0) {
-                const delay = RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1);
-                console.log(`[Bedrock] Retry ${attempt}/${MAX_RETRIES} after ${delay / 1000}s...`);
-                await new Promise((resolve) => setTimeout(resolve, delay));
-            }
-
-            try {
-                return await this.runOnce(prompt);
-            } catch (err) {
-                lastError = err;
-                if (!this.isRetryable(err) || attempt === MAX_RETRIES) {
-                    throw err;
-                }
-            }
-        }
-
-        throw lastError instanceof Error
-            ? lastError
-            : new Error("Bedrock request failed after retries");
+        return runWithRetry(() => this.runOnce(prompt), {
+            isRetryable: (err) => this.isRetryable(err),
+            label: "[Bedrock]",
+        });
     }
 
     private async runOnce(prompt: string): Promise<string> {
