@@ -36,6 +36,10 @@ export default tseslint.config(
         files: ["tests/**/*.ts"],
         rules: {
             "@typescript-eslint/no-floating-promises": "off",
+            // bun-types types `.rejects` as `Matchers<unknown>` (not PromiseLike),
+            // so `await expect(...).rejects.toThrow(...)` triggers this rule even
+            // though Bun's runtime does honour the await semantics on `.rejects`.
+            "@typescript-eslint/await-thenable": "off",
         },
     },
 

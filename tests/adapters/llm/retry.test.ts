@@ -36,7 +36,7 @@ describe("runWithRetry", () => {
 
     it("throws immediately when error is not retryable", async () => {
         let calls = 0;
-        expect(
+        await expect(
             runWithRetry(
                 () => {
                     calls++;
@@ -45,13 +45,12 @@ describe("runWithRetry", () => {
                 { isRetryable: () => false, label: "[test]", baseDelayMs: 1 },
             ),
         ).rejects.toThrow("fatal");
-        await Promise.resolve();
         expect(calls).toBe(1);
     });
 
     it("throws the last error after maxRetries retryable failures", async () => {
         let calls = 0;
-        expect(
+        await expect(
             runWithRetry(
                 () => {
                     calls++;
@@ -65,7 +64,6 @@ describe("runWithRetry", () => {
                 },
             ),
         ).rejects.toThrow("attempt-3");
-        await new Promise((resolve) => setTimeout(resolve, 20));
         expect(calls).toBe(3);
     });
 });
