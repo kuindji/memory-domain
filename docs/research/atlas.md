@@ -414,7 +414,94 @@ GraphRAG, HippoRAG, HippoRAG 2, and LightRAG all share a common move: at ingest,
 - **Prior-art note:** Substrate present, time-alignment step not wired. Path-memory (phases 2.8 / 2.9 / 2.13) supplies the graph walk and weighted fusion; `event_time` index (commit 8d587ac) supplies the per-edge timestamp; `validFrom`/`invalidAt` (cbf9ea7) supplies the interval. The time-aligned-subgraph restriction at traversal time is the open atom. path_memory_phase211_deferred (MAGMA) flagged per-view routing as a candidate — a time-view router is a natural special case.
 
 ### 6. Survey-depth families
-_(to be filled in Task 8)_
+
+Stubs only (name + gist + miss-mode + citation + prior-art). Expand to full entries if a recipe in `domain-recipes.md` pulls them in.
+
+#### Hierarchical / summary trees (RAPTOR)
+
+- **Gist:** Build a tree of progressively-summarized nodes over a corpus at ingest, then let retrieval match against any level of the tree.
+- **Miss-mode killed:** aggregation, scale
+- **Where it lives:** ingest (cluster + summarize recursively)
+- **Paper(s):** RAPTOR (2024), arxiv 2401.18059
+- **Prior-art note:** none. Compare with §2 Community summaries (GraphRAG) — both are "summarize clusters" moves; RAPTOR is chunk-clustering, GraphRAG is entity-clustering.
+
+#### Memory tree with agentic editing (MemTree)
+
+- **Gist:** Maintain a tree of memories where an agent decides on each new input whether to insert, merge, split, or re-summarize.
+- **Miss-mode killed:** aggregation, scale, temporal (via explicit edit ops)
+- **Where it lives:** ingest (agent-driven edits)
+- **Paper(s):** MemTree (2024)
+- **Prior-art note:** none — closest in spirit is §1 Reflection rollup but agent-driven rather than batched.
+
+#### Claim canonicalization via structured extraction (SPIRES / KGGen)
+
+- **Gist:** Use schema-guided LLM extraction to coerce free-text claims into a typed, normalized form keyed off an ontology.
+- **Miss-mode killed:** schema, lexical, paraphrase
+- **Where it lives:** ingest
+- **Paper(s):** SPIRES (Caufield et al. 2023); KGGen (2024)
+- **Prior-art note:** §C commit aecc0e4 (query intent classification for KB) is a query-side cousin; no ingest-side schema coercion in-tree.
+
+#### Fast triple extraction (Triplex)
+
+- **Gist:** A small fine-tuned model does triple extraction at a fraction of the cost of a full-size LLM, with accuracy close enough for most graph-RAG uses.
+- **Miss-mode killed:** schema, operational-scale
+- **Where it lives:** ingest
+- **Paper(s):** Triplex (SciPhi, 2024)
+- **Prior-art note:** none. Directly relevant to token-budget of §2 LLM-extracted entity-relation graph.
+
+#### HyDE (hypothetical-document embedding)
+
+- **Gist:** At query time, ask the LLM to write a hypothetical answer, embed that hypothetical, and use its embedding to search.
+- **Miss-mode killed:** paraphrase (question-shape vs. answer-shape mismatch)
+- **Where it lives:** query
+- **Token cost:** 1-per-query
+- **Paper(s):** HyDE (Gao et al. 2022), arxiv 2212.10496
+- **Prior-art note:** none. Compare with §3 Step-Back — both rewrite the query but in opposite directions (HyDE toward a concrete answer, Step-Back toward an abstract principle). Potentially fusable via RRF.
+
+#### Query2Doc (query expansion by pseudo-answer generation)
+
+- **Gist:** Generate a short pseudo-document about the query and concatenate it with the original before embedding.
+- **Miss-mode killed:** paraphrase, lexical
+- **Where it lives:** query
+- **Token cost:** 1-per-query
+- **Paper(s):** Query2Doc (Wang et al. 2023), arxiv 2303.07678
+- **Prior-art note:** none. Redundant with HyDE; nullifies when stacked.
+
+#### Self-RAG (on-demand retrieval with reflection tokens)
+
+- **Gist:** The model decides at each generation step whether to retrieve, and emits critique tokens evaluating each retrieved passage before using it.
+- **Miss-mode killed:** context (irrelevant retrieval poisoning generation), scale (skip retrieval when not needed)
+- **Where it lives:** query (inside the generation loop)
+- **Token cost:** many
+- **Paper(s):** Self-RAG (2023), arxiv 2310.11511
+- **Prior-art note:** none.
+
+#### CRAG (corrective retrieval with quality estimator)
+
+- **Gist:** Score each retrieved candidate's quality; if all are low, fall back to web search and continue.
+- **Miss-mode killed:** sparse-precedent (recovery when the store has nothing useful)
+- **Where it lives:** query
+- **Token cost:** 1-per-query + fallback cost
+- **Paper(s):** CRAG (2024), arxiv 2401.15884
+- **Prior-art note:** none.
+
+#### Adaptive-RAG (route by query difficulty)
+
+- **Gist:** A small classifier decides whether to answer directly, retrieve once, or enter an iterative loop, based on estimated query difficulty.
+- **Miss-mode killed:** operational-efficiency — prevents spending iterative-retrieval budget on easy queries
+- **Where it lives:** query (front gate)
+- **Token cost:** 1-per-query (classifier) + variable downstream
+- **Paper(s):** Adaptive-RAG (2024), arxiv 2403.14403
+- **Prior-art note:** §A path_memory_phase211_deferred (MAGMA per-view router) is the same family; deferred for view-granularity reasons. Adaptive-RAG's difficulty axis is a different routing signal than MAGMA's view axis — potentially complementary.
+
+#### FLARE (forward-looking retrieval)
+
+- **Gist:** Generate the next sentence speculatively; if low-confidence tokens appear, retrieve on them and regenerate.
+- **Miss-mode killed:** context, compositional
+- **Where it lives:** query (inside generation)
+- **Token cost:** many
+- **Paper(s):** FLARE (2023), arxiv 2305.06983
+- **Prior-art note:** none. Adjacent to §3 IRCoT — FLARE triggers retrieval on confidence, IRCoT on every reasoning step.
 
 ### 7. Prior-art-derived entries
 _(to be filled in Task 9)_
