@@ -142,7 +142,7 @@ class OpenAiHttpAdapter implements LLMAdapter {
                 : "";
         const prompt = `Rate the novelty and importance of the following content on a scale from 0.0 to 1.0, where 0.0 means completely redundant/trivial and 1.0 means highly novel and important.${contextBlock}\n\nNew content: "${content}"\n\nReturn ONLY a JSON number between 0.0 and 1.0.`;
         const response = await this.run(prompt);
-        const score = parseFloat(response.replace(/[^0-9.]/g, ""));
+        const score = parseFloat(response.trim());
         return Math.max(0, Math.min(1, score));
     }
 
