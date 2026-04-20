@@ -134,7 +134,7 @@ New content: "${content}"
 Return ONLY a JSON number between 0.0 and 1.0.`;
 
         const response = await this.run(prompt);
-        const score = parseFloat(response.replace(/[^0-9.]/g, ""));
+        const score = parseFloat(response.trim());
         return Math.max(0, Math.min(1, score));
     }
 
