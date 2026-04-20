@@ -16,16 +16,11 @@
 import { mkdir, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { argv, cwd, exit, stdout } from "node:process";
-import { downloadFile, formatMB } from "./_download.js";
-
-interface ModelFile {
-    name: string;
-    url: string;
-}
+import { downloadFile, formatMB, type HfFile } from "./_download.js";
 
 interface ModelSpec {
     defaultSubdir: string;
-    files: ModelFile[];
+    files: HfFile[];
 }
 
 const MODELS: Record<string, ModelSpec> = {

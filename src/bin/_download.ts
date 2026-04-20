@@ -76,7 +76,13 @@ export async function listHfRepoFiles(repo: string, revision = "main"): Promise<
                 `HF tree listing failed for ${repo}${path ? `/${path}` : ""}: ${res.status} ${res.statusText}`,
             );
         }
-        const entries = (await res.json()) as Array<{ type: "file" | "directory"; path: string }>;
+        const raw: unknown = await res.json();
+        if (!Array.isArray(raw)) {
+            throw new Error(
+                `HF tree listing for ${repo}${path ? `/${path}` : ""}: unexpected response shape`,
+            );
+        }
+        const entries = raw as Array<{ type: "file" | "directory"; path: string }>;
         for (const entry of entries) {
             if (entry.type === "file") {
                 out.push(entry.path);
