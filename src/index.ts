@@ -101,6 +101,8 @@ export type { TopicLinkingOptions, ExtractedTopic, LinkResult } from "./plugins/
 export { ClaudeCliAdapter } from "./adapters/llm/claude-cli.js";
 export { BedrockAdapter } from "./adapters/llm/bedrock.js";
 export type { BedrockAdapterConfig } from "./core/types.js";
+export { OpenAiHttpAdapter } from "./adapters/llm/openai-http.js";
+export type { OpenAiHttpAdapterConfig } from "./adapters/llm/openai-http.js";
 export { OnnxEmbeddingAdapter } from "./adapters/onnx-embedding.js";
 export type { OnnxEmbeddingConfig } from "./adapters/onnx-embedding.js";
 export { CachedEmbeddingAdapter } from "./adapters/cached-embedding.js";

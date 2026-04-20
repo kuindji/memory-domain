@@ -19,7 +19,9 @@
     "bin": {
         "memory-domain": "dist/cli/cli.js",
         "memory-domain-tui": "dist/tui/tui.js",
-        "memory-domain-download-model": "dist/bin/download-model.js"
+        "memory-domain-download-model": "dist/bin/download-model.js",
+        "memory-domain-download-mlx-model": "dist/bin/download-mlx-model.js",
+        "memory-domain-download-gguf-model": "dist/bin/download-gguf-model.js"
     },
     "files": [
         "dist",
