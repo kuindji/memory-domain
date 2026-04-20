@@ -504,4 +504,113 @@ Stubs only (name + gist + miss-mode + citation + prior-art). Expand to full entr
 - **Prior-art note:** none. Adjacent to §3 IRCoT — FLARE triggers retrieval on confidence, IRCoT on every reasoning step.
 
 ### 7. Prior-art-derived entries
-_(to be filled in Task 9)_
+
+Mechanisms tried in this repo (or adjacent work) that are not cleanly captured by families 1–6. Refuted mechanisms count — a refutation is as useful as a confirmation.
+
+#### Score-space weighted fusion (Dijkstra τ)
+
+- **Gist:** Combine scores from multiple retrievers by a weighted sum with a temperature τ that sharpens or softens the combination.
+- **Insight:** RRF operates on ranks; this operates on raw scores. τ controls how sharply differences in score translate into differences in combined rank — low τ behaves like "only the top scorer matters," high τ behaves like averaging. Runs cheaply alongside Dijkstra-style path weighting.
+- **Miss-mode killed:** lexical (multi-retriever blend); complements RRF when score scales ARE comparable (same-family encoders).
+- **Where it lives:** query (fusion stage)
+- **Token cost:** none
+- **Pairs with:** Dijkstra path traversal; same-family encoders
+- **Conflicts with:** Reciprocal-rank fusion (choose one or run both — path_memory_phase216 ships RRF opt-in alongside τ-fusion as default)
+- **Paper(s):** no external paper; framework-internal from path-memory Phase 2.8.
+- **Prior-art note:** §A path_memory_phase28 — Dijkstra tmp=0.5, wfusion τ=0.2 is the default runner. Option M (alternative fusion) regressed. Phase 2.13 kept this default under BGE-base.
+
+#### Spreading activation with tier inhibition (SYNAPSE variant — refuted)
+
+- **Gist:** Activate seed nodes at full weight, spread to neighbors at reduced weight, apply inhibition so later tiers don't dominate.
+- **Insight:** The cognitive-psych idea that a concept activates related concepts proportional to edge weight, damped by hop distance. Classic on dense human semantic graphs. Tier inhibition adds a penalty on tier-2+ nodes so the walk doesn't run away from the seed neighborhood.
+- **Miss-mode it was supposed to kill:** analogy, context, compositional
+- **Where it lives:** query
+- **Token cost:** none
+- **Pairs with:** (n/a — refuted on this repo's graphs)
+- **Conflicts with:** Personalized PageRank (PPR is the non-inhibited, density-weighted cousin and outperforms SYNAPSE here)
+- **Paper(s):** cognitive psychology tradition (Collins & Loftus 1975); path_memory_phase210 tried a SYNAPSE variant.
+- **Prior-art note:** §A path_memory_phase210 — eval-A regresses, eval-B flat. Small-graph dilution + tier-2 inhibition harm. Ships opt-in only. Refutation is specific to tier-inhibition + small-graph dilution; PPR proper (family 2) is still open.
+
+#### Edge-hotness soft-gate (refuted)
+
+- **Gist:** Use per-edge access counts as a soft penalty on traversal weight — hot edges cheapen, cold edges burden.
+- **Insight:** Since edge weights concentrate on repeat-user arcs (phase 2.9's edgeRatio 7.72× observation), bias traversal toward hot edges to exploit that concentration.
+- **Miss-mode it was supposed to kill:** scale, compositional
+- **Where it lives:** query
+- **Token cost:** none
+- **Pairs with:** (n/a — refuted as a gate; the hotness OBSERVATION is valid, soft-gating on it is not)
+- **Conflicts with:** eval-C retrieval (+35% latency, flat coverage)
+- **Paper(s):** no external source; framework-internal from path-memory Phase 4a.
+- **Prior-art note:** §A path_memory_phase4a — ships disabled-only. Phase 2.9 shows hotness exists; Phase 4a shows exploiting it as a soft-gate regresses. Node-level reinforcement (family 5) is the open slot, not more edge-gating.
+
+#### Per-query view router (MAGMA — deferred)
+
+- **Gist:** Route each query to one of N pre-defined retrieval "views" (anchor sets, encoders, filters) based on query features.
+- **Insight:** Views are whole-query retrieval configurations. A router maps a query signature to a view. Idea is that different queries prefer different retrieval shapes.
+- **Miss-mode it was supposed to kill:** compositional, analogy
+- **Where it lives:** query (front-gate)
+- **Token cost:** 1-per-query (router classifier)
+- **Pairs with:** Planner-led retrieval (PlanRAG); Adaptive-RAG routing
+- **Conflicts with:** whole-query views when the right granularity is sub-query — this is why MAGMA dry-run produced only 1 unique tuple across 38 probes.
+- **Paper(s):** no external paper by this name; framework-internal from Phase 2.11.
+- **Prior-art note:** §A path_memory_phase211_deferred — deferred until after Phase 7. Diagnosis: view granularity was too coarse. PlanRAG-style leaf-level routing (family 3) is the open variant.
+
+#### Topic-linking cross-domain plugin
+
+- **Gist:** A shared plugin layer that extracts topics from memories at ingest and uses them as a cheap structured index across all domains.
+- **Insight:** Topics are a coarse but free signal — every memory has some, they cut the candidate pool fast, and they compose with any retrieval mechanism downstream. The trick is making topic extraction itself tiered (stable-id lookup → vector-only mode → full LLM) so 90% of memories never trigger an LLM call.
+- **Miss-mode killed:** scale (candidate pool pruning), schema (cross-domain interop)
+- **Where it lives:** ingest (tiered topic extraction) + query (topic-based score boost)
+- **Token cost:** amortized — most ingests hit the fast tiers
+- **Pairs with:** Entity-anchored retrieval; community summaries (topics are the flat precursor)
+- **Conflicts with:** none known
+- **Paper(s):** no external paper; framework-internal.
+- **Prior-art note:** §F commits e2b816a (topic-linking plugin), b98b09d (cache afterTopicLink mutations + memory.topics field), cb9ccbe (vector-only tier), 57ffca4 (Tier 0 stable-id lookup), 2249076 (perf: cut WDI ingestion ~47% via topic tiers), 776e1af (topic-based score boosting). Core framework primitive.
+
+#### MMR budget-filling for diverse top-k
+
+- **Gist:** Instead of returning the top-k by score, fill a budget by greedily picking the next candidate that maximizes `λ·score − (1−λ)·max-similarity-to-already-picked`.
+- **Insight:** Top-k by raw score often returns several near-duplicates. MMR (Maximal Marginal Relevance) trades a little score for diversity, so the returned set covers more of the candidate space. Useful when the answer needs evidence from several angles.
+- **Miss-mode killed:** aggregation (near-duplicates crowding out diverse evidence)
+- **Where it lives:** query (post-ranking selection)
+- **Token cost:** none
+- **Pairs with:** Atomic-fact extraction (atomic facts benefit most from diversity); cascade rerank (MMR at the final step)
+- **Conflicts with:** point-lookup queries where the right answer is a single near-duplicate cluster.
+- **Paper(s):** Carbonell & Goldstein "The Use of MMR, Diversity-Based Reranking" (SIGIR 1998).
+- **Prior-art note:** §C commit 77e6484 — MMR budget filling + question-aware indexing for KB noise reduction. Already in-tree.
+
+#### Intent-classification front-gate (refuted)
+
+- **Gist:** Classify the query's intent up-front and hard-filter the candidate pool to memories tagged with that intent.
+- **Insight:** A priori it sounds like free precision. In practice, classification accuracy caps the ceiling — at 43% classification accuracy, 57% of queries get the wrong pool.
+- **Miss-mode it was supposed to kill:** scale, schema
+- **Where it lives:** query (front-gate)
+- **Token cost:** 1-per-query (classifier)
+- **Pairs with:** (n/a — refuted at the whole-query level; per-sub-query variant is open, see §3 Sub-question fanout)
+- **Conflicts with:** recall — a misclassified query is dead.
+- **Paper(s):** kb_architecture_testing (repo note).
+- **Prior-art note:** §C kb_architecture_testing (43% classification accuracy); commits aecc0e4 (added), bfe91d0 (wired), 106b0a3 (removed as a negative result). The refutation is at OUTER-question granularity; sub-question granularity (Self-Ask/IRCoT) is the open slot.
+
+#### Similarity batching for ingest-time LLM decisions
+
+- **Gist:** Before making supersession/merge/contradiction decisions, cluster pending inbox items by embedding + request context, and pass each cluster to the LLM as a batch.
+- **Insight:** Decisions like "does A supersede B?" require the LLM to see both. Rather than asking once per candidate pair, cluster first so each LLM call sees a coherent group and makes all pairwise decisions in one call. Amortizes the per-call overhead and produces consistent decisions across the cluster.
+- **Miss-mode killed:** operational-scale at ingest; also improves supersession precision by giving the LLM full context
+- **Where it lives:** ingest (pre-LLM clustering)
+- **Token cost:** reduces total tokens vs. per-pair calls
+- **Pairs with:** Atomic-fact extraction; Contradiction-based supersession; Reflection rollup
+- **Conflicts with:** strict streaming ingest where each item must commit immediately
+- **Paper(s):** no external paper; framework-internal from inbox redesign.
+- **Prior-art note:** §B similarity_batching + project_inbox_redesign; inbox_error_handling documents retry/quarantine policies.
+
+#### Parametric memory via learned codebook (GRACE — mixed)
+
+- **Gist:** Store memories as key-value entries in a small LLM's own weights (codebook keys lookup, value tokens decoded).
+- **Insight:** Instead of external retrieval, bake the facts into model parameters directly and let the model recall them natively. Avoids the embedding/retrieval mismatch entirely.
+- **Miss-mode it was supposed to kill:** paraphrase (native recall), context
+- **Where it lives:** ingest (codebook edit) + query (model-native)
+- **Token cost:** high at ingest (codebook learning), low at query
+- **Pairs with:** (experimental — not yet composed with other primitives)
+- **Conflicts with:** external retrieval (they're alternatives, not additives)
+- **Paper(s):** GRACE-style parametric memory literature; framework-internal Phase 0.4.
+- **Prior-art note:** §E lm_as_memory_phase04 — 23/23 exact-form recall, 0/20 Q&A-form recall. Codebook learned perfectly but L2 lookup defeated by template wrapping. Parametric line survives as exploratory; not in the current retrieval-stack conversation. Next external analog: WISE (Phase 0.5).
