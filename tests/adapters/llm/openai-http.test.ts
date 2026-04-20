@@ -16,6 +16,7 @@ let nextResponse: { status: number; body: unknown } = {
     status: 200,
     body: { choices: [{ message: { content: "" } }] },
 };
+let responseQueue: Array<{ status: number; body: unknown }> = [];
 
 beforeAll(() => {
     server = Bun.serve({
@@ -28,8 +29,9 @@ beforeAll(() => {
             });
             const body = await req.json().catch(() => null);
             captured.push({ method: req.method, path: url.pathname, headers, body });
-            return new Response(JSON.stringify(nextResponse.body), {
-                status: nextResponse.status,
+            const responder = responseQueue.shift() ?? nextResponse;
+            return new Response(JSON.stringify(responder.body), {
+                status: responder.status,
                 headers: { "Content-Type": "application/json" },
             });
         },
@@ -43,6 +45,7 @@ afterAll(() => {
 
 function reset(): void {
     captured = [];
+    responseQueue = [];
     nextResponse = { status: 200, body: { choices: [{ message: { content: "" } }] } };
 }
 
@@ -178,5 +181,71 @@ describe("OpenAiHttpAdapter auth headers", () => {
         await adapter.extract("x");
         const req0 = captured[0];
         expect(req0.headers["x-trace"]).toBe("abc");
+    });
+});
+
+describe("OpenAiHttpAdapter retry behavior", () => {
+    it("retries on 503 then succeeds when the server recovers", async () => {
+        reset();
+        responseQueue.push({ status: 503, body: { error: "overloaded" } });
+        responseQueue.push({ status: 503, body: { error: "overloaded" } });
+        responseQueue.push({
+            status: 200,
+            body: { choices: [{ message: { content: `["ok"]` } }] },
+        });
+
+        const adapter = new OpenAiHttpAdapter({
+            baseUrl,
+            model: "m",
+            retryBaseDelayMs: 1,
+        });
+        const result = await adapter.extract("x");
+
+        expect(result).toEqual(["ok"]);
+        expect(captured).toHaveLength(3);
+    }, 10_000);
+
+    it("throws immediately on a non-retryable 400", async () => {
+        reset();
+        nextResponse = { status: 400, body: { error: "bad request" } };
+        const adapter = new OpenAiHttpAdapter({ baseUrl, model: "m", retryBaseDelayMs: 1 });
+        let caught: unknown;
+        try {
+            await adapter.extract("x");
+        } catch (err) {
+            caught = err;
+        }
+        expect(caught).toBeInstanceOf(Error);
+        expect((caught as Error).message).toContain("400");
+        expect(captured).toHaveLength(1);
+    });
+});
+
+describe("OpenAiHttpAdapter timeout", () => {
+    it("throws when the server hangs past the configured timeout", async () => {
+        const hangServer = Bun.serve({
+            port: 0,
+            async fetch() {
+                await new Promise(() => {}); // never resolves
+                return new Response();
+            },
+        });
+        try {
+            const adapter = new OpenAiHttpAdapter({
+                baseUrl: `http://localhost:${hangServer.port}/v1`,
+                model: "m",
+                timeout: 50,
+                retryBaseDelayMs: 1,
+            });
+            let caught: unknown;
+            try {
+                await adapter.extract("x");
+            } catch (err) {
+                caught = err;
+            }
+            expect(caught).toBeInstanceOf(Error);
+        } finally {
+            hangServer.stop(true);
+        }
     });
 });
