@@ -65,7 +65,7 @@ Analytical layer over `atlas.md`. No per-domain ranking here — those live in `
 
 ### N2. Exponential decay + Ebbinghaus reinforcement without coordination
 
-- **Atlas entries:** Exponential decay of access score; Ebbinghaus reinforcement on re-access (family 5).
+- **Atlas entries:** Exponential decay of access score; Ebbinghaus-style reinforcement on re-access (family 5).
 - **Why unchecked stacking hurts:** Both are tweaking the same score on the same dimension (recency). Ebbinghaus bumps the stability parameter on read, which lengthens the effective τ. If the exponential decay is applied at query time with a fixed τ AND the stored stability is also being used, the two are fighting over how much weight age should have. Documented in the atlas entry's conflict field.
 - **Policy:** Pick one as primary (exponential decay with a single τ is simpler); use the other (Ebbinghaus stability) as a tiebreaker or for items with very high access counts. Do not let both drive top-k directly.
 

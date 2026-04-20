@@ -2,7 +2,7 @@
 
 Three proposed stacks drawing on `atlas.md` and `combinations.md`. No benchmark numbers here; those come from the plan that follows this research.
 
-Every recipe names a non-AI backbone, at most 2 haiku-class LLM insertion points, a ceiling statement, explicit mapping to prior work, and open questions.
+Every recipe names a non-AI backbone, at most 2 local-LLM insertion points, a ceiling statement, explicit mapping to prior work, and open questions.
 
 ---
 
@@ -29,20 +29,20 @@ Two miss-modes the backbone cannot kill:
 1. **Granularity and decomposition at ingest** — a raw turn is stored as one unit, so a turn with three claims is embedded as an average of three signals. Phase 2.15 documents this as "encoder-granularity-bound." No tuning of the encoder closes this; it requires splitting the unit of memory.
 2. **Compositional queries requiring atomic-level joins** — "what did Alice and I agree on last week and is it still current?" needs atom-level retrieval with per-atom validity. The whole-turn unit loses this.
 
-### Where haiku earns its tokens
+### Where the local LLM earns its tokens
 
 **Insertion 1: atomic-fact extraction at ingest**
 
 - **What it does:** Rewrites each incoming turn into a list of standalone claims in subject-predicate-object form, each with a `validFrom` timestamp extracted from the turn.
 - **Why no algorithm replaces it:** Distinguishing a standalone claim from conversational filler requires semantic judgment no rule-based extractor delivers reliably at chat-text messiness.
-- **Token cost:** ~1 haiku call per ingested turn. Turns average ~50 tokens in; output is usually <200 tokens out. Similarity batching at the inbox stage groups related pending turns so a single call can process several turns.
+- **Token cost:** ~1 local-LLM call per ingested turn. Turns average ~50 tokens in; output is usually <200 tokens out. Similarity batching at the inbox stage groups related pending turns so a single call can process several turns.
 - **Plausible recall delta:** unlocks the granularity + decomposition miss-modes the backbone cannot touch. This is the single largest expected gain.
 
 **Insertion 2: contradiction-based supersession routed by valid-time**
 
 - **What it does:** At consolidation, identify claims about the same subject that cannot both be true, and close the loser's valid-time interval at the winner's `validFrom` (not at ingest-order).
 - **Why no algorithm replaces it:** Identifying "A contradicts B about the same subject" is a world-knowledge problem. Embedding similarity gets close but confuses "same subject, compatible claims" with "same subject, incompatible claims."
-- **Token cost:** 1 haiku call per conflict group, amortized via similarity batching (§B similarity_batching). Most ingested facts do not trigger a conflict call.
+- **Token cost:** 1 local-LLM call per conflict group, amortized via similarity batching (§B similarity_batching). Most ingested facts do not trigger a conflict call.
 - **Plausible recall delta:** eliminates stale-fact pollution end-to-end and fixes the "newer-in-log wins over newer-in-world" bug that a plain `invalidAt`-on-consolidation policy has.
 
 No third insertion point — query-side rewriting and listwise LLM rerank fail the "cheaper in total tokens than recall bought" test for Chat workloads.
@@ -58,7 +58,7 @@ No third insertion point — query-side rewriting and listwise LLM rerank fail t
 
 1. Does routing supersession by `validFrom` rather than ingest order flip the Alexander-succession arc that phase 2.14 Stage 2 diagnosed as encoder-granularity-bound? The granularity fix from atomic extraction is the independent variable.
 2. Does atomic-fact extraction at ingest cost more in total tokens than the multi-hop retrieval + follow-up generation it replaces at query time? The "LLM only when it pays for itself" rule demands measurement.
-3. What similarity-batch size minimizes total haiku spend across a typical Chat day? Underbatching wastes overhead, overbatching causes cross-contamination between unrelated conflict groups.
+3. What similarity-batch size minimizes total local-LLM spend across a typical Chat day? Underbatching wastes overhead, overbatching causes cross-contamination between unrelated conflict groups.
 
 ---
 
@@ -86,23 +86,23 @@ Two miss-modes the backbone cannot kill:
 1. **Schema-level relations** — "which records have `auth_method=oauth2` AND also satisfy constraint Y?" requires the fields to be extractable and typed, not just embedded. Topic-linking is too coarse; it gets "authy stuff" but not "oauth2 specifically."
 2. **Granularity traps** — a query that should return a sub-record often returns the parent because the parent's embedding is the average of all sub-records, which is close enough to every sub-query to always rank.
 
-### Where haiku earns its tokens
+### Where the local LLM earns its tokens
 
 **Insertion 1: atomic-fact decomposition with parent-link at ingest**
 
 - **What it does:** On record ingest, extract atomic facts keeping a pointer to the parent record (the A+B+C fix from `kb_decomposition_next_steps`). Each atom gets its own embedding and its own retrieval probability, but the parent can still be reconstructed.
 - **Why no algorithm replaces it:** Identifying the "unit of claim" inside a structured record requires understanding the record's content, not just its schema. Rule-based splitting produces too many useless atoms.
-- **Token cost:** 1 haiku call per ingested record, batched across records in the same ingest burst.
+- **Token cost:** 1 local-LLM call per ingested record, batched across records in the same ingest burst.
 - **Plausible recall delta:** directly kills the granularity-trap miss-mode.
 
 **Insertion 2: schema-guided claim canonicalization at ingest (SPIRES/KGGen variant)**
 
 - **What it does:** For each atomic claim, coerce it into a typed form against the domain schema (field name, value, value type). Stored alongside the embedding as structured metadata, filterable at query time without LLM.
 - **Why no algorithm replaces it:** Aligning a natural-language claim to a schema field requires the LLM. Once aligned, the filter is cheap and deterministic.
-- **Token cost:** 1 haiku call per atomic claim (piggybacked on Insertion 1 — same call emits both the split and the schema alignment).
+- **Token cost:** 1 local-LLM call per atomic claim (piggybacked on Insertion 1 — same call emits both the split and the schema alignment).
 - **Plausible recall delta:** kills the schema miss-mode and enables precise structural queries ("auth_method=oauth2") that embedding retrieval cannot match reliably.
 
-Both insertions fit in ONE haiku call per record. The budget is "1 haiku per ingest, 0 per query" — which matches the Chat/KB ingest-heavy tilt from the brainstorming conversation.
+Both insertions fit in ONE local-LLM call per record. The budget is "1 local-LLM call per ingest, 0 per query" — which matches the Chat/KB ingest-heavy tilt from the brainstorming conversation.
 
 ### Relation to what's already in the repo
 
@@ -145,23 +145,23 @@ Two miss-modes the backbone cannot kill:
 1. **Analogy misses** — a query that rhymes with a past situation but shares no surface features (no overlapping entities, no keyword matches). Graph walks from empty seeds produce nothing; embedding similarity is too weak across different entity sets.
 2. **False-friend context misses** — PPR seeds hallucinate when a query entity happens to also appear in a thematically-unrelated cluster. One bad seed poisons the walk.
 
-### Where haiku earns its tokens
+### Where the local LLM earns its tokens
 
 **Insertion 1: query decomposition with step-back + sub-question fanout**
 
-- **What it does:** Two haiku calls at query time: (a) step-back to generate an abstract version of the query ("what kind of situation is this?"); (b) sub-question fanout to break the query into atomic retrievals. Both rewrites retrieve in parallel and merge via RRF (compound 5 in `combinations.md`).
+- **What it does:** Two local-LLM calls at query time: (a) step-back to generate an abstract version of the query ("what kind of situation is this?"); (b) sub-question fanout to break the query into atomic retrievals. Both rewrites retrieve in parallel and merge via RRF (compound 5 in `combinations.md`).
 - **Why no algorithm replaces it:** Analogy misses require semantic abstraction that embeddings alone cannot perform — the whole miss-mode is that surface features disagree, so any embedding-only method is stuck by construction.
-- **Token cost:** ~2 haiku calls per query (one per rewrite). If query volume is low and the domain is query-heavy by design (category B), this is the budget the user explicitly allocated.
+- **Token cost:** ~2 local-LLM calls per query (one per rewrite). If query volume is low and the domain is query-heavy by design (category B), this is the budget the user explicitly allocated.
 - **Plausible recall delta:** kills analogy misses (via step-back) + compositional misses (via fanout), which are Silentium's two dominant failure modes per the domain sketch.
 
 **Insertion 2: recognition-memory triple filter after retrieval**
 
-- **What it does:** Before the final PPR walk, take the top-N retrieved seed triples and run one haiku call asking "which of these actually match the query intent?" Drop the rejected seeds.
+- **What it does:** Before the final PPR walk, take the top-N retrieved seed triples and run one local-LLM call asking "which of these actually match the query intent?" Drop the rejected seeds.
 - **Why no algorithm replaces it:** This is the "system 2" check that catches false-friend embeddings — lexical near-matches that are semantic far-matches. Cross-encoders can do this for passages, but for triples the LLM is cheaper and more accurate.
-- **Token cost:** 1 small haiku call per query (input is <50 triples × ~20 tokens = 1K in, <100 tokens out).
+- **Token cost:** 1 small local-LLM call per query (input is <50 triples × ~20 tokens = 1K in, <100 tokens out).
 - **Plausible recall delta:** kills false-friend context misses, which PPR alone cannot catch — this is exactly what HippoRAG 2 introduced the mechanism for.
 
-Total haiku budget: 3 calls per query, all small. If the user wants to cap at 2, drop the triple filter first — the query rewrites address the dominant failure modes and the triple filter is precision-over-recall at the margin.
+Total local-LLM budget: 3 calls per query, all small. If the user wants to cap at 2, drop the triple filter first — the query rewrites address the dominant failure modes and the triple filter is precision-over-recall at the margin.
 
 ### Relation to what's already in the repo
 
@@ -175,7 +175,7 @@ Total haiku budget: 3 calls per query, all small. If the user wants to cap at 2,
 
 1. Does time-aligned subgraph traversal close the analogy gap when the query time-scope is implicit (the user says "situations like this" without naming a window)? If the time-scope inference requires an LLM call, Insertion 1 grows to 3 calls.
 2. Can the recognition-memory triple filter (Insertion 2) replace the parked listwise LLM rerank (commit 607d943) at lower total token cost? If yes, this recipe also unblocks the "exhaust non-LLM first" parked work.
-3. Is step-back's rewriting ceiling limited by the haiku model tier? If haiku-class abstractions are too shallow for long-historical analogy, the insertion point is under-budgeted and needs a sonnet-tier fallback (per `feedback_sonnet_over_haiku`).
+3. Is step-back's rewriting ceiling limited by the size/quality of the local model chosen? If small-local-model abstractions are too shallow for long-historical analogy, the insertion point is under-budgeted and needs a larger-local-model fallback.
 
 ---
 
@@ -186,9 +186,9 @@ Total haiku budget: 3 calls per query, all small. If the user wants to cap at 2,
 | Tilt | ingest-heavy | ingest-heavy | query-heavy |
 | Backbone encoder | BGE-base | BGE-base | BGE-base |
 | Backbone retriever | path-memory graph + session decay | RRF across {BM25, dense, graph} | path-memory graph + time-aligned subgraph + PPR |
-| Haiku insertion 1 | atomic-fact extraction (ingest) | atomic-fact + schema coercion (ingest, 1 call) | step-back + fanout query rewrites (query) |
-| Haiku insertion 2 | supersession by valid-time (ingest) | (covered by Insertion 1) | recognition-memory triple filter (query) |
-| Biggest ceiling | none after insertions; residual: cross-session analogy | cross-encoder may still be needed if precision gap persists | analogy ceiling if step-back is haiku-limited |
+| Local-LLM insertion 1 | atomic-fact extraction (ingest) | atomic-fact + schema coercion (ingest, 1 call) | step-back + fanout query rewrites (query) |
+| Local-LLM insertion 2 | supersession by valid-time (ingest) | (covered by Insertion 1) | recognition-memory triple filter (query) |
+| Biggest ceiling | none after insertions; residual: cross-session analogy | cross-encoder may still be needed if precision gap persists | analogy ceiling if step-back is local-model-limited |
 | Closest live prior-art | temporal-validity spec 2026-04-12 + inbox redesign | phase 7.6 candidates + commit 3309841 | phase 7.5 LOCOMO/MSC + phase 2.10 SYNAPSE refutation |
 
 ---
@@ -200,7 +200,7 @@ All success criteria from `docs/superpowers/specs/2026-04-20-memory-research-atl
 - Atlas coverage: 32 full entries + 10 survey stubs across 7 family sections.
 - Miss-mode coverage: all 12 miss-modes have ≥3 entries (see atlas appendix).
 - Combinations viability: 7 compounds, 4 nullifications, 4 conflicts.
-- Recipes actionability: each recipe has named backbone, ≤2 haiku insertions (KB squeezes both into 1 call), prior-art paragraph with concrete pointers, 3 open questions, ≥1 stated ceiling.
+- Recipes actionability: each recipe has named backbone, ≤2 local-LLM insertions (KB squeezes both into 1 call), prior-art paragraph with concrete pointers, 3 open questions, ≥1 stated ceiling.
 - Prior-art coverage: every atlas entry has an explicit Prior-art note.
 - Honest ceilings: every recipe names at least one residual miss-mode.
 
