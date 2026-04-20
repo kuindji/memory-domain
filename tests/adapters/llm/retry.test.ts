@@ -36,25 +36,31 @@ describe("runWithRetry", () => {
 
     it("throws immediately when error is not retryable", async () => {
         let calls = 0;
-        await expect(
-            runWithRetry(
+        let caught: unknown;
+        try {
+            await runWithRetry(
                 () => {
                     calls++;
-                    return Promise.reject(new Error("fatal"));
+                    throw new Error("fatal");
                 },
                 { isRetryable: () => false, label: "[test]", baseDelayMs: 1 },
-            ),
-        ).rejects.toThrow("fatal");
+            );
+        } catch (err) {
+            caught = err;
+        }
+        expect(caught).toBeInstanceOf(Error);
+        expect((caught as Error).message).toBe("fatal");
         expect(calls).toBe(1);
     });
 
     it("throws the last error after maxRetries retryable failures", async () => {
         let calls = 0;
-        await expect(
-            runWithRetry(
+        let caught: unknown;
+        try {
+            await runWithRetry(
                 () => {
                     calls++;
-                    return Promise.reject(new Error(`attempt-${calls}`));
+                    throw new Error(`attempt-${calls}`);
                 },
                 {
                     isRetryable: () => true,
@@ -62,8 +68,12 @@ describe("runWithRetry", () => {
                     baseDelayMs: 1,
                     maxRetries: 2,
                 },
-            ),
-        ).rejects.toThrow("attempt-3");
+            );
+        } catch (err) {
+            caught = err;
+        }
+        expect(caught).toBeInstanceOf(Error);
+        expect((caught as Error).message).toBe("attempt-3");
         expect(calls).toBe(3);
     });
 });
