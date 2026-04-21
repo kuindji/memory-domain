@@ -105,6 +105,8 @@ export interface MemoryFilter {
     since?: number;
     /** Filter to memories whose event_time is <= this timestamp (ms). Lets callers freeze the clock for historical queries. */
     beforeTime?: number;
+    /** Filter to memories whose event_time is >= this timestamp (ms). Symmetric to beforeTime. */
+    afterTime?: number;
     limit?: number;
 }
 

@@ -165,6 +165,7 @@ class SearchEngine {
     private buildFilterClauses(
         filters: Record<string, unknown> | undefined,
         beforeTime: number | undefined,
+        afterTime: number | undefined,
     ): {
         clauses: string[];
         vars: Record<string, unknown>;
@@ -175,6 +176,11 @@ class SearchEngine {
         if (beforeTime !== undefined) {
             clauses.push("event_time <= $beforeTime");
             vars.beforeTime = beforeTime;
+        }
+
+        if (afterTime !== undefined) {
+            clauses.push("event_time >= $afterTime");
+            vars.afterTime = afterTime;
         }
 
         if (!filters) return { clauses, vars };
@@ -215,6 +221,7 @@ class SearchEngine {
         const { clauses: filterClauses, vars: filterVars } = this.buildFilterClauses(
             query.filters,
             query.beforeTime,
+            query.afterTime,
         );
         const filterSql = filterClauses.length > 0 ? ` AND ${filterClauses.join(" AND ")}` : "";
 
@@ -262,6 +269,7 @@ class SearchEngine {
         const { clauses: filterClauses, vars: filterVars } = this.buildFilterClauses(
             query.filters,
             query.beforeTime,
+            query.afterTime,
         );
         const filterSql = filterClauses.length > 0 ? ` AND ${filterClauses.join(" AND ")}` : "";
 
