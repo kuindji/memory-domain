@@ -156,6 +156,31 @@ export interface SearchResult {
     };
 }
 
+// --- Tabular access types (sibling to semantic search) ---
+
+/** Opaque structured filter. Domains declare their own slot vocabulary; the
+ *  framework never interprets this — it just hands it to `search.execute`. */
+export interface FilterSpec {
+    [slot: string]: unknown;
+}
+
+export type TableCell = string | number | boolean | null;
+
+export interface TableRow {
+    [column: string]: TableCell;
+}
+
+export interface TableResult {
+    /** Stable-ordered rows. Domains MUST order deterministically. */
+    rows: TableRow[];
+    /** Column names in display order. Length > 0 even if rows is empty. */
+    columns: string[];
+    /** Domain-declared source identifier (e.g. 'wdi', 'commodities'). */
+    source: string;
+    /** Optional per-row metadata (unit, source_ref, etc.) not shown in table. */
+    rowMeta?: Record<string, unknown>[];
+}
+
 export interface ScoredMemory {
     id: string;
     content: string;
@@ -299,6 +324,9 @@ export interface DomainConfig {
     search?: {
         rank?(query: SearchQuery, candidates: ScoredMemory[]): ScoredMemory[];
         expand?(query: SearchQuery, context: DomainContext): Promise<SearchQuery>;
+        /** Deterministic tabular access. Returns rows for a structured filter.
+         *  No LLM in the hot path; domains order results stably. */
+        execute?(filter: FilterSpec, context: DomainContext): Promise<TableResult>;
     };
     buildContext?(
         text: string,
