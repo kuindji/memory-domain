@@ -109,8 +109,6 @@ export { OpenAiHttpAdapter } from "./adapters/llm/openai-http.js";
 export type { OpenAiHttpAdapterConfig } from "./adapters/llm/openai-http.js";
 export { OnnxEmbeddingAdapter } from "./adapters/onnx-embedding.js";
 export type { OnnxEmbeddingConfig } from "./adapters/onnx-embedding.js";
-export { BgeM3EmbeddingAdapter } from "./adapters/bge-m3-embedding.js";
-export type { BgeM3Config } from "./adapters/bge-m3-embedding.js";
 export { CachedEmbeddingAdapter } from "./adapters/cached-embedding.js";
 export type { CachedEmbeddingOptions } from "./adapters/cached-embedding.js";
 export { PassthroughAdapter } from "./adapters/connection/passthrough.js";
