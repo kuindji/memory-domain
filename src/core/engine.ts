@@ -1370,6 +1370,13 @@ class MemoryEngine {
         return await domain.search.execute(filter, ctx);
     }
 
+    /** Public accessor for a domain's runtime context. Required by ingestion tooling that needs to write graph rows directly. */
+    getDomainContext(domainId: string): DomainContext {
+        const domain = this.domainRegistry.get(domainId);
+        if (!domain) throw new Error(`getDomainContext: unknown domain "${domainId}"`);
+        return this.createDomainContext(domainId);
+    }
+
     async ask(question: string, options?: AskOptions): Promise<AskResult> {
         const budgetTokens = options?.budgetTokens ?? 8000;
 

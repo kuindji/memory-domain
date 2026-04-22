@@ -100,3 +100,38 @@ describe("MemoryEngine.searchTable", () => {
         await engine.close();
     });
 });
+
+describe("MemoryEngine.getDomainContext", () => {
+    test("returns a DomainContext for a registered domain", async () => {
+        const engine = new MemoryEngine();
+        await engine.initialize({
+            connection: "mem://",
+            namespace: "test",
+            database: `test_getctx_${Date.now()}`,
+            llm: new MockLLMAdapter(),
+        });
+        await engine.registerDomain(
+            makeTabularDomain([{ country: "USA", year: 2010, value: 100 }]),
+        );
+
+        const ctx = engine.getDomainContext("tabular");
+        expect(ctx).toBeDefined();
+        expect(ctx.domain).toBe("tabular");
+
+        await engine.close();
+    });
+
+    test("throws on unknown domain", async () => {
+        const engine = new MemoryEngine();
+        await engine.initialize({
+            connection: "mem://",
+            namespace: "test",
+            database: `test_getctx_unknown_${Date.now()}`,
+            llm: new MockLLMAdapter(),
+        });
+        expect(() => engine.getDomainContext("does-not-exist")).toThrow(
+            /unknown domain/i,
+        );
+        await engine.close();
+    });
+});
