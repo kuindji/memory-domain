@@ -50,6 +50,8 @@ import type {
     OwnedMemory,
     DomainPlugin,
     DomainRegistration,
+    FilterSpec,
+    TableResult,
 } from "./types.js";
 import { isDomainRegistration } from "./types.js";
 
@@ -1349,6 +1351,23 @@ class MemoryEngine {
         const totalTokens = countTokens(context);
 
         return { context, memories: fitted, totalTokens };
+    }
+
+    async searchTable(
+        domainId: string,
+        filter: FilterSpec,
+    ): Promise<TableResult> {
+        const domain = this.domainRegistry.get(domainId);
+        if (!domain) {
+            throw new Error(`searchTable: unknown domain "${domainId}"`);
+        }
+        if (!domain.search?.execute) {
+            throw new Error(
+                `searchTable: domain "${domainId}" does not support tabular access (no search.execute defined)`,
+            );
+        }
+        const ctx = this.createDomainContext(domainId);
+        return await domain.search.execute(filter, ctx);
     }
 
     async ask(question: string, options?: AskOptions): Promise<AskResult> {
