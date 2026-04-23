@@ -1,6 +1,13 @@
-import type { LLMAdapter, ModelLevel, ScoredMemory } from "../../core/types.js";
+import type {
+    LLMAdapter,
+    ModelLevel,
+    ScoredMemory,
+    AgentRunSpec,
+    AgentRunResult,
+} from "../../core/types.js";
 import { parseJsonResponse } from "./json-response.js";
 import { runWithRetry } from "./retry.js";
+import { runJsonAgentLoop, type ChatMessage } from "./agent-loop.js";
 
 export interface OpenAiHttpAdapterConfig {
     baseUrl: string;
@@ -177,7 +184,62 @@ class OpenAiHttpAdapter implements LLMAdapter {
         const fullPrompt = `${baseInstructions}\n\nQuery: "${query}"\n${tagBlock}\n\nRetrieved memories:\n${memoryList}`;
         return this.run(fullPrompt);
     }
+
+    async runAgent(spec: AgentRunSpec): Promise<AgentRunResult> {
+        return runJsonAgentLoop(spec, (msgs) => this.chatOnce(msgs));
+    }
+
+    private async chatOnce(messages: ChatMessage[]): Promise<string> {
+        return runWithRetry(
+            async () => {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+                const headers: Record<string, string> = {
+                    "Content-Type": "application/json",
+                    ...this.extraHeaders,
+                };
+                if (this.apiKey !== undefined && this.apiKey !== "") {
+                    headers["Authorization"] = `Bearer ${this.apiKey}`;
+                }
+                try {
+                    const res = await fetch(`${this.baseUrl}/chat/completions`, {
+                        method: "POST",
+                        headers,
+                        body: JSON.stringify({
+                            model: this.model,
+                            messages,
+                            max_tokens: this.maxTokens,
+                            temperature: this.temperature,
+                            stream: false,
+                            response_format: { type: "json_object" },
+                        }),
+                        signal: controller.signal,
+                    });
+                    if (!res.ok) {
+                        const preview = (await res.text().catch(() => "")).slice(0, 500);
+                        throw new OpenAiHttpStatusError(res.status, preview);
+                    }
+                    const data = (await res.json()) as ChatCompletionResponse;
+                    const content = data.choices?.[0]?.message?.content;
+                    if (typeof content !== "string" || content.length === 0) {
+                        throw new Error(
+                            `OpenAI HTTP response missing choices[0].message.content`,
+                        );
+                    }
+                    return content.trim();
+                } finally {
+                    clearTimeout(timeoutId);
+                }
+            },
+            {
+                isRetryable: (err) => this.isRetryable(err),
+                label: "[OpenAI HTTP agent]",
+                baseDelayMs: this.retryBaseDelayMs,
+            },
+        );
+    }
 }
+
 
 class OpenAiHttpStatusError extends Error {
     constructor(

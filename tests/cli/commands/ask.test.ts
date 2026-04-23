@@ -4,6 +4,9 @@ import { MockLLMAdapter } from "../../helpers.js";
 import { askCommand } from "../../../src/cli/commands/ask.js";
 import type { ParsedCommand } from "../../../src/cli/types.js";
 import type { AskResult } from "../../../src/core/types.js";
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 function makeParsed(args: string[], flags: Record<string, string | boolean> = {}): ParsedCommand {
     return {
@@ -16,32 +19,34 @@ function makeParsed(args: string[], flags: Record<string, string | boolean> = {}
 describe("askCommand", () => {
     let engine: MemoryEngine;
     let llm: MockLLMAdapter;
+    let tmpDir: string;
 
     beforeEach(async () => {
+        tmpDir = mkdtempSync(join(tmpdir(), "ask-cmd-"));
+        mkdirSync(join(tmpDir, "skills"), { recursive: true });
+        writeFileSync(join(tmpDir, "skills", "ask.md"), "Test domain skill.");
+
         llm = new MockLLMAdapter();
-        // generate() returns JSON with { answer: "..." } so ask() skips search rounds
-        llm.generateResult = '{"answer":"Test answer"}';
-        llm.synthesizeResult = "Final answer";
+        llm.agentAnswer = "Final answer";
 
         engine = new MemoryEngine();
         await engine.initialize({
             connection: "mem://",
             namespace: "test",
-            database: `test_ask_${Date.now()}`,
+            database: `test_ask_cmd_${Date.now()}`,
             llm,
         });
         await engine.registerDomain({
             id: "test",
             name: "Test",
+            baseDir: tmpDir,
             async processInboxBatch() {},
         });
-
-        await engine.ingest("The quick brown fox jumps over the lazy dog", { domains: ["test"] });
-        await engine.ingest("Meeting notes for project kickoff on monday", { domains: ["test"] });
     });
 
     afterEach(async () => {
         await engine.close();
+        rmSync(tmpDir, { recursive: true, force: true });
     });
 
     it("returns error when no question is provided", async () => {
@@ -50,49 +55,43 @@ describe("askCommand", () => {
         expect((result.output as { error: string }).error).toBe("Question is required.");
     });
 
-    it("returns result for a valid question", async () => {
-        const result = await askCommand(engine, makeParsed(["What is the fox doing?"]));
+    it("returns an answer when passed a single domain", async () => {
+        const result = await askCommand(
+            engine,
+            makeParsed(["What is the fox doing?"], { domains: "test" }),
+        );
         expect(result.exitCode).toBe(0);
         const output = result.output as AskResult;
-        expect(typeof output.answer).toBe("string");
-        expect(Array.isArray(output.memories)).toBe(true);
+        expect(output.answer).toBe("Final answer");
         expect(typeof output.rounds).toBe("number");
     });
 
-    it("result has answer, memories, rounds fields", async () => {
-        const result = await askCommand(engine, makeParsed(["Tell me about meetings"]));
+    it("result has answer and rounds fields", async () => {
+        const result = await askCommand(
+            engine,
+            makeParsed(["Tell me about meetings"], { domains: "test" }),
+        );
         expect(result.exitCode).toBe(0);
         const output = result.output as AskResult;
         expect("answer" in output).toBe(true);
-        expect("memories" in output).toBe(true);
         expect("rounds" in output).toBe(true);
     });
 
     it("passes domains flag to engine", async () => {
         const result = await askCommand(
             engine,
-            makeParsed(["What happened?"], { domains: "log,notes" }),
+            makeParsed(["What happened?"], { domains: "test" }),
         );
         expect(result.exitCode).toBe(0);
-        const output = result.output as AskResult;
-        expect(typeof output.answer).toBe("string");
-    });
-
-    it("passes tags flag to engine", async () => {
-        const result = await askCommand(engine, makeParsed(["What happened?"], { tags: "work" }));
-        expect(result.exitCode).toBe(0);
-        expect(result.output).toBeDefined();
+        expect(llm.lastAgentSpec?.question).toBe("What happened?");
     });
 
     it("passes budget flag to engine", async () => {
-        const result = await askCommand(engine, makeParsed(["What happened?"], { budget: "4000" }));
+        const result = await askCommand(
+            engine,
+            makeParsed(["What happened?"], { domains: "test", budget: "4000" }),
+        );
         expect(result.exitCode).toBe(0);
-        expect(result.output).toBeDefined();
-    });
-
-    it("passes limit flag to engine", async () => {
-        const result = await askCommand(engine, makeParsed(["What happened?"], { limit: "5" }));
-        expect(result.exitCode).toBe(0);
-        expect(result.output).toBeDefined();
+        expect(llm.lastAgentSpec?.budgetTokens).toBe(4000);
     });
 });

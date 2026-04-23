@@ -79,8 +79,9 @@ async function runAsk(engine: MemoryEngine, domains: string[]): Promise<void> {
         spin.stop("Done");
 
         p.log.message(result.answer);
+        const turns = result.turns?.length ?? 0;
         p.log.info(
-            `${result.memories.length} memories | ${result.rounds} round${result.rounds !== 1 ? "s" : ""}`,
+            `${turns} turn${turns !== 1 ? "s" : ""} | ${result.rounds} round${result.rounds !== 1 ? "s" : ""}`,
         );
     } catch (err) {
         spin.stop("Failed");

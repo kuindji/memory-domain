@@ -4,9 +4,17 @@
  */
 
 import { spawn } from "node:child_process";
-import type { LLMAdapter, ScoredMemory, ModelLevel } from "../../core/types.js";
+import type {
+    LLMAdapter,
+    ScoredMemory,
+    ModelLevel,
+    AgentRunSpec,
+    AgentRunResult,
+    AgentRunTurn,
+} from "../../core/types.js";
 import { parseJsonResponse } from "./json-response.js";
 import { runWithRetry } from "./retry.js";
+import { runJsonAgentLoop } from "./agent-loop.js";
 
 interface ClaudeCliConfig {
     command?: string;
@@ -14,6 +22,14 @@ interface ClaudeCliConfig {
     modelLevels?: Partial<Record<ModelLevel, string>>;
     maxTokens?: number;
     timeout?: number;
+    /**
+     * Working directory the inner Claude subprocess runs in. Must be a
+     * workspace where the `memory-domain` binary is on PATH — typically the
+     * root of the package (or monorepo) that file:-links @kuindji/memory-domain.
+     */
+    agentCwd?: string;
+    /** Timeout for `runAgent` calls; defaults to 600s since agent loops run many tool calls. */
+    agentTimeout?: number;
 }
 
 const DEFAULT_COMMAND = "claude";
@@ -39,6 +55,8 @@ class ClaudeCliAdapter implements LLMAdapter {
     private modelLevels: Partial<Record<ModelLevel, string>> | undefined;
     private maxTokens: number | undefined;
     private timeout: number;
+    private agentCwd: string | undefined;
+    private agentTimeout: number;
     private originalConfig: ClaudeCliConfig | undefined;
 
     constructor(config?: ClaudeCliConfig) {
@@ -48,6 +66,8 @@ class ClaudeCliAdapter implements LLMAdapter {
         this.modelLevels = config?.modelLevels;
         this.maxTokens = config?.maxTokens;
         this.timeout = config?.timeout ?? DEFAULT_TIMEOUT;
+        this.agentCwd = config?.agentCwd;
+        this.agentTimeout = config?.agentTimeout ?? 600_000;
     }
 
     withLevel(level: ModelLevel): LLMAdapter {
@@ -241,6 +261,81 @@ Retrieved memories:
 ${memoryList}`;
 
         return this.run(prompt);
+    }
+
+    async runAgent(spec: AgentRunSpec): Promise<AgentRunResult> {
+        const level = spec.effort;
+        const model = (level && this.modelLevels?.[level]) ?? this.model;
+        const timeout = this.agentTimeout;
+        return runJsonAgentLoop(spec, async (messages) => {
+            // First message is the system prompt; everything else forms a
+            // textual conversation log that becomes the single user prompt
+            // (--print mode is one-shot). `--bare` disables CLAUDE.md
+            // auto-discovery and memory so the inner Claude doesn't leak
+            // project context into its JSON reply. `--tools ""` disables
+            // Bash/etc — Claude is pure reasoner; tool use is our dispatch.
+            const system = messages.find((m) => m.role === "system")?.content ?? "";
+            const conversation = messages
+                .filter((m) => m.role !== "system")
+                .map((m) => `[${m.role.toUpperCase()}]\n${m.content}`)
+                .join("\n\n");
+            return this.runClaudeOnce(system, conversation, model, timeout);
+        });
+    }
+
+    private async runClaudeOnce(
+        systemPrompt: string,
+        userPrompt: string,
+        model: string | undefined,
+        timeout: number,
+    ): Promise<string> {
+        // --tools "" disables Bash/etc — Claude is a pure reasoner here, tool
+        // dispatch happens in-process via the engine's toolExec. --system-prompt
+        // replaces the default so CLAUDE.md / project context doesn't leak into
+        // the JSON reply.
+        const args = ["--print", "--tools", ""];
+        if (model) args.push("--model", model);
+        if (this.maxTokens) args.push("--max-tokens", String(this.maxTokens));
+        if (systemPrompt) args.push("--system-prompt", systemPrompt);
+
+        const proc = spawn(this.command, args, {
+            stdio: ["pipe", "pipe", "pipe"],
+            cwd: this.agentCwd,
+        });
+        proc.stdin.end(userPrompt);
+
+        let timedOut = false;
+        const timeoutId = setTimeout(() => {
+            timedOut = true;
+            proc.kill();
+        }, timeout);
+
+        const collectStream = (stream: NodeJS.ReadableStream): Promise<string> =>
+            new Promise((resolve) => {
+                const chunks: Buffer[] = [];
+                stream.on("data", (chunk: Buffer) => chunks.push(chunk));
+                stream.on("end", () => resolve(Buffer.concat(chunks).toString()));
+            });
+        const exitCodePromise = new Promise<number>((resolve) => {
+            proc.on("close", (code) => resolve(code ?? 1));
+        });
+
+        const [stdout, stderr, exitCode] = await Promise.all([
+            collectStream(proc.stdout),
+            collectStream(proc.stderr),
+            exitCodePromise,
+        ]);
+        clearTimeout(timeoutId);
+
+        if (timedOut) {
+            throw new Error(
+                `Claude CLI timed out after ${timeout}ms: ${previewOutput(stderr)}`,
+            );
+        }
+        if (exitCode !== 0) {
+            throw new Error(`Claude CLI exited ${exitCode}: ${previewOutput(stderr)}`);
+        }
+        return stdout.trim();
     }
 }
 

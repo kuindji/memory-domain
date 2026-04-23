@@ -1,6 +1,13 @@
 import { Surreal } from "surrealdb";
 import { createNodeEngines } from "@surrealdb/node";
-import type { LLMAdapter, EmbeddingAdapter, ScoredMemory } from "../src/core/types.js";
+import type {
+    LLMAdapter,
+    EmbeddingAdapter,
+    ScoredMemory,
+    AgentRunSpec,
+    AgentRunResult,
+    AgentRunTurn,
+} from "../src/core/types.js";
 
 let dbCounter = 0;
 
@@ -17,6 +24,12 @@ export class MockLLMAdapter implements LLMAdapter {
     consolidateResult = "";
     generateResult = "";
     synthesizeResult = "";
+    /** If set, runAgent returns this answer immediately without invoking toolExec. */
+    agentAnswer = "mock agent answer";
+    /** If set, runAgent issues these CLI calls in order before emitting agentAnswer. */
+    agentToolCalls: string[][] = [];
+    /** Captures every AgentRunSpec passed to runAgent for assertions. */
+    lastAgentSpec: AgentRunSpec | null = null;
 
     extract(): Promise<string[]> {
         return Promise.resolve(this.extractResult);
@@ -35,6 +48,15 @@ export class MockLLMAdapter implements LLMAdapter {
     }
     synthesize(_query: string, _memories: ScoredMemory[], _tagContext?: string[]): Promise<string> {
         return Promise.resolve(this.synthesizeResult);
+    }
+    async runAgent(spec: AgentRunSpec): Promise<AgentRunResult> {
+        this.lastAgentSpec = spec;
+        const turns: AgentRunTurn[] = [];
+        for (const args of this.agentToolCalls) {
+            const result = await spec.toolExec({ command: "memory-domain", args });
+            turns.push({ call: { command: "memory-domain", args }, result });
+        }
+        return { answer: this.agentAnswer, turns };
     }
 }
 

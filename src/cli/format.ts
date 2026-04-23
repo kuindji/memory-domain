@@ -94,7 +94,9 @@ function formatSearch(data: SearchResult): string {
 }
 
 function formatAsk(data: AskResult): string {
-    return `${data.answer}\n\n--- ${data.memories.length} memories, ${data.rounds} rounds ---`;
+    const turns = data.turns?.length ?? 0;
+    const cached = data.cached ? ", cached" : "";
+    return `${data.answer}\n\n--- ${turns} turns, ${data.rounds} rounds${cached} ---`;
 }
 
 function formatBuildContext(data: ContextResult): string {

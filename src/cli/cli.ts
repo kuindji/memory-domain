@@ -15,6 +15,17 @@ async function main(): Promise<void> {
         process.exit(0);
     }
 
+    // Refuse nested ask() from inside an ongoing ask() agent loop.
+    if (process.env["MEMORY_DOMAIN_INNER_ASK"] === "1" && parsed.command === "ask") {
+        console.error(
+            formatError(
+                "RECURSION_BLOCKED",
+                "ask is not available inside an ongoing ask() loop; answer from the data you already have.",
+            ),
+        );
+        process.exit(2);
+    }
+
     // Load engine from config
     let engine;
     try {
@@ -41,6 +52,7 @@ async function main(): Promise<void> {
         exitCode = result.exitCode;
     } finally {
         await engine.close();
+        await new Promise<void>((resolve) => process.stdout.write("", () => resolve()));
         process.exit(exitCode);
     }
 }

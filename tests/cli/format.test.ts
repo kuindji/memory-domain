@@ -292,14 +292,16 @@ describe("formatOutput - pretty mode: search", () => {
 });
 
 describe("formatOutput - pretty mode: ask", () => {
-    it("formats answer with memory and rounds summary", () => {
+    it("formats answer with turn and rounds summary", () => {
         const data: AskResult = {
             answer: "The answer to your question.",
-            memories: [makeScoredMemory(), makeScoredMemory({ id: "mem2" })],
-            rounds: 2,
+            rounds: 1,
+            turns: [
+                { call: { command: "memory-domain", args: ["domains"] }, result: { stdout: "", stderr: "", exitCode: 0 } },
+            ],
         };
         const result = formatOutput("ask", data, true);
-        expect(result).toBe("The answer to your question.\n\n--- 2 memories, 2 rounds ---");
+        expect(result).toBe("The answer to your question.\n\n--- 1 turns, 1 rounds ---");
     });
 });
 

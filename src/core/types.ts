@@ -428,13 +428,51 @@ export interface AskOptions {
     budgetTokens?: number;
     limit?: number;
     maxRounds?: number;
+    maxTurns?: number;
+    effort?: ModelLevel;
     context?: RequestContext;
+    cache?: boolean;
 }
 
 export interface AskResult {
     answer: string;
-    memories: ScoredMemory[];
     rounds: number;
+    turns?: AgentRunTurn[];
+    cached?: boolean;
+}
+
+// --- Agent run types ---
+
+export interface AgentToolCall {
+    command: string;
+    args: string[];
+}
+
+export interface AgentToolResult {
+    stdout: string;
+    stderr: string;
+    exitCode: number;
+}
+
+export type AgentToolExec = (call: AgentToolCall) => Promise<AgentToolResult>;
+
+export interface AgentRunSpec {
+    skill: string;
+    question: string;
+    toolExec: AgentToolExec;
+    effort?: ModelLevel;
+    budgetTokens?: number;
+    maxTurns?: number;
+}
+
+export interface AgentRunTurn {
+    call: AgentToolCall;
+    result: AgentToolResult;
+}
+
+export interface AgentRunResult {
+    answer: string;
+    turns: AgentRunTurn[];
 }
 
 // --- Adapter types ---
@@ -452,6 +490,7 @@ export interface LLMAdapter {
         instructions?: string,
     ): Promise<string>;
     generate?(prompt: string): Promise<string>;
+    runAgent?(spec: AgentRunSpec): Promise<AgentRunResult>;
     withLevel?(level: ModelLevel): LLMAdapter;
 }
 

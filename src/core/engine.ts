@@ -14,6 +14,9 @@ import { EventEmitter } from "./events.js";
 import { createDebugTools, wrapLLMAdapter } from "./debug.js";
 import { countTokens, applyTokenBudget } from "./scoring.js";
 import { loadPrompt as loadPromptFromFile } from "./prompt-loader.js";
+import { parseArgs } from "../cli/parse-args.js";
+import { dispatchCommand } from "../serve/dispatch.js";
+import { createHash } from "node:crypto";
 import type {
     EngineConfig,
     DomainConfig,
@@ -56,6 +59,24 @@ import type {
     TemplateResult,
 } from "./types.js";
 import { isDomainRegistration } from "./types.js";
+
+const ASK_ALLOWED_COMMANDS = [
+    "search",
+    "search-table",
+    "run-template",
+    "build-context",
+    "memory",
+    "domain",
+    "domains",
+    "skill",
+    "core-memory",
+] as const;
+
+function askCacheKey(domainId: string, question: string, skill: string): string {
+    const skillHash = createHash("sha256").update(skill).digest("hex").slice(0, 16);
+    const questionHash = createHash("sha256").update(question).digest("hex").slice(0, 16);
+    return `ask_cache_${domainId}_${skillHash}_${questionHash}`;
+}
 
 class MemoryEngine {
     private db: Surreal | null = null;
@@ -1414,39 +1435,120 @@ class MemoryEngine {
     }
 
     async ask(question: string, options?: AskOptions): Promise<AskResult> {
-        const budgetTokens = options?.budgetTokens ?? 8000;
+        if (!options?.domains?.length || options.domains.length !== 1) {
+            throw new Error(
+                "ask() requires exactly one target domain via options.domains",
+            );
+        }
+        const domainId = options.domains[0];
 
-        // Use buildContext to get domain-curated context with structured sections
-        const contextResult = await this.buildContext(question, {
-            domains: options?.domains,
-            budgetTokens,
-            context: options?.context,
-        });
+        const adapter = options?.effort && this.llm.withLevel
+            ? this.llm.withLevel(options.effort)
+            : this.llm;
 
-        // Final synthesis using the curated memories
-        if (!this.llm.synthesize) {
-            throw new Error("LLM adapter must implement synthesize() to use ask()");
+        if (!adapter.runAgent) {
+            throw new Error(
+                "LLM adapter must implement runAgent() to use ask(). See ClaudeCliAdapter / OpenAiHttpAdapter.",
+            );
         }
 
-        // Load domain-specific ask instructions when targeting a single domain
-        let instructions: string | undefined;
-        if (options?.domains?.length === 1) {
-            try {
-                const ctx = this.createDomainContext(options.domains[0], options?.context);
-                instructions = await ctx.loadPrompt("ask");
-            } catch {
-                // Domain has no ask.md skill — use adapter default
+        const ctx = this.createDomainContext(domainId, options?.context);
+        const skill = await ctx.loadPrompt("ask");
+
+        const useCache = options?.cache !== false;
+        const cacheKey = useCache ? askCacheKey(domainId, question, skill) : null;
+        if (cacheKey) {
+            const cachedRaw = await ctx.getMeta(cacheKey);
+            if (cachedRaw) {
+                try {
+                    const cached = JSON.parse(cachedRaw) as AskResult;
+                    return { ...cached, cached: true };
+                } catch {
+                    // Corrupt cache entry — ignore and recompute.
+                }
             }
         }
 
-        const answer = await this.llm.synthesize(
-            question,
-            contextResult.memories,
-            undefined,
-            instructions,
-        );
+        const toolExec = this.buildAskToolExec(domainId);
+        const prevInnerEnv = process.env["MEMORY_DOMAIN_INNER_ASK"];
+        process.env["MEMORY_DOMAIN_INNER_ASK"] = "1";
+        let run;
+        try {
+            run = await adapter.runAgent({
+                skill,
+                question,
+                toolExec,
+                effort: options?.effort,
+                budgetTokens: options?.budgetTokens,
+                maxTurns: options?.maxTurns,
+            });
+        } finally {
+            if (prevInnerEnv === undefined) {
+                delete process.env["MEMORY_DOMAIN_INNER_ASK"];
+            } else {
+                process.env["MEMORY_DOMAIN_INNER_ASK"] = prevInnerEnv;
+            }
+        }
 
-        return { answer, memories: contextResult.memories, rounds: 1 };
+        const result: AskResult = {
+            answer: run.answer,
+            rounds: 1,
+            turns: run.turns,
+        };
+
+        if (cacheKey) {
+            try {
+                await ctx.setMeta(cacheKey, JSON.stringify(result));
+            } catch {
+                // Persistence failure is non-fatal.
+            }
+        }
+
+        return result;
+    }
+
+    private buildAskToolExec(
+        _domainId: string,
+    ): (call: { command: string; args: string[] }) => Promise<{
+        stdout: string;
+        stderr: string;
+        exitCode: number;
+    }> {
+        return async (call) => {
+            if (call.command !== "memory-domain") {
+                return {
+                    stdout: "",
+                    stderr: `Only the 'memory-domain' CLI is available inside ask(); got '${call.command}'.`,
+                    exitCode: 2,
+                };
+            }
+            if (call.args[0] === "ask") {
+                return {
+                    stdout: "",
+                    stderr:
+                        "ask is not available inside ask(); answer from the data you already have.",
+                    exitCode: 2,
+                };
+            }
+            let parsed;
+            try {
+                parsed = parseArgs(call.args);
+            } catch (err) {
+                return {
+                    stdout: "",
+                    stderr: err instanceof Error ? err.message : String(err),
+                    exitCode: 1,
+                };
+            }
+            const result = await dispatchCommand(this, parsed, {
+                pretty: true,
+                allow: ASK_ALLOWED_COMMANDS,
+            });
+            if (result.ok) {
+                return { stdout: result.rendered, stderr: "", exitCode: 0 };
+            }
+            return { stdout: "", stderr: result.rendered, exitCode: result.exitCode };
+        };
     }
 
     getGraph(): GraphStore {
