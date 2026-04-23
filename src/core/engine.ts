@@ -52,6 +52,8 @@ import type {
     DomainRegistration,
     FilterSpec,
     TableResult,
+    TemplateParams,
+    TemplateResult,
 } from "./types.js";
 import { isDomainRegistration } from "./types.js";
 
@@ -1305,9 +1307,18 @@ class MemoryEngine {
         if (options?.domains?.length === 1) {
             const domainId = options.domains[0];
             const domain = this.domainRegistry.get(domainId);
-            if (domain?.buildContext && typeof domain.buildContext === "function") {
+            const hook = domain?.buildContext;
+            let hookResult: ContextResult | undefined;
+            if (typeof hook === "function") {
                 const ctx = this.createDomainContext(domainId, options?.context);
-                let result = await domain.buildContext(text, budgetTokens, ctx);
+                hookResult = await hook(text, budgetTokens, ctx);
+            } else if (hook && typeof hook === "object" && hook.fromText) {
+                const ctx = this.createDomainContext(domainId, options?.context);
+                hookResult = await hook.fromText(text, budgetTokens, ctx);
+            }
+            if (hookResult) {
+                const ctx = this.createDomainContext(domainId, options?.context);
+                let result = hookResult;
                 const domainPlugins = this.pluginsByDomain.get(domainId);
                 if (domainPlugins) {
                     for (const plugin of domainPlugins) {
@@ -1351,6 +1362,32 @@ class MemoryEngine {
         const totalTokens = countTokens(context);
 
         return { context, memories: fitted, totalTokens };
+    }
+
+    async runTemplate(
+        domainId: string,
+        name: string,
+        params: TemplateParams,
+        options?: { context?: RequestContext },
+    ): Promise<TemplateResult> {
+        const domain = this.domainRegistry.get(domainId);
+        if (!domain) {
+            throw new Error(`runTemplate: unknown domain "${domainId}"`);
+        }
+        const hook = domain.buildContext;
+        if (!hook || typeof hook === "function" || !hook.templates) {
+            throw new Error(
+                `runTemplate: domain "${domainId}" has no templates registry`,
+            );
+        }
+        const fn = hook.templates[name];
+        if (!fn) {
+            throw new Error(
+                `runTemplate: domain "${domainId}" has no template named "${name}"`,
+            );
+        }
+        const ctx = this.createDomainContext(domainId, options?.context);
+        return fn(params, ctx);
     }
 
     async searchTable(
