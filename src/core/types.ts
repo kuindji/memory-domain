@@ -328,11 +328,13 @@ export interface DomainConfig {
          *  No LLM in the hot path; domains order results stably. */
         execute?(filter: FilterSpec, context: DomainContext): Promise<TableResult>;
     };
-    buildContext?(
-        text: string,
-        budgetTokens: number,
-        context: DomainContext,
-    ): Promise<ContextResult>;
+    buildContext?:
+        | ((
+              text: string,
+              budgetTokens: number,
+              context: DomainContext,
+          ) => Promise<ContextResult>)
+        | BuildContextApi;
     describe?(): string;
     schedules?: DomainSchedule[];
     tunableParams?: TunableParamDefinition[];
@@ -377,6 +379,41 @@ export interface ContextResult {
     context: string;
     memories: ScoredMemory[];
     totalTokens: number;
+}
+
+export interface TemplateResult {
+    /** Template name, for round-tripping and caching. */
+    template: string;
+    /** Stable-ordered rows. Templates MUST order deterministically. */
+    rows: TableRow[];
+    /** Column names in display order. */
+    columns: string[];
+    /** Domain source identifier, e.g. 'wdi'. Matches TableResult.source. */
+    source: string;
+    /** Optional LLM-rendered paragraph. Populated only when caller requests it. */
+    narrative?: string;
+    /** Optional per-row metadata (unit, source_ref, etc.). */
+    rowMeta?: Record<string, unknown>[];
+}
+
+export interface TemplateParams {
+    [key: string]: unknown;
+    /** Opt-in narrative rendering. Default false. */
+    narrative?: boolean;
+}
+
+export type TemplateFn = (
+    params: TemplateParams,
+    context: DomainContext,
+) => Promise<TemplateResult>;
+
+export interface BuildContextApi {
+    fromText?(
+        text: string,
+        budgetTokens: number,
+        context: DomainContext,
+    ): Promise<ContextResult>;
+    templates?: Record<string, TemplateFn>;
 }
 
 // --- Ask types ---

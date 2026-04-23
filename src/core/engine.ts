@@ -1305,7 +1305,7 @@ class MemoryEngine {
         if (options?.domains?.length === 1) {
             const domainId = options.domains[0];
             const domain = this.domainRegistry.get(domainId);
-            if (domain?.buildContext) {
+            if (domain?.buildContext && typeof domain.buildContext === "function") {
                 const ctx = this.createDomainContext(domainId, options?.context);
                 let result = await domain.buildContext(text, budgetTokens, ctx);
                 const domainPlugins = this.pluginsByDomain.get(domainId);
