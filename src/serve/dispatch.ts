@@ -5,6 +5,7 @@ import type { CommandHandler, CommandResult, ParsedCommand } from "../cli/types.
 import { initCommand } from "../cli/commands/init.js";
 import { ingestCommand } from "../cli/commands/ingest.js";
 import { searchCommand } from "../cli/commands/search.js";
+import { searchTableCommand } from "../cli/commands/search-table.js";
 import { askCommand } from "../cli/commands/ask.js";
 import { buildContextCommand } from "../cli/commands/build-context.js";
 import { domainsCommand, domainCommand } from "../cli/commands/domains.js";
@@ -19,6 +20,7 @@ const COMMANDS: Record<string, CommandHandler> = {
     init: initCommand,
     ingest: ingestCommand,
     search: searchCommand,
+    "search-table": searchTableCommand,
     ask: askCommand,
     "build-context": buildContextCommand,
     domains: domainsCommand,

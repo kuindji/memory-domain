@@ -5,6 +5,7 @@ Commands:
   init            Initialize database, schemas, and optionally bootstrap domains
   ingest          Store new memory from text or stdin
   search          Search memories by query
+  search-table    Run a domain tabular query (e.g. financial indicators)
   ask             Ask a question against stored memories
   build-context   Build a context block from relevant memories
   write           Create a memory with direct domain ownership
@@ -83,6 +84,23 @@ Options:
 Examples:
   memory-domain search "project deadlines" --mode vector --limit 5
   memory-domain search "shopping list" --domains personal --meta user-id=abc
+`.trim(),
+
+    "search-table": `
+Usage: memory-domain search-table <domain> [--filter <json>] [--filter-file <path>]
+
+Run a domain's tabular query (domain.search.execute). Returns {columns, rows, source, rowMeta?}.
+
+Arguments:
+  <domain>             Domain id (must support tabular access, e.g. "financial")
+
+Options:
+  --filter <json>      FilterSpec as a JSON object (default: {})
+  --filter-file <path> Read FilterSpec JSON from a file (overrides --filter)
+
+Examples:
+  memory-domain search-table financial --filter '{"countries":["USA"],"indicators":["NY.GDP.MKTP.KD.ZG"],"yearRange":{"from":2001,"to":2005}}'
+  memory-domain search-table financial --filter-file ./q2.json
 `.trim(),
 
     ask: `
