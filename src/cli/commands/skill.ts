@@ -3,40 +3,82 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { CommandHandler } from "../types.js";
 
-const skillCommand: CommandHandler = async (engine, _parsed) => {
-    const registry = engine.getDomainRegistry();
-    const domains = registry.list();
+interface SkillIndexEntry {
+    domain: string;
+    id: string;
+    name: string;
+    description: string;
+}
 
-    const sections: string[] = [];
-
-    // Prepend general CLI guide
+async function loadOverview(): Promise<string> {
     try {
         const cliDir = dirname(fileURLToPath(import.meta.url));
-        const cliGuide = await readFile(join(cliDir, "..", "skills", "cli-guide.md"), "utf-8");
-        sections.push(cliGuide);
+        return await readFile(join(cliDir, "..", "skills", "cli-guide.md"), "utf-8");
     } catch {
-        // CLI guide file missing — skip
+        return "";
+    }
+}
+
+const skillCommand: CommandHandler = async (engine, parsed) => {
+    const registry = engine.getDomainRegistry();
+    const target = parsed.args[0];
+
+    if (target) {
+        const matches: Array<{ domain: string; skillId: string; content: string | null }> = [];
+        for (const domain of registry.list()) {
+            const skill = registry.getSkill(domain.id, target);
+            if (!skill) continue;
+            const externals = registry.getExternalSkills(domain.id);
+            if (!externals.some((s) => s.id === target)) continue;
+            const content = await registry.getSkillContent(domain.id, target);
+            matches.push({ domain: domain.id, skillId: target, content });
+        }
+
+        if (matches.length === 0) {
+            return {
+                output: { error: `Skill "${target}" not found in any registered domain` },
+                exitCode: 1,
+            };
+        }
+
+        if (matches.length > 1) {
+            return {
+                output: {
+                    error: `Skill id "${target}" is ambiguous`,
+                    candidates: matches.map((m) => ({ domain: m.domain, id: m.skillId })),
+                },
+                exitCode: 1,
+            };
+        }
+
+        const [only] = matches;
+        const skill = registry.getSkill(only.domain, only.skillId)!;
+        return {
+            output: { ...skill, domain: only.domain, content: only.content ?? "" },
+            exitCode: 0,
+            formatCommand: "domain-skill",
+        };
     }
 
-    for (const domain of domains) {
-        const skills = registry.getExternalSkills(domain.id);
-        if (skills.length === 0) continue;
-
-        for (const skill of skills) {
-            const content = await registry.getSkillContent(domain.id, skill.id);
-            if (content) {
-                sections.push(content);
-            }
+    const overview = await loadOverview();
+    const index: SkillIndexEntry[] = [];
+    for (const domain of registry.list()) {
+        for (const skill of registry.getExternalSkills(domain.id)) {
+            index.push({
+                domain: domain.id,
+                id: skill.id,
+                name: skill.name,
+                description: skill.description,
+            });
         }
     }
 
-    const combined = sections.join("\n\n---\n\n");
-
     return {
-        output: { content: combined },
+        output: { overview, index },
         exitCode: 0,
-        formatCommand: "skill",
+        formatCommand: "skill-index",
     };
 };
 
 export { skillCommand };
+export type { SkillIndexEntry };

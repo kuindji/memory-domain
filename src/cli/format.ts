@@ -68,6 +68,34 @@ function formatDomainSkills(data: { domainId: string; skills: DomainSkill[] }): 
         .join("\n");
 }
 
+interface SkillIndexEntry {
+    domain: string;
+    id: string;
+    name: string;
+    description: string;
+}
+
+function formatSkillIndex(data: { overview: string; index: SkillIndexEntry[] }): string {
+    const { overview, index } = data;
+    if (index.length === 0) return overview;
+
+    const maxDomainLen = Math.max(...index.map((e) => e.domain.length));
+    const maxIdLen = Math.max(...index.map((e) => e.id.length));
+    const maxNameLen = Math.max(...index.map((e) => e.name.length));
+
+    const rows = index
+        .map((e) => {
+            const domain = padRight(e.domain, maxDomainLen);
+            const id = padRight(e.id, maxIdLen);
+            const name = padRight(e.name, maxNameLen);
+            return `${domain}   ${id}   ${name}   ${e.description}`;
+        })
+        .join("\n");
+
+    const head = overview ? `${overview}\n\n` : "";
+    return `${head}## Available skills\n\nFetch a skill by id: \`memory-domain skill <skill-id>\` (or \`memory-domain domain <domain-id> skill <skill-id>\` when disambiguation is needed).\n\n${rows}`;
+}
+
 function formatIngest(data: IngestResult): string {
     if (data.action === "stored") {
         return `Stored memory ${data.id ?? ""}`;
@@ -180,8 +208,12 @@ function formatOutput(command: string, data: unknown, pretty: boolean): string {
             return formatDomainSkills(data as { domainId: string; skills: DomainSkill[] });
 
         case "domain-skill":
-        case "skill":
             return (data as { content: string }).content;
+
+        case "skill-index":
+            return formatSkillIndex(
+                data as { overview: string; index: SkillIndexEntry[] },
+            );
 
         case "ingest":
             return formatIngest(data as IngestResult);

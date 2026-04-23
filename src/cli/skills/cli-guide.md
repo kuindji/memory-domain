@@ -50,6 +50,17 @@ Use `ingest` when the domain should process the input. Use `write` when you know
 `node memory-domain memory <id> untag <tag>`                 # remove tag
 `node memory-domain memory <id> delete`                      # delete
 
+## How skills work
+
+Skills are documentation modules the engine composes from the currently registered domains. The top-level `memory-domain skill` command returns this overview plus a discovery index of every external skill available — names and descriptions only, not bodies.
+
+Fetch a specific skill on demand:
+
+`node memory-domain skill <skill-id>`                       # flat lookup across all registered domains
+`node memory-domain domain <domain-id> skill <skill-id>`    # disambiguated form (when two domains expose the same skill id)
+
+Skills may reference other skills by id. Fetch referenced skills the same way — do not assume their contents.
+
 ## Core Memories (Instructions)
 
 Core memories are persistent instructions included in every context and prompt for a domain.
