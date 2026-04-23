@@ -1308,26 +1308,25 @@ class MemoryEngine {
             const domainId = options.domains[0];
             const domain = this.domainRegistry.get(domainId);
             const hook = domain?.buildContext;
-            let hookResult: ContextResult | undefined;
-            if (typeof hook === "function") {
+            if (hook) {
                 const ctx = this.createDomainContext(domainId, options?.context);
-                hookResult = await hook(text, budgetTokens, ctx);
-            } else if (hook && typeof hook === "object" && hook.fromText) {
-                const ctx = this.createDomainContext(domainId, options?.context);
-                hookResult = await hook.fromText(text, budgetTokens, ctx);
-            }
-            if (hookResult) {
-                const ctx = this.createDomainContext(domainId, options?.context);
-                let result = hookResult;
-                const domainPlugins = this.pluginsByDomain.get(domainId);
-                if (domainPlugins) {
-                    for (const plugin of domainPlugins) {
-                        if (plugin.hooks.enrichContext) {
-                            result = await plugin.hooks.enrichContext(result, text, ctx);
+                let result: ContextResult | undefined;
+                if (typeof hook === "function") {
+                    result = await hook(text, budgetTokens, ctx);
+                } else if (typeof hook === "object" && hook.fromText) {
+                    result = await hook.fromText(text, budgetTokens, ctx);
+                }
+                if (result) {
+                    const domainPlugins = this.pluginsByDomain.get(domainId);
+                    if (domainPlugins) {
+                        for (const plugin of domainPlugins) {
+                            if (plugin.hooks.enrichContext) {
+                                result = await plugin.hooks.enrichContext(result, text, ctx);
+                            }
                         }
                     }
+                    return result;
                 }
-                return result;
             }
         }
 
@@ -1377,7 +1376,7 @@ class MemoryEngine {
         const hook = domain.buildContext;
         if (!hook || typeof hook === "function" || !hook.templates) {
             throw new Error(
-                `runTemplate: domain "${domainId}" has no templates registry`,
+                `runTemplate: domain "${domainId}" has no templates registry (requested "${name}")`,
             );
         }
         const fn = hook.templates[name];
