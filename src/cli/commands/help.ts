@@ -6,6 +6,7 @@ Commands:
   ingest          Store new memory from text or stdin
   search          Search memories by query
   search-table    Run a domain tabular query (e.g. financial indicators)
+  run-template    Run a named template from a domain's buildContext registry
   ask             Ask a question against stored memories
   build-context   Build a context block from relevant memories
   write           Create a memory with direct domain ownership
@@ -101,6 +102,25 @@ Options:
 Examples:
   memory-domain search-table financial --filter '{"countries":["USA"],"indicators":["NY.GDP.MKTP.KD.ZG"],"yearRange":{"from":2001,"to":2005}}'
   memory-domain search-table financial --filter-file ./q2.json
+`.trim(),
+
+    "run-template": `
+Usage: memory-domain run-template <domain> <template-name> [--params <json>] [--params-file <path>]
+
+Run a named template from a domain's buildContext.templates registry. Returns a TemplateResult {template, rows, columns, source, narrative?}.
+
+Arguments:
+  <domain>             Domain id (must expose buildContext.templates, e.g. "financial")
+  <template-name>      Template name (e.g. "macro_snapshot", "indicator_trend")
+
+Options:
+  --params <json>      Template params as a JSON object (default: {})
+  --params-file <path> Read params JSON from a file (overrides --params)
+
+Examples:
+  memory-domain run-template financial macro_snapshot --params '{"country":"USA","year":2005}'
+  memory-domain run-template financial peer_comparison --params '{"country":"USA","indicator":"NY.GDP.PCAP.KD","year":2005,"peerSet":"G7"}'
+  memory-domain run-template financial indicator_trend --params-file ./query.json
 `.trim(),
 
     ask: `
