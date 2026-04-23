@@ -179,6 +179,8 @@ export interface TableResult {
     source: string;
     /** Optional per-row metadata (unit, source_ref, etc.) not shown in table. */
     rowMeta?: Record<string, unknown>[];
+    /** Optional result-level metadata (dataWindow, version, etc.). */
+    meta?: Record<string, unknown>;
 }
 
 export interface ScoredMemory {
@@ -394,6 +396,8 @@ export interface TemplateResult {
     narrative?: string;
     /** Optional per-row metadata (unit, source_ref, etc.). */
     rowMeta?: Record<string, unknown>[];
+    /** Optional result-level metadata (dataWindow, version, etc.). */
+    meta?: Record<string, unknown>;
 }
 
 export interface TemplateParams {

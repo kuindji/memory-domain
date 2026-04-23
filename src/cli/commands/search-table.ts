@@ -50,7 +50,7 @@ const searchTableCommand: CommandHandler = async (engine, parsed) => {
     }
 
     const result = await engine.searchTable(domainId, filter);
-    return { output: result, exitCode: 0 };
+    return { output: result, exitCode: 0, formatCommand: "search-table" };
 };
 
 export { searchTableCommand };

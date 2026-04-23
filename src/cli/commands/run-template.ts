@@ -57,7 +57,7 @@ const runTemplateCommand: CommandHandler = async (engine, parsed) => {
     }
 
     const result = await engine.runTemplate(domainId, templateName, params);
-    return { output: result, exitCode: 0 };
+    return { output: result, exitCode: 0, formatCommand: "run-template" };
 };
 
 export { runTemplateCommand };
