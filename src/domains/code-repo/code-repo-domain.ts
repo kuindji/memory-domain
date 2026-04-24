@@ -11,7 +11,7 @@ import type {
     ScoredMemory,
     ContextResult,
 } from "../../core/types.js";
-import { countTokens, cosineSimilarity } from "../../core/scoring.js";
+import { countTokens, cosineSimilarityF32 } from "../../core/scoring.js";
 import { createTopicLinkingPlugin } from "../../plugins/topic-linking.js";
 import {
     CODE_REPO_DOMAIN_ID,
@@ -893,10 +893,14 @@ async function mmrBudgetFill(
         candidates.map((c) => c.id),
         graph,
     );
+    const embeddingMapF32 = new Map<string, Float32Array>();
+    for (const [id, emb] of embeddingMap) {
+        embeddingMapF32.set(id, Float32Array.from(emb));
+    }
 
     const remaining = candidates.map((c, i) => ({ entry: c, idx: i }));
     const selected: Array<{ mem: ScoredMemory; classification: MemoryClassification }> = [];
-    const selectedEmbeddings: number[][] = [];
+    const selectedEmbeddings: Float32Array[] = [];
     let usedTokens = 0;
 
     while (remaining.length > 0) {
@@ -912,10 +916,10 @@ async function mmrBudgetFill(
             let maxSim = 0;
 
             if (selectedEmbeddings.length > 0) {
-                const emb = embeddingMap.get(entry.id);
+                const emb = embeddingMapF32.get(entry.id);
                 if (emb) {
                     for (const sel of selectedEmbeddings) {
-                        const sim = cosineSimilarity(emb, sel);
+                        const sim = cosineSimilarityF32(emb, sel);
                         if (sim > maxSim) maxSim = sim;
                     }
                 }
@@ -936,7 +940,7 @@ async function mmrBudgetFill(
 
         selected.push({ mem: entry, classification: classify(entry) });
 
-        const emb = embeddingMap.get(entry.id);
+        const emb = embeddingMapF32.get(entry.id);
         if (emb) selectedEmbeddings.push(emb);
 
         remaining.splice(bestIdx, 1);

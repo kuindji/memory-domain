@@ -1,5 +1,11 @@
 import { describe, test, expect } from "bun:test";
-import { countTokens, mergeScores, applyTokenBudget } from "../src/core/scoring.js";
+import {
+    countTokens,
+    mergeScores,
+    applyTokenBudget,
+    cosineSimilarity,
+    cosineSimilarityF32,
+} from "../src/core/scoring.js";
 
 describe("countTokens", () => {
     test("returns token count for a simple string", () => {
@@ -129,5 +135,43 @@ describe("applyTokenBudget", () => {
         // Budget of 5 tokens should limit results
         const result = applyTokenBudget(entries, 5);
         expect(result.length).toBeLessThanOrEqual(entries.length);
+    });
+});
+
+describe("cosineSimilarityF32", () => {
+    test("matches cosineSimilarity within 1e-6 on 1024-dim random vectors", () => {
+        let s = 0x9e3779b9;
+        const rng = () => {
+            s = (s + 0x6d2b79f5) >>> 0;
+            let t = s;
+            t = Math.imul(t ^ (t >>> 15), t | 1);
+            t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+        for (let trial = 0; trial < 20; trial++) {
+            const a: number[] = [];
+            const b: number[] = [];
+            for (let i = 0; i < 1024; i++) {
+                a.push(rng() * 2 - 1);
+                b.push(rng() * 2 - 1);
+            }
+            const baseline = cosineSimilarity(a, b);
+            const fast = cosineSimilarityF32(Float32Array.from(a), Float32Array.from(b));
+            expect(Math.abs(baseline - fast)).toBeLessThan(1e-6);
+        }
+    });
+
+    test("returns 0 on empty or mismatched inputs", () => {
+        expect(cosineSimilarityF32(new Float32Array(), new Float32Array())).toBe(0);
+        expect(
+            cosineSimilarityF32(new Float32Array([1, 2]), new Float32Array([1, 2, 3])),
+        ).toBe(0);
+    });
+
+    test("returns 0 when either vector has zero norm", () => {
+        const zero = new Float32Array(4);
+        const nonzero = new Float32Array([1, 2, 3, 4]);
+        expect(cosineSimilarityF32(zero, nonzero)).toBe(0);
+        expect(cosineSimilarityF32(nonzero, zero)).toBe(0);
     });
 });

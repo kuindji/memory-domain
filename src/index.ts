@@ -16,6 +16,7 @@ export {
     mergeScores,
     applyTokenBudget,
     cosineSimilarity,
+    cosineSimilarityF32,
 } from "./core/scoring.js";
 export type { TunableParamDefinition } from "./core/tunable-params.js";
 

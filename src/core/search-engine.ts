@@ -1,7 +1,7 @@
 import { StringRecordId } from "surrealdb";
 import type { GraphApi, EngineConfig, EmbeddingAdapter, DebugTools } from "./types.js";
 import type { SearchQuery, SearchResult, ScoredMemory } from "./types.js";
-import { countTokens, mergeScores, applyTokenBudget, cosineSimilarity } from "./scoring.js";
+import { countTokens, mergeScores, applyTokenBudget, cosineSimilarityF32 } from "./scoring.js";
 import { createDebugTools } from "./debug.js";
 
 const NOOP_DEBUG: DebugTools = createDebugTools("search", { timing: false });
@@ -675,12 +675,15 @@ class SearchEngine {
 
         if (!rows) return entries;
 
-        const embeddingMap = new Map<string, number[]>();
+        const embeddingMap = new Map<string, Float32Array>();
         for (const row of rows) {
             if (row.embedding) {
-                embeddingMap.set(String(row.id), row.embedding);
+                embeddingMap.set(String(row.id), Float32Array.from(row.embedding));
             }
         }
+
+        // Convert queryVec once for the whole rerank loop.
+        const queryVecF32 = Float32Array.from(queryVec);
 
         // Score each entry by direct cosine similarity and filter
         const reranked: ScoredMemory[] = [];
@@ -690,7 +693,7 @@ class SearchEngine {
                 reranked.push(entry);
                 continue;
             }
-            const similarity = cosineSimilarity(queryVec, emb);
+            const similarity = cosineSimilarityF32(queryVecF32, emb);
             if (similarity >= threshold) {
                 reranked.push({ ...entry, score: similarity });
             }
