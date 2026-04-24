@@ -245,11 +245,18 @@ class MemoryEngine {
                 domainToRegister = Object.create(domain) as DomainConfig;
                 domainToRegister.processInboxBatch = async (entries, context) => {
                     await original(entries, context);
-                    for (const plugin of plugins) {
-                        if (plugin.hooks.afterInboxProcess) {
-                            await plugin.hooks.afterInboxProcess(entries, context);
-                        }
-                    }
+                    // Fan out afterInboxProcess hooks in parallel. Each plugin
+                    // owns a distinct corner of the graph (persona, topic,
+                    // region, etc.); their writes to independent tables are
+                    // safe to interleave. Plugins that create shared nodes
+                    // (e.g. both touching `person:USA`) rely on the existing
+                    // createNodeWithId + try/catch idempotency pattern, which
+                    // already tolerates concurrent-creation races.
+                    await Promise.all(
+                        plugins
+                            .filter((p) => p.hooks.afterInboxProcess !== undefined)
+                            .map((p) => p.hooks.afterInboxProcess!(entries, context)),
+                    );
                 };
             }
 

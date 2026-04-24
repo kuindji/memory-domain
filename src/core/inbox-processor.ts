@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { StringRecordId } from "surrealdb";
 import { createDebugTools } from "./debug.js";
+import { cosineSimilarity } from "./scoring.js";
 import type { GraphStore } from "./graph-store.js";
 import type { DomainRegistry } from "./domain-registry.js";
 import type { EventEmitter } from "./events.js";
@@ -215,24 +216,31 @@ class InboxProcessor {
 
     /**
      * Fetch full memory rows for a set of IDs, preserving order.
+     *
+     * Uses per-id `getNode` with `Promise.all` rather than `WHERE id IN $ids`.
+     * Per project findings, `id IN $ids` on record-id PKs is a TableScan in
+     * SurrealDB; direct `getNode(id)` (which selects by record id) compiles to
+     * a RecordIdScan (O(1) lookup). For N candidates this turns O(N) sequential
+     * round-trips into O(1) wall-clock on a warm connection.
      */
     private async fetchMemoryRows(ids: string[]): Promise<RawMemoryRow[]> {
         if (ids.length === 0) return [];
 
+        const nodes = await Promise.all(
+            ids.map((id) => this.store.getNode<Node & RawMemoryRow>(id)),
+        );
         const rows: RawMemoryRow[] = [];
-        for (const id of ids) {
-            const node = await this.store.getNode<Node & RawMemoryRow>(id);
-            if (node) {
-                rows.push({
-                    id: node.id,
-                    content: node.content,
-                    embedding: node.embedding,
-                    event_time: node.event_time,
-                    created_at: node.created_at,
-                    token_count: node.token_count,
-                    request_context: this.normalizeRequestContext(node.request_context),
-                });
-            }
+        for (const node of nodes) {
+            if (!node) continue;
+            rows.push({
+                id: node.id,
+                content: node.content,
+                embedding: node.embedding,
+                event_time: node.event_time,
+                created_at: node.created_at,
+                token_count: node.token_count,
+                request_context: this.normalizeRequestContext(node.request_context),
+            });
         }
         return rows;
     }
@@ -284,12 +292,14 @@ class InboxProcessor {
         let batchIds: string[];
 
         if (seed.embedding && sameContextRows.length > 1) {
-            // Use similarity-based ordering
-            const neighborIds = sameContextRows.slice(1).map((r) => String(r.id));
+            // Use similarity-based ordering. Embeddings are already loaded on
+            // sameContextRows from fetchMemoryRows above, so we can score
+            // client-side in O(N) without a second DB query.
+            const candidateRowsSansSeed = sameContextRows.slice(1);
             batchIds = await this.debug.time(
                 "buildSimilarityBatch.findSimilarNeighbors",
-                () => this.findSimilarNeighbors(seed, neighborIds),
-                { neighbors: neighborIds.length },
+                () => this.findSimilarNeighbors(seed, candidateRowsSansSeed),
+                { neighbors: candidateRowsSansSeed.length },
             );
             batchIds = [seedId, ...batchIds];
         } else {
@@ -314,63 +324,51 @@ class InboxProcessor {
         return { batchId, entries, memoryIds: batchIds, requestContext };
     }
 
+    /**
+     * Rank candidate neighbors by cosine similarity to the seed embedding.
+     *
+     * The previous implementation issued `SELECT ... FROM memory WHERE id IN
+     * $candidateIds AND vector::similarity::cosine(embedding, $seedEmbedding)
+     * >= $threshold`, which is doubly pathological in SurrealDB: `id IN $ids`
+     * on record-id PKs is a TableScan (the stored pattern documented in
+     * `packages/memory/src/plugins/region/extract-regions.ts`), and the cosine
+     * predicate cannot use HNSW because it's gated on an IN-list.
+     *
+     * Since `fetchMemoryRows` already loaded embeddings for all candidates,
+     * we can score client-side in O(N) with no DB roundtrip at all. Rows
+     * without an embedding are appended in chronological order as a fallback,
+     * matching the prior contract.
+     */
     private async findSimilarNeighbors(
         seed: RawMemoryRow,
-        candidateIds: string[],
+        candidateRows: RawMemoryRow[],
     ): Promise<string[]> {
-        if (candidateIds.length === 0 || !seed.embedding) return [];
-
-        // Fetch in batches to avoid huge queries, but use SurrealDB for similarity
+        if (candidateRows.length === 0 || !seed.embedding) return [];
         const seedId = String(seed.id);
         const limit = this.batchLimit - 1; // seed already takes one slot
+        const threshold = this.similarityThreshold > 0 ? this.similarityThreshold : null;
 
-        // Query neighbors by similarity from the candidate set
-        const idRefs = candidateIds.map((id) => new StringRecordId(id));
+        const scored: Array<{ id: string; similarity: number }> = [];
+        const withoutEmbedding: string[] = [];
 
-        let query: string;
-        const vars: Record<string, unknown> = {
-            seedEmbedding: seed.embedding,
-            seedId: new StringRecordId(seedId),
-            candidateIds: idRefs,
-            limit,
-        };
-
-        if (this.similarityThreshold > 0) {
-            query = `SELECT id, vector::similarity::cosine(embedding, $seedEmbedding) AS similarity
-        FROM memory
-        WHERE id IN $candidateIds
-          AND id != $seedId
-          AND embedding IS NOT NONE
-          AND vector::similarity::cosine(embedding, $seedEmbedding) >= $threshold
-        ORDER BY similarity DESC
-        LIMIT $limit`;
-            vars.threshold = this.similarityThreshold;
-        } else {
-            query = `SELECT id, vector::similarity::cosine(embedding, $seedEmbedding) AS similarity
-        FROM memory
-        WHERE id IN $candidateIds
-          AND id != $seedId
-          AND embedding IS NOT NONE
-        ORDER BY similarity DESC
-        LIMIT $limit`;
+        for (const row of candidateRows) {
+            const rowId = String(row.id);
+            if (rowId === seedId) continue;
+            if (!row.embedding || row.embedding.length !== seed.embedding.length) {
+                withoutEmbedding.push(rowId);
+                continue;
+            }
+            const similarity = cosineSimilarity(seed.embedding, row.embedding);
+            if (threshold !== null && similarity < threshold) continue;
+            scored.push({ id: rowId, similarity });
         }
 
-        const rows = await this.store.query<Array<{ id: RecordIdLike | string }>>(query, vars);
-        if (!rows || rows.length === 0) {
-            // Fallback: return candidates without embedding in chronological order
-            return candidateIds.slice(0, limit);
-        }
+        scored.sort((a, b) => b.similarity - a.similarity);
+        const similarIds = scored.slice(0, limit).map((s) => s.id);
 
-        const similarIds = rows.map((r) => String(r.id));
-
-        // Also include candidates without embeddings (chronological, appended)
-        const similarSet = new Set(similarIds);
-        const remaining = candidateIds.filter((id) => !similarSet.has(id) && id !== seedId);
-
-        // Fill up to limit
         const spotsLeft = limit - similarIds.length;
         if (spotsLeft > 0) {
-            similarIds.push(...remaining.slice(0, spotsLeft));
+            similarIds.push(...withoutEmbedding.slice(0, spotsLeft));
         }
 
         return similarIds;
@@ -596,9 +594,9 @@ class InboxProcessor {
         // via an index-scan on child_of instead of a full scan of `tagged`.
         await this.store.relate(tagId, "child_of", PROCESSING_ROOT_TAG_ID);
 
-        for (const memId of memoryIds) {
-            await this.store.relate(memId, "tagged", tagId);
-        }
+        await Promise.all(
+            memoryIds.map((memId) => this.store.relate(memId, "tagged", tagId)),
+        );
 
         return batchId;
     }
@@ -692,55 +690,66 @@ class InboxProcessor {
         };
     }
 
+    /**
+     * Materialize OwnedMemory entries for a batch. The per-memory work (node
+     * fetch, tags query, owned_by query) runs in parallel via `Promise.all`
+     * rather than sequentially. All three underlying queries use `= $id`-style
+     * record-id lookups, which are O(1) RecordIdScans in SurrealDB.
+     */
     private async buildOwnedMemoryEntries(
         memoryIds: string[],
         domainId?: string,
     ): Promise<OwnedMemory[]> {
-        const entries: OwnedMemory[] = [];
+        if (memoryIds.length === 0) return [];
 
-        for (const memId of memoryIds) {
-            const node = await this.store.getNode<Node & RawMemoryRow>(memId);
-            if (!node) continue;
+        const perMemory = await Promise.all(
+            memoryIds.map(async (memId): Promise<OwnedMemory | null> => {
+                const memIdRef = new StringRecordId(memId);
+                const domainIdRef = domainId
+                    ? new StringRecordId(`domain:${domainId}`)
+                    : null;
 
-            const memory = this.toMemoryEntry({
-                id: node.id,
-                content: node.content,
-                event_time: node.event_time,
-                created_at: node.created_at,
-                token_count: node.token_count,
-            });
+                const [node, allTags, ownedByEdges] = await Promise.all([
+                    this.store.getNode<Node & RawMemoryRow>(memId),
+                    this.store.query<string[]>(
+                        `SELECT VALUE out.label FROM tagged WHERE in = $memId`,
+                        { memId: memIdRef },
+                    ),
+                    domainIdRef
+                        ? this.store.query<RawOwnedByEdge[]>(
+                            "SELECT attributes, owned_at FROM owned_by WHERE in = $memId AND out = $domainId",
+                            { memId: memIdRef, domainId: domainIdRef },
+                        )
+                        : Promise.resolve(null),
+                ]);
 
-            // Get non-inbox tags
-            const allTags = await this.store.query<string[]>(
-                `SELECT VALUE out.label FROM tagged WHERE in = $memId`,
-                { memId: new StringRecordId(memId) },
-            );
-            const tags = (allTags ?? [])
-                .filter((label): label is string => typeof label === "string")
-                .filter((l) => !l.startsWith("inbox"));
+                if (!node) return null;
 
-            // Get domain attributes if domainId provided
-            let domainAttributes: Record<string, unknown> = {};
-            if (domainId) {
-                const ownedByEdges = await this.store.query<RawOwnedByEdge[]>(
-                    "SELECT attributes, owned_at FROM owned_by WHERE in = $memId AND out = $domainId",
-                    {
-                        memId: new StringRecordId(memId),
-                        domainId: new StringRecordId(`domain:${domainId}`),
-                    },
-                );
-                domainAttributes = ownedByEdges?.[0]?.attributes ?? {};
-            }
+                const memory = this.toMemoryEntry({
+                    id: node.id,
+                    content: node.content,
+                    event_time: node.event_time,
+                    created_at: node.created_at,
+                    token_count: node.token_count,
+                });
 
-            const structuredData =
-                domainId && node.structured_data?.[domainId] !== undefined
-                    ? node.structured_data[domainId]
-                    : undefined;
+                const tags = (allTags ?? [])
+                    .filter((label): label is string => typeof label === "string")
+                    .filter((l) => !l.startsWith("inbox"));
 
-            entries.push({ memory, domainAttributes, tags, structuredData });
-        }
+                const domainAttributes: Record<string, unknown> =
+                    ownedByEdges?.[0]?.attributes ?? {};
 
-        return entries;
+                const structuredData =
+                    domainId && node.structured_data?.[domainId] !== undefined
+                        ? node.structured_data[domainId]
+                        : undefined;
+
+                return { memory, domainAttributes, tags, structuredData };
+            }),
+        );
+
+        return perMemory.filter((entry): entry is OwnedMemory => entry !== null);
     }
 
     // --- Phase 1: Claim Assertion ---
@@ -947,24 +956,28 @@ class InboxProcessor {
 
                         if (failure.status === "quarantined") {
                             const failedTagId = await this.ensureTag(`inbox:failed:${domainId}`);
-                            for (const memId of memoryIds) {
-                                await this.store.unrelate(memId, "tagged", inboxTagId);
-                                await this.store.relate(memId, "tagged", failedTagId);
-                                await this.clearRootInboxIfNoActiveTags(memId);
-                            }
+                            await Promise.all(
+                                memoryIds.map(async (memId) => {
+                                    await this.store.unrelate(memId, "tagged", inboxTagId);
+                                    await this.store.relate(memId, "tagged", failedTagId);
+                                    await this.clearRootInboxIfNoActiveTags(memId);
+                                }),
+                            );
                         }
 
                         continue;
                     }
 
-                    for (const memId of memoryIds) {
-                        await this.store.unrelate(memId, "tagged", inboxTagId);
-                        this.events.emit("inboxDomainProcessed", { memoryId: memId, domainId });
-                    }
+                    await Promise.all(
+                        memoryIds.map(async (memId) => {
+                            await this.store.unrelate(memId, "tagged", inboxTagId);
+                            this.events.emit("inboxDomainProcessed", { memoryId: memId, domainId });
+                        }),
+                    );
 
-                    for (const memId of memoryIds) {
-                        await this.clearRootInboxIfNoActiveTags(memId);
-                    }
+                    await Promise.all(
+                        memoryIds.map((memId) => this.clearRootInboxIfNoActiveTags(memId)),
+                    );
 
                     totalProcessed += memoryIds.length;
                 } finally {

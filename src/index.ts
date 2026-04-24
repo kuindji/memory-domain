@@ -107,6 +107,7 @@ export type { TopicLinkingOptions, ExtractedTopic, LinkResult } from "./plugins/
 
 // Adapters
 export { ClaudeCliAdapter } from "./adapters/llm/claude-cli.js";
+export { NoLlmAdapter } from "./adapters/llm/no-llm.js";
 export { BedrockAdapter } from "./adapters/llm/bedrock.js";
 export type { BedrockAdapterConfig } from "./core/types.js";
 export { OpenAiHttpAdapter } from "./adapters/llm/openai-http.js";
