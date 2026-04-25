@@ -103,6 +103,11 @@ class SchemaRegistry {
             { name: "strength", type: "option<float>" },
             { name: "detected_at", type: "option<int>" },
         ]);
+        // owned_by carries domain-supplied attributes + a write timestamp.
+        await this.addEdgeFields("owned_by", [
+            { name: "attributes", type: "option<object>" },
+            { name: "owned_at", type: "option<int>" },
+        ]);
 
         // Indexes on edge endpoints. Two indexes per edge (one per direction)
         // to support traversal from either side.

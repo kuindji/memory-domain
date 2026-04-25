@@ -1,5 +1,4 @@
 import { createHash } from "node:crypto";
-import { StringRecordId } from "surrealdb";
 import { createDebugTools } from "./debug.js";
 import { cosineSimilarityF32 } from "./scoring.js";
 import type { GraphStore } from "./graph-store.js";
@@ -14,16 +13,10 @@ import type {
     Node,
 } from "./types.js";
 
-interface RecordIdLike {
-    tb: string;
-    id: string;
-    toString(): string;
-}
-
 interface RawMemoryRow {
-    id: RecordIdLike | string;
+    id: string;
     content: string;
-    embedding?: number[];
+    embedding?: number[] | string | null;
     event_time: number | null;
     created_at: number;
     token_count: number;
@@ -31,25 +24,12 @@ interface RawMemoryRow {
     structured_data?: Record<string, unknown>;
 }
 
-interface RawOwnedByEdge {
-    out: RecordIdLike | string;
-    attributes?: Record<string, unknown>;
-    owned_at?: number;
-}
-
-interface RawTaggedRow {
-    in: RecordIdLike | string;
-    label: string;
-}
-
 interface InboxLockPayload {
     lockedAt: number;
 }
 
 type InboxStage = "assert" | "process";
-
 type FailureKind = "transient" | "permanent" | "unknown";
-
 type FailureStatus = "retryable_failed" | "quarantined";
 
 interface BatchFailureRecord {
@@ -82,17 +62,24 @@ interface SimilarityBatch {
 
 type TagFilter = { type: "assert-claim" } | { type: "domain"; domainId: string };
 
-// Sentinel parent tag. Every inbox:processing:<uuid> tag gets a child_of edge to this
-// root so fetchProcessing can find them via two index-scans instead of scanning the
-// full `tagged` table with a string::starts_with(out.label, ...) predicate.
 const PROCESSING_ROOT_LABEL = "inbox:processing:_root";
-const PROCESSING_ROOT_TAG_ID = `tag:\`${PROCESSING_ROOT_LABEL}\``;
+const PROCESSING_ROOT_TAG_ID = `tag:${PROCESSING_ROOT_LABEL}`;
 
-// Same pattern for assert-claim discovery: each inbox:assert-claim:<domainId> tag gets
-// a child_of edge to this root so fetchCandidateIds(assert-claim) can resolve active
-// tags via idx_child_of_out instead of scanning `tagged` by out.label prefix.
 const ASSERT_CLAIM_ROOT_LABEL = "inbox:assert-claim:_root";
-const ASSERT_CLAIM_ROOT_TAG_ID = `tag:\`${ASSERT_CLAIM_ROOT_LABEL}\``;
+const ASSERT_CLAIM_ROOT_TAG_ID = `tag:${ASSERT_CLAIM_ROOT_LABEL}`;
+
+function parseEmbedding(raw: number[] | string | null | undefined): number[] | undefined {
+    if (raw == null) return undefined;
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw === "string" && raw.startsWith("[")) {
+        try {
+            return JSON.parse(raw) as number[];
+        } catch {
+            return undefined;
+        }
+    }
+    return undefined;
+}
 
 class InboxProcessor {
     private timeout: ReturnType<typeof setTimeout> | null = null;
@@ -121,121 +108,94 @@ class InboxProcessor {
 
     private async recoverStaleBatches(): Promise<void> {
         const cutoff = Date.now() - this.staleAfterMs;
-        // Find stale processing tags via child_of sentinel (index-scan on idx_child_of_out).
-        const staleTags = await this.store.query<Array<{ in: RecordIdLike | string }>>(
-            `SELECT in FROM child_of
-       WHERE out = $root
-         AND in.created_at < $cutoff`,
-            { root: new StringRecordId(PROCESSING_ROOT_TAG_ID), cutoff },
+        const staleTags = await this.store.query<{ in_id: string }>(
+            `SELECT c.in_id FROM child_of c
+             JOIN tag t ON t.id = c.in_id
+             WHERE c.out_id = $1 AND t.created_at < $2`,
+            [PROCESSING_ROOT_TAG_ID, cutoff],
         );
-        if (!staleTags || staleTags.length === 0) return;
+        if (staleTags.length === 0) return;
 
-        const staleTagIds = staleTags.map((r) => new StringRecordId(String(r.in)));
-
-        // Best-effort cascading delete: tagged edges, child_of edge, then the tag node.
-        await this.store.query(`DELETE tagged WHERE out IN $tagIds`, { tagIds: staleTagIds });
-        await this.store.query(`DELETE child_of WHERE in IN $tagIds AND out = $root`, {
-            tagIds: staleTagIds,
-            root: new StringRecordId(PROCESSING_ROOT_TAG_ID),
-        });
-        await this.store.query(`DELETE $tagIds`, { tagIds: staleTagIds });
+        const staleTagIds = staleTags.map((r) => r.in_id);
+        await this.store.query(`DELETE FROM tagged WHERE out_id = ANY($1::text[])`, [staleTagIds]);
+        await this.store.query(
+            `DELETE FROM child_of WHERE in_id = ANY($1::text[]) AND out_id = $2`,
+            [staleTagIds, PROCESSING_ROOT_TAG_ID],
+        );
+        await this.store.deleteNodes(staleTagIds);
     }
 
     // --- Candidate Fetching ---
 
-    /**
-     * Fetches candidate memory IDs matching the tag filter, excluding any
-     * that are currently tagged with inbox:processing:*.
-     * Returns IDs in created_at ASC order.
-     */
     private async fetchCandidateIds(filter: TagFilter): Promise<string[]> {
         const candidates = await this.debug.time(
             "buildSimilarityBatch.fetchInboxTagged",
             async () => {
                 if (filter.type === "assert-claim") {
-                    // Two index-scans mirroring fetchProcessing: resolve active
-                    // assert-claim tag ids via the sentinel root (idx_child_of_out),
-                    // then match tagged rows by `out IN $tagIds` (idx_tagged_out).
-                    // Replaces a full scan of `tagged` via out.label prefix predicate.
-                    const tagRows = await this.store.query<Array<{ in: RecordIdLike | string }>>(
-                        `SELECT in FROM child_of WHERE out = $root`,
-                        { root: new StringRecordId(ASSERT_CLAIM_ROOT_TAG_ID) },
+                    const tagRows = await this.store.query<{ in_id: string }>(
+                        `SELECT in_id FROM child_of WHERE out_id = $1`,
+                        [ASSERT_CLAIM_ROOT_TAG_ID],
                     );
-                    if (!tagRows || tagRows.length === 0) return [];
-                    const tagIds = tagRows.map((r) => new StringRecordId(String(r.in)));
-                    return (
-                        (await this.store.query<Array<{ in: RecordIdLike | string }>>(
-                            `SELECT in FROM tagged WHERE out IN $tagIds`,
-                            { tagIds },
-                        )) ?? []
+                    if (tagRows.length === 0) return [];
+                    const tagIds = tagRows.map((r) => r.in_id);
+                    return this.store.query<{ in_id: string }>(
+                        `SELECT in_id FROM tagged WHERE out_id = ANY($1::text[])`,
+                        [tagIds],
                     );
                 }
-                return (
-                    (await this.store.query<Array<{ in: RecordIdLike | string }>>(
-                        `SELECT in FROM tagged WHERE out = $domainTag`,
-                        {
-                            domainTag: new StringRecordId(`tag:\`inbox:${filter.domainId}\``),
-                        },
-                    )) ?? []
+                return this.store.query<{ in_id: string }>(
+                    `SELECT in_id FROM tagged WHERE out_id = $1`,
+                    [`tag:inbox:${filter.domainId}`],
                 );
             },
             { filter: filter.type },
         );
-        if (!candidates || candidates.length === 0) return [];
+        if (candidates.length === 0) return [];
 
-        const memIds = [...new Set(candidates.map((r) => String(r.in)))];
+        const memIds = [...new Set(candidates.map((r) => r.in_id))];
 
-        // Exclude any currently tagged as processing.
-        // Two separate index-scans: first find active processing tag ids via the
-        // child_of sentinel (idx_child_of_out), then materialize them and query
-        // `tagged` with a literal $procTagIds list (idx_tagged_out). A single query
-        // with a subquery in `WHERE out IN (...)` was a correlated plan in SurrealDB
-        // and ran ~6x slower than the old full scan.
         const processingIds = await this.debug.time(
             "buildSimilarityBatch.fetchProcessing",
             async () => {
-                const procTagRows = await this.store.query<Array<{ in: RecordIdLike | string }>>(
-                    `SELECT in FROM child_of WHERE out = $root`,
-                    {
-                        root: new StringRecordId(PROCESSING_ROOT_TAG_ID),
-                    },
+                const procTagRows = await this.store.query<{ in_id: string }>(
+                    `SELECT in_id FROM child_of WHERE out_id = $1`,
+                    [PROCESSING_ROOT_TAG_ID],
                 );
-                if (!procTagRows || procTagRows.length === 0) return new Set<string>();
-
-                const procTagIds = procTagRows.map((r) => new StringRecordId(String(r.in)));
-                const taggedRows = await this.store.query<Array<{ in: RecordIdLike | string }>>(
-                    `SELECT in FROM tagged WHERE out IN $procTagIds`,
-                    { procTagIds },
+                if (procTagRows.length === 0) return new Set<string>();
+                const procTagIds = procTagRows.map((r) => r.in_id);
+                const taggedRows = await this.store.query<{ in_id: string }>(
+                    `SELECT in_id FROM tagged WHERE out_id = ANY($1::text[])`,
+                    [procTagIds],
                 );
-                return new Set((taggedRows ?? []).map((r) => String(r.in)));
+                return new Set(taggedRows.map((r) => r.in_id));
             },
         );
 
         return memIds.filter((id) => !processingIds.has(id));
     }
 
-    /**
-     * Fetch full memory rows for a set of IDs, preserving order.
-     *
-     * Uses per-id `getNode` with `Promise.all` rather than `WHERE id IN $ids`.
-     * Per project findings, `id IN $ids` on record-id PKs is a TableScan in
-     * SurrealDB; direct `getNode(id)` (which selects by record id) compiles to
-     * a RecordIdScan (O(1) lookup). For N candidates this turns O(N) sequential
-     * round-trips into O(1) wall-clock on a warm connection.
-     */
     private async fetchMemoryRows(ids: string[]): Promise<RawMemoryRow[]> {
         if (ids.length === 0) return [];
 
         const nodes = await Promise.all(
-            ids.map((id) => this.store.getNode<Node & RawMemoryRow>(id)),
+            ids.map((id) =>
+                this.store.query<RawMemoryRow>(
+                    `SELECT id, content, embedding::text AS embedding,
+                            event_time, created_at, token_count,
+                            request_context, structured_data
+                     FROM memory WHERE id = $1`,
+                    [id],
+                ),
+            ),
         );
         const rows: RawMemoryRow[] = [];
-        for (const node of nodes) {
+        for (const result of nodes) {
+            const node = result[0];
             if (!node) continue;
             rows.push({
                 id: node.id,
                 content: node.content,
-                embedding: node.embedding,
+                embedding: parseEmbedding(node.embedding),
                 event_time: node.event_time,
                 created_at: node.created_at,
                 token_count: node.token_count,
@@ -262,7 +222,6 @@ class InboxProcessor {
         filter: TagFilter,
         domainId?: string,
     ): Promise<SimilarityBatch | null> {
-        // 1. Get candidate IDs (filtered)
         const candidateIds = await this.debug.time(
             "buildSimilarityBatch.fetchCandidateIds",
             () => this.fetchCandidateIds(filter),
@@ -270,7 +229,6 @@ class InboxProcessor {
         );
         if (candidateIds.length === 0) return null;
 
-        // 2. Fetch all candidate rows and sort by created_at (oldest first)
         const candidateRows = await this.debug.time(
             "buildSimilarityBatch.fetchMemoryRows",
             () => this.fetchMemoryRows(candidateIds),
@@ -279,42 +237,38 @@ class InboxProcessor {
         if (candidateRows.length === 0) return null;
         candidateRows.sort((a, b) => a.created_at - b.created_at);
 
-        // 3. Pick centroid (oldest)
         const seed = candidateRows[0];
-        const seedId = String(seed.id);
+        const seedId = seed.id;
         const requestContext = seed.request_context;
         const requestContextKey = this.getRequestContextKey(requestContext);
         const sameContextRows = candidateRows.filter(
             (row) => this.getRequestContextKey(row.request_context) === requestContextKey,
         );
 
-        // 4. Find neighbors
         let batchIds: string[];
-
-        if (seed.embedding && sameContextRows.length > 1) {
-            // Use similarity-based ordering. Embeddings are already loaded on
-            // sameContextRows from fetchMemoryRows above, so we can score
-            // client-side in O(N) without a second DB query.
+        const seedEmbedding = parseEmbedding(seed.embedding);
+        if (seedEmbedding && sameContextRows.length > 1) {
             const candidateRowsSansSeed = sameContextRows.slice(1);
             batchIds = await this.debug.time(
                 "buildSimilarityBatch.findSimilarNeighbors",
-                () => this.findSimilarNeighbors(seed, candidateRowsSansSeed),
+                () =>
+                    this.findSimilarNeighbors(
+                        { ...seed, embedding: seedEmbedding },
+                        candidateRowsSansSeed,
+                    ),
                 { neighbors: candidateRowsSansSeed.length },
             );
             batchIds = [seedId, ...batchIds];
         } else {
-            // No embedding or single candidate: chronological
-            batchIds = sameContextRows.slice(0, this.batchLimit).map((r) => String(r.id));
+            batchIds = sameContextRows.slice(0, this.batchLimit).map((r) => r.id);
         }
 
-        // 4. Tag as processing
         const batchId = await this.debug.time(
             "buildSimilarityBatch.tagBatchAsProcessing",
             () => this.tagBatchAsProcessing(batchIds),
             { batchSize: batchIds.length },
         );
 
-        // 5. Build OwnedMemory entries
         const entries = await this.debug.time(
             "buildSimilarityBatch.buildOwnedMemoryEntries",
             () => this.buildOwnedMemoryEntries(batchIds, domainId),
@@ -324,33 +278,15 @@ class InboxProcessor {
         return { batchId, entries, memoryIds: batchIds, requestContext };
     }
 
-    /**
-     * Rank candidate neighbors by cosine similarity to the seed embedding.
-     *
-     * The previous implementation issued `SELECT ... FROM memory WHERE id IN
-     * $candidateIds AND vector::similarity::cosine(embedding, $seedEmbedding)
-     * >= $threshold`, which is doubly pathological in SurrealDB: `id IN $ids`
-     * on record-id PKs is a TableScan (the stored pattern documented in
-     * `packages/memory/src/plugins/region/extract-regions.ts`), and the cosine
-     * predicate cannot use HNSW because it's gated on an IN-list.
-     *
-     * Since `fetchMemoryRows` already loaded embeddings for all candidates,
-     * we can score client-side in O(N) with no DB roundtrip at all. Rows
-     * without an embedding are appended in chronological order as a fallback,
-     * matching the prior contract.
-     */
     private async findSimilarNeighbors(
-        seed: RawMemoryRow,
+        seed: RawMemoryRow & { embedding: number[] },
         candidateRows: RawMemoryRow[],
     ): Promise<string[]> {
-        if (candidateRows.length === 0 || !seed.embedding) return [];
-        const seedId = String(seed.id);
-        const limit = this.batchLimit - 1; // seed already takes one slot
+        if (candidateRows.length === 0) return [];
+        const seedId = seed.id;
+        const limit = this.batchLimit - 1;
         const threshold = this.similarityThreshold > 0 ? this.similarityThreshold : null;
 
-        // Convert seed once; Float32Array dot-product is ~2.8× faster than
-        // number[] on JSC. Per-vector conversion cost is trivial vs the
-        // cosine work it enables across the candidate fan-out.
         const seedF32 = Float32Array.from(seed.embedding);
         const seedLen = seedF32.length;
 
@@ -358,25 +294,22 @@ class InboxProcessor {
         const withoutEmbedding: string[] = [];
 
         for (const row of candidateRows) {
-            const rowId = String(row.id);
+            const rowId = row.id;
             if (rowId === seedId) continue;
-            if (!row.embedding || row.embedding.length !== seedLen) {
+            const emb = parseEmbedding(row.embedding);
+            if (!emb || emb.length !== seedLen) {
                 withoutEmbedding.push(rowId);
                 continue;
             }
-            const similarity = cosineSimilarityF32(seedF32, Float32Array.from(row.embedding));
+            const similarity = cosineSimilarityF32(seedF32, Float32Array.from(emb));
             if (threshold !== null && similarity < threshold) continue;
             scored.push({ id: rowId, similarity });
         }
 
         scored.sort((a, b) => b.similarity - a.similarity);
         const similarIds = scored.slice(0, limit).map((s) => s.id);
-
         const spotsLeft = limit - similarIds.length;
-        if (spotsLeft > 0) {
-            similarIds.push(...withoutEmbedding.slice(0, spotsLeft));
-        }
-
+        if (spotsLeft > 0) similarIds.push(...withoutEmbedding.slice(0, spotsLeft));
         return similarIds;
     }
 
@@ -394,19 +327,14 @@ class InboxProcessor {
         if (value === null || typeof value !== "object") {
             return JSON.stringify(value);
         }
-
         if (Array.isArray(value)) {
             return `[${value.map((item) => this.stableStringify(item)).join(",")}]`;
         }
-
         const entries = Object.entries(value as Record<string, unknown>)
-            .filter(([, entryValue]) => entryValue !== undefined)
-            .sort(([left], [right]) => left.localeCompare(right));
-
+            .filter(([, v]) => v !== undefined)
+            .sort(([l], [r]) => l.localeCompare(r));
         return `{${entries
-            .map(
-                ([key, entryValue]) => `${JSON.stringify(key)}:${this.stableStringify(entryValue)}`,
-            )
+            .map(([k, v]) => `${JSON.stringify(k)}:${this.stableStringify(v)}`)
             .join(",")}}`;
     }
 
@@ -436,11 +364,9 @@ class InboxProcessor {
             "504",
             "overloaded",
         ];
-
-        if (name === "aborterror" || transientMarkers.some((marker) => message.includes(marker))) {
+        if (name === "aborterror" || transientMarkers.some((m) => message.includes(m))) {
             return "transient";
         }
-
         return error instanceof Error ? "permanent" : "unknown";
     }
 
@@ -469,7 +395,6 @@ class InboxProcessor {
     private async readBatchFailureRecord(metaId: string): Promise<BatchFailureRecord | null> {
         const node = await this.store.getNode<Node & { value?: string }>(metaId);
         if (!node?.value) return null;
-
         try {
             const parsed: unknown = JSON.parse(node.value);
             if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
@@ -489,7 +414,7 @@ class InboxProcessor {
         try {
             await this.store.deleteNode(metaId);
         } catch {
-            // Best-effort cleanup
+            /* best-effort */
         }
     }
 
@@ -530,92 +455,76 @@ class InboxProcessor {
         } catch {
             await this.store.updateNode(metaId, { value });
         }
-
         return record;
     }
 
     private async ensureTag(label: string): Promise<string> {
-        const tagId = `tag:\`${label}\``;
+        const tagId = `tag:${label}`;
         try {
             await this.store.createNodeWithId(tagId, { label, created_at: Date.now() });
         } catch {
-            // Already exists
+            /* already exists */
         }
         return tagId;
     }
 
     private async countActiveInboxTags(memId: string): Promise<number> {
-        const remainingInbox = await this.store.query<{ count: number }[]>(
-            `SELECT count() AS count FROM tagged
-       WHERE in = $memId
-         AND out.label IS NOT NONE
-         AND string::starts_with(out.label, 'inbox:')
-         AND !string::starts_with(out.label, 'inbox:processing:')
-         AND !string::starts_with(out.label, 'inbox:failed')
-       GROUP ALL`,
-            { memId: new StringRecordId(memId) },
+        const rows = await this.store.query<{ count: number }>(
+            `SELECT COUNT(*)::int AS count
+             FROM tagged tg JOIN tag t ON t.id = tg.out_id
+             WHERE tg.in_id = $1
+               AND t.label LIKE 'inbox:%'
+               AND t.label NOT LIKE 'inbox:processing:%'
+               AND t.label NOT LIKE 'inbox:failed%'`,
+            [memId],
         );
-
-        return remainingInbox && remainingInbox.length > 0 ? remainingInbox[0].count : 0;
+        return rows[0]?.count ?? 0;
     }
 
     private async clearRootInboxIfNoActiveTags(memId: string): Promise<void> {
         const remaining = await this.countActiveInboxTags(memId);
         if (remaining === 0) {
             await this.store.unrelate(memId, "tagged", "tag:inbox");
-            // Clear transient structured data now that all domains have processed
-            await this.store.query("UPDATE $memId SET structured_data = NONE", {
-                memId: new StringRecordId(memId),
-            });
+            await this.store.query(`UPDATE memory SET structured_data = NULL WHERE id = $1`, [
+                memId,
+            ]);
             this.events.emit("inboxProcessed", { memoryId: memId });
         }
     }
 
     private async countTagsByPrefix(memId: string, prefix: string): Promise<number> {
-        const rows = await this.store.query<{ count: number }[]>(
-            `SELECT count() AS count FROM tagged
-       WHERE in = $memId
-         AND out.label IS NOT NONE
-         AND string::starts_with(out.label, $prefix)
-       GROUP ALL`,
-            { memId: new StringRecordId(memId), prefix },
+        const rows = await this.store.query<{ count: number }>(
+            `SELECT COUNT(*)::int AS count
+             FROM tagged tg JOIN tag t ON t.id = tg.out_id
+             WHERE tg.in_id = $1 AND t.label LIKE $2`,
+            [memId, `${prefix}%`],
         );
-
-        return rows && rows.length > 0 ? rows[0].count : 0;
+        return rows[0]?.count ?? 0;
     }
 
     private async tagBatchAsProcessing(memoryIds: string[]): Promise<string> {
         const batchId = crypto.randomUUID();
-        const tagId = `tag:\`inbox:processing:${batchId}\``;
+        const label = `inbox:processing:${batchId}`;
+        const tagId = `tag:${label}`;
         const now = Date.now();
 
         await this.ensureProcessingRoot();
-
-        await this.store.createNodeWithId(tagId, {
-            label: `inbox:processing:${batchId}`,
-            created_at: now,
-        });
-
-        // Link to the processing-root sentinel so fetchProcessing can find this tag
-        // via an index-scan on child_of instead of a full scan of `tagged`.
+        await this.store.createNodeWithId(tagId, { label, created_at: now });
         await this.store.relate(tagId, "child_of", PROCESSING_ROOT_TAG_ID);
 
         await Promise.all(
             memoryIds.map((memId) => this.store.relate(memId, "tagged", tagId)),
         );
-
         return batchId;
     }
 
     private async removeBatchProcessingTag(batchId: string): Promise<void> {
-        const tagId = `tag:\`inbox:processing:${batchId}\``;
-        await this.store.query(`DELETE tagged WHERE out = $tagId`, {
-            tagId: new StringRecordId(tagId),
-        });
-        await this.store.query(`DELETE child_of WHERE in = $tagId AND out = $root`, {
-            tagId: new StringRecordId(tagId),
-            root: new StringRecordId(PROCESSING_ROOT_TAG_ID),
-        });
+        const tagId = `tag:inbox:processing:${batchId}`;
+        await this.store.query(`DELETE FROM tagged WHERE out_id = $1`, [tagId]);
+        await this.store.query(
+            `DELETE FROM child_of WHERE in_id = $1 AND out_id = $2`,
+            [tagId, PROCESSING_ROOT_TAG_ID],
+        );
         try {
             await this.store.deleteNode(tagId);
         } catch {
@@ -632,7 +541,7 @@ class InboxProcessor {
                 created_at: Date.now(),
             });
         } catch {
-            // Already exists
+            /* already exists */
         }
         this.processingRootReady = true;
     }
@@ -649,7 +558,7 @@ class InboxProcessor {
                 created_at: Date.now(),
             });
         } catch {
-            // Already exists
+            /* already exists */
         }
         this.assertClaimRootReady = true;
     }
@@ -664,20 +573,18 @@ class InboxProcessor {
     private async backfillAssertClaimLinks(): Promise<void> {
         if (this.assertClaimBackfilled) return;
         await this.ensureAssertClaimRoot();
-        const linkedRows = await this.store.query<Array<{ in: RecordIdLike | string }>>(
-            `SELECT in FROM child_of WHERE out = $root`,
-            { root: new StringRecordId(ASSERT_CLAIM_ROOT_TAG_ID) },
+        const linkedRows = await this.store.query<{ in_id: string }>(
+            `SELECT in_id FROM child_of WHERE out_id = $1`,
+            [ASSERT_CLAIM_ROOT_TAG_ID],
         );
-        for (const row of linkedRows ?? []) {
-            this.assertClaimLinked.add(String(row.in));
-        }
-        const tagRows = await this.store.query<Array<{ id: RecordIdLike | string }>>(
-            `SELECT id FROM tag WHERE string::starts_with(label, 'inbox:assert-claim:')
-             AND label != $rootLabel`,
-            { rootLabel: ASSERT_CLAIM_ROOT_LABEL },
+        for (const row of linkedRows) this.assertClaimLinked.add(row.in_id);
+
+        const tagRows = await this.store.query<{ id: string }>(
+            `SELECT id FROM tag WHERE label LIKE 'inbox:assert-claim:%' AND label != $1`,
+            [ASSERT_CLAIM_ROOT_LABEL],
         );
-        for (const row of tagRows ?? []) {
-            const tagId = String(row.id);
+        for (const row of tagRows) {
+            const tagId = row.id;
             if (!this.assertClaimLinked.has(tagId)) {
                 await this.store.relate(tagId, "child_of", ASSERT_CLAIM_ROOT_TAG_ID);
                 this.assertClaimLinked.add(tagId);
@@ -688,7 +595,7 @@ class InboxProcessor {
 
     private toMemoryEntry(raw: RawMemoryRow): MemoryEntry {
         return {
-            id: String(raw.id),
+            id: raw.id,
             content: raw.content,
             eventTime: raw.event_time,
             createdAt: raw.created_at,
@@ -696,12 +603,6 @@ class InboxProcessor {
         };
     }
 
-    /**
-     * Materialize OwnedMemory entries for a batch. The per-memory work (node
-     * fetch, tags query, owned_by query) runs in parallel via `Promise.all`
-     * rather than sequentially. All three underlying queries use `= $id`-style
-     * record-id lookups, which are O(1) RecordIdScans in SurrealDB.
-     */
     private async buildOwnedMemoryEntries(
         memoryIds: string[],
         domainId?: string,
@@ -710,72 +611,69 @@ class InboxProcessor {
 
         const perMemory = await Promise.all(
             memoryIds.map(async (memId): Promise<OwnedMemory | null> => {
-                const memIdRef = new StringRecordId(memId);
-                const domainIdRef = domainId
-                    ? new StringRecordId(`domain:${domainId}`)
-                    : null;
+                const targetDomainId = domainId ? `domain:${domainId}` : null;
 
-                const [node, allTags, ownedByEdges] = await Promise.all([
+                const [nodeRows, tagRows, ownedByRows] = await Promise.all([
                     this.debug.time(
                         "buildSimilarityBatch.buildOwnedMemoryEntries.getNode",
-                        () => this.store.getNode<Node & RawMemoryRow>(memId),
+                        () =>
+                            this.store.query<RawMemoryRow>(
+                                `SELECT id, content, event_time, created_at, token_count, structured_data
+                                 FROM memory WHERE id = $1`,
+                                [memId],
+                            ),
                     ),
                     this.debug.time(
                         "buildSimilarityBatch.buildOwnedMemoryEntries.fetchTags",
                         () =>
-                            this.store.query<string[]>(
-                                `SELECT VALUE out.label FROM tagged WHERE in = $memId`,
-                                { memId: memIdRef },
+                            this.store.query<{ label: string }>(
+                                `SELECT t.label FROM tagged tg
+                                 JOIN tag t ON t.id = tg.out_id
+                                 WHERE tg.in_id = $1`,
+                                [memId],
                             ),
                     ),
-                    domainIdRef
+                    targetDomainId
                         ? this.debug.time(
-                            "buildSimilarityBatch.buildOwnedMemoryEntries.fetchOwnedBy",
-                            // Filter on `in` only — Surreal's planner picks the
-                            // less selective `idx_owned_by_out` when both `in`
-                            // and `out` are constrained, then falls back to a
-                            // Filter predicate that scans every edge to the
-                            // domain (super-linear in corpus size). `in =` alone
-                            // hits `idx_owned_by_in` directly. Each memory has
-                            // ≤ N domains worth of edges, so we filter the
-                            // matching `out` in JS.
-                            async () => {
-                                const rows = await this.store.query<
-                                    Array<RawOwnedByEdge & { out?: string }>
-                                >(
-                                    "SELECT attributes, owned_at, out FROM owned_by WHERE in = $memId",
-                                    { memId: memIdRef },
-                                );
-                                if (!rows) return null;
-                                const target = `domain:${domainId}`;
-                                return rows.filter(
-                                    (row) => String(row.out) === target,
-                                );
-                            },
-                        )
+                              "buildSimilarityBatch.buildOwnedMemoryEntries.fetchOwnedBy",
+                              // Filter on `in_id` only and reduce in JS — keeps
+                              // the per-direction `idx_owned_by_in` hit and avoids
+                              // any planner issue when both sides are constrained.
+                              async () => {
+                                  const rows = await this.store.query<{
+                                      attributes: unknown;
+                                      owned_at: number | null;
+                                      out_id: string;
+                                  }>(
+                                      `SELECT attributes, owned_at, out_id
+                                       FROM owned_by WHERE in_id = $1`,
+                                      [memId],
+                                  );
+                                  return rows.filter((r) => r.out_id === targetDomainId);
+                              },
+                          )
                         : Promise.resolve(null),
                 ]);
 
+                const node = nodeRows[0];
                 if (!node) return null;
 
-                const memory = this.toMemoryEntry({
-                    id: node.id,
-                    content: node.content,
-                    event_time: node.event_time,
-                    created_at: node.created_at,
-                    token_count: node.token_count,
-                });
+                const memory = this.toMemoryEntry(node);
 
-                const tags = (allTags ?? [])
-                    .filter((label): label is string => typeof label === "string")
-                    .filter((l) => !l.startsWith("inbox"));
+                const tags = tagRows
+                    .map((r) => r.label)
+                    .filter((label) => !label.startsWith("inbox"));
 
+                const firstOwned = ownedByRows?.[0];
                 const domainAttributes: Record<string, unknown> =
-                    ownedByEdges?.[0]?.attributes ?? {};
+                    firstOwned && firstOwned.attributes && typeof firstOwned.attributes === "object"
+                        ? (firstOwned.attributes as Record<string, unknown>)
+                        : {};
 
+                const sd = node.structured_data;
                 const structuredData =
-                    domainId && node.structured_data?.[domainId] !== undefined
-                        ? node.structured_data[domainId]
+                    domainId && sd && typeof sd === "object" && domainId in sd
+                        ? (sd as Record<string, unknown>)[domainId]
                         : undefined;
 
                 return { memory, domainAttributes, tags, structuredData };
@@ -795,59 +693,60 @@ class InboxProcessor {
             const { batchId, entries, memoryIds, requestContext } = batch;
 
             try {
-                // Collect assert-claim tags for each memory to know which domains to call
                 const memoryDomainMap = new Map<string, string[]>();
                 const allDomainIds = new Set<string>();
 
                 for (const memId of memoryIds) {
-                    const assertTags = await this.store.query<string[]>(
-                        `SELECT VALUE out.label FROM tagged
-             WHERE in = $memId AND out.label IS NOT NONE AND string::starts_with(out.label, 'inbox:assert-claim:')`,
-                        { memId: new StringRecordId(memId) },
+                    const tagRows = await this.store.query<{ label: string }>(
+                        `SELECT t.label FROM tagged tg
+                         JOIN tag t ON t.id = tg.out_id
+                         WHERE tg.in_id = $1
+                           AND t.label LIKE 'inbox:assert-claim:%'`,
+                        [memId],
                     );
-                    const domainIds = (assertTags ?? []).map((label) =>
-                        label.slice("inbox:assert-claim:".length),
+                    const domainIds = tagRows.map((r) =>
+                        r.label.slice("inbox:assert-claim:".length),
                     );
                     memoryDomainMap.set(memId, domainIds);
                     for (const d of domainIds) allDomainIds.add(d);
                 }
 
-                for (const domainId of allDomainIds) {
-                    const domain = this.domainRegistry.get(domainId);
+                for (const did of allDomainIds) {
+                    const domain = this.domainRegistry.get(did);
                     if (!domain?.assertInboxClaimBatch) continue;
 
                     const domainEntries = entries.filter((e) =>
-                        memoryDomainMap.get(e.memory.id)?.includes(domainId),
+                        memoryDomainMap.get(e.memory.id)?.includes(did),
                     );
                     if (domainEntries.length === 0) continue;
 
-                    const domainMemoryIds = domainEntries.map((entry) => entry.memory.id);
-                    const assertTagId = `tag:\`inbox:assert-claim:${domainId}\``;
+                    const domainMemoryIds = domainEntries.map((e) => e.memory.id);
+                    const assertTagId = `tag:inbox:assert-claim:${did}`;
 
-                    const ctx = this.contextFactory(domainId, requestContext);
+                    const ctx = this.contextFactory(did, requestContext);
                     try {
                         const claimedIds = await this.debug.time(
                             "assertBatch.domain",
                             () => domain.assertInboxClaimBatch!(domainEntries, ctx),
-                            { domainId, entries: domainEntries.length },
+                            { domainId: did, entries: domainEntries.length },
                         );
                         await this.clearBatchFailureRecord(
                             "assert",
-                            domainId,
+                            did,
                             domainMemoryIds,
                             requestContext,
                         );
 
                         for (const memId of claimedIds) {
-                            const fullDomainId = `domain:${domainId}`;
+                            const fullDomainId = `domain:${did}`;
                             await this.store.relate(memId, "owned_by", fullDomainId, {
                                 attributes: {},
                                 owned_at: Date.now(),
                             });
-                            const inboxTagId = `tag:\`inbox:${domainId}\``;
+                            const inboxTagId = `tag:inbox:${did}`;
                             try {
                                 await this.store.createNodeWithId(inboxTagId, {
-                                    label: `inbox:${domainId}`,
+                                    label: `inbox:${did}`,
                                     created_at: Date.now(),
                                 });
                             } catch {
@@ -862,21 +761,20 @@ class InboxProcessor {
                     } catch (err) {
                         this.events.emit("error", {
                             source: "inbox-assertion",
-                            domainId,
+                            domainId: did,
                             error: err,
                         });
 
                         const failure = await this.recordBatchFailure(
                             "assert",
-                            domainId,
+                            did,
                             domainMemoryIds,
                             requestContext,
                             err,
                         );
-
                         if (failure.status === "quarantined") {
                             const failedTagId = await this.ensureTag(
-                                `inbox:failed-assert-claim:${domainId}`,
+                                `inbox:failed-assert-claim:${did}`,
                             );
                             for (const memId of domainMemoryIds) {
                                 await this.store.unrelate(memId, "tagged", assertTagId);
@@ -887,11 +785,11 @@ class InboxProcessor {
                 }
 
                 for (const memId of memoryIds) {
-                    const owners = await this.store.query<{ count: number }[]>(
-                        "SELECT count() AS count FROM owned_by WHERE in = $memId GROUP ALL",
-                        { memId: new StringRecordId(memId) },
+                    const owners = await this.store.query<{ count: number }>(
+                        `SELECT COUNT(*)::int AS count FROM owned_by WHERE in_id = $1`,
+                        [memId],
                     );
-                    const ownerCount = owners && owners.length > 0 ? owners[0].count : 0;
+                    const ownerCount = owners[0]?.count ?? 0;
                     const activeAssertCount = await this.countTagsByPrefix(
                         memId,
                         "inbox:assert-claim:",
@@ -906,7 +804,6 @@ class InboxProcessor {
                     } else {
                         await this.clearRootInboxIfNoActiveTags(memId);
                     }
-
                     this.events.emit("inboxClaimAsserted", {
                         memoryId: memId,
                         claimed: ownerCount > 0,
@@ -924,71 +821,57 @@ class InboxProcessor {
 
     private async processInboxBatch(): Promise<number> {
         return this.debug.time("processBatch.total", async () => {
-            const taggedRows = await this.store.query<RawTaggedRow[]>(
-                `SELECT in, out.label AS label FROM tagged
-         WHERE out.label IS NOT NONE
-           AND string::starts_with(out.label, 'inbox:')
-           AND !string::starts_with(out.label, 'inbox:assert-claim:')
-           AND !string::starts_with(out.label, 'inbox:failed')
-           AND !string::starts_with(out.label, 'inbox:processing:')
-         LIMIT $limit`,
-                { limit: this.batchLimit * 10 },
+            const taggedRows = await this.store.query<{ in_id: string; label: string }>(
+                `SELECT tg.in_id, t.label FROM tagged tg
+                 JOIN tag t ON t.id = tg.out_id
+                 WHERE t.label LIKE 'inbox:%'
+                   AND t.label NOT LIKE 'inbox:assert-claim:%'
+                   AND t.label NOT LIKE 'inbox:failed%'
+                   AND t.label NOT LIKE 'inbox:processing:%'
+                 LIMIT $1`,
+                [this.batchLimit * 10],
             );
-
-            if (!taggedRows || taggedRows.length === 0) return 0;
+            if (taggedRows.length === 0) return 0;
 
             const domainIds = new Set<string>();
-            for (const row of taggedRows) {
-                domainIds.add(row.label.slice("inbox:".length));
-            }
+            for (const row of taggedRows) domainIds.add(row.label.slice("inbox:".length));
 
             let totalProcessed = 0;
-
-            for (const domainId of domainIds) {
-                const domain = this.domainRegistry.get(domainId);
+            for (const did of domainIds) {
+                const domain = this.domainRegistry.get(did);
                 if (!domain) continue;
 
-                const batch = await this.buildSimilarityBatch(
-                    { type: "domain", domainId },
-                    domainId,
-                );
+                const batch = await this.buildSimilarityBatch({ type: "domain", domainId: did }, did);
                 if (!batch) continue;
 
                 const { batchId, entries, memoryIds, requestContext } = batch;
-
                 try {
-                    const ctx = this.contextFactory(domainId, requestContext);
-                    const inboxTagId = `tag:\`inbox:${domainId}\``;
+                    const ctx = this.contextFactory(did, requestContext);
+                    const inboxTagId = `tag:inbox:${did}`;
 
                     try {
                         await this.debug.time(
                             "processBatch.domain",
                             () => domain.processInboxBatch(entries, ctx),
-                            { domainId, entries: entries.length },
+                            { domainId: did, entries: entries.length },
                         );
                         await this.clearBatchFailureRecord(
                             "process",
-                            domainId,
+                            did,
                             memoryIds,
                             requestContext,
                         );
                     } catch (err) {
-                        this.events.emit("error", {
-                            source: "inbox",
-                            domainId,
-                            error: err,
-                        });
-
+                        this.events.emit("error", { source: "inbox", domainId: did, error: err });
                         const failure = await this.recordBatchFailure(
                             "process",
-                            domainId,
+                            did,
                             memoryIds,
                             requestContext,
                             err,
                         );
-
                         if (failure.status === "quarantined") {
-                            const failedTagId = await this.ensureTag(`inbox:failed:${domainId}`);
+                            const failedTagId = await this.ensureTag(`inbox:failed:${did}`);
                             await Promise.all(
                                 memoryIds.map(async (memId) => {
                                     await this.store.unrelate(memId, "tagged", inboxTagId);
@@ -997,17 +880,18 @@ class InboxProcessor {
                                 }),
                             );
                         }
-
                         continue;
                     }
 
                     await Promise.all(
                         memoryIds.map(async (memId) => {
                             await this.store.unrelate(memId, "tagged", inboxTagId);
-                            this.events.emit("inboxDomainProcessed", { memoryId: memId, domainId });
+                            this.events.emit("inboxDomainProcessed", {
+                                memoryId: memId,
+                                domainId: did,
+                            });
                         }),
                     );
-
                     await Promise.all(
                         memoryIds.map((memId) => this.clearRootInboxIfNoActiveTags(memId)),
                     );
@@ -1017,7 +901,6 @@ class InboxProcessor {
                     await this.removeBatchProcessingTag(batchId);
                 }
             }
-
             return totalProcessed;
         });
     }
@@ -1025,9 +908,7 @@ class InboxProcessor {
     // --- Cleanup ---
 
     private async removeOrphanedMemory(memId: string): Promise<void> {
-        await this.store.query("DELETE tagged WHERE in = $memId", {
-            memId: new StringRecordId(memId),
-        });
+        await this.store.query(`DELETE FROM tagged WHERE in_id = $1`, [memId]);
         await this.store.deleteNode(memId);
         this.events.emit("deleted", { memoryId: memId, reason: "unclaimed" });
     }
@@ -1085,7 +966,6 @@ class InboxProcessor {
 
     private async acquireLock(): Promise<boolean> {
         const existing = await this.store.getNode<Node & { value?: string }>("meta:_inbox_lock");
-
         if (existing?.value) {
             const parsed: unknown = JSON.parse(existing.value);
             const lockedAt =
@@ -1094,14 +974,10 @@ class InboxProcessor {
                     : undefined;
             if (typeof lockedAt === "number") {
                 const age = Date.now() - lockedAt;
-                if (age < this.staleAfterMs) {
-                    return false;
-                }
+                if (age < this.staleAfterMs) return false;
             }
         }
-
         const payload: InboxLockPayload = { lockedAt: Date.now() };
-
         try {
             if (existing) {
                 await this.store.updateNode("meta:_inbox_lock", { value: JSON.stringify(payload) });
@@ -1113,7 +989,6 @@ class InboxProcessor {
         } catch {
             return false;
         }
-
         return true;
     }
 
@@ -1121,7 +996,7 @@ class InboxProcessor {
         try {
             await this.store.deleteNode("meta:_inbox_lock");
         } catch {
-            // Best-effort — staleness will handle it
+            /* best-effort — staleness handles it */
         }
     }
 }

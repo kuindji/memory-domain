@@ -46,15 +46,25 @@ export interface Edge {
 }
 
 export interface GraphApi {
-    createNode(type: string, data: Record<string, unknown>): Promise<string>;
+    createNode(table: string, data: Record<string, unknown>): Promise<string>;
     createNodeWithId(id: string, data: Record<string, unknown>): Promise<string>;
     getNode<T extends Node = Node>(id: string): Promise<T | null>;
+    getNodes<T extends Node = Node>(ids: string[]): Promise<T[]>;
     updateNode(id: string, data: Record<string, unknown>): Promise<void>;
     deleteNode(id: string): Promise<boolean>;
+    deleteNodes(ids: string[]): Promise<void>;
     relate(from: string, edge: string, to: string, data?: Record<string, unknown>): Promise<string>;
     unrelate(from: string, edge: string, to: string): Promise<boolean>;
-    traverse<T = Node>(from: string, pattern: string): Promise<T[]>;
-    query<T = unknown>(surql: string, vars?: Record<string, unknown>): Promise<T>;
+    outgoing<T = Edge>(from: string, edge: string): Promise<T[]>;
+    incoming<T = Edge>(to: string, edge: string): Promise<T[]>;
+    deleteEdges(
+        edge: string,
+        where: { in?: string | string[]; out?: string | string[] },
+    ): Promise<void>;
+    /** Raw SQL escape hatch — Postgres syntax with positional ($1, $2, ...) params. */
+    query<T = unknown>(sql: string, params?: unknown[]): Promise<T[]>;
+    /** Run a parameter-free statement (DDL etc.). */
+    run(sql: string): Promise<void>;
     transaction<T>(fn: (tx: GraphApi) => Promise<T>): Promise<T>;
 }
 
