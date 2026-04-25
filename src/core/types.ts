@@ -515,7 +515,9 @@ export interface EmbeddingAdapter {
 // --- Connection adapter types ---
 
 export interface ConnectionAdapter {
-    resolve(): Promise<string>;
+    /** Returns the database config the engine should connect with. */
+    resolve(): Promise<import("../adapters/pg/types.js").DbConfig>;
+    /** Persist the local data dir back to its origin (for tarball-backed adapters). */
     save(): Promise<void>;
 }
 
@@ -549,11 +551,17 @@ export interface BedrockAdapterConfig {
 // --- Config types ---
 
 export interface EngineConfig {
-    connection?: string;
+    /** Postgres database config. Use `{ kind: 'pglite' }` for in-memory tests. */
+    db?: import("../adapters/pg/types.js").DbConfig;
+    /** Optional adapter that resolves to a DbConfig (e.g. file/s3/directory tarball stagers). Overrides `db` when present. */
     adapter?: ConnectionAdapter;
-    namespace?: string;
-    database?: string;
-    credentials?: { user: string; pass: string };
+    /**
+     * Legacy connection-string field parsed to DbConfig:
+     *   `mem://` → in-memory PGLite
+     *   `surrealkv://<path>` or `pglite://<path>` → file-backed PGLite at `<path>`
+     *   `postgres://...` or `postgresql://...` → managed Postgres via Bun.SQL
+     */
+    connection?: string;
     llm: LLMAdapter;
     embedding?: EmbeddingAdapter;
     repetition?: RepetitionConfig;

@@ -21,11 +21,11 @@ describe("GraphStore over Postgres", () => {
                 metadata: { source: "test" },
             });
             expect(id).toMatch(/^memory:[0-9a-f-]+$/);
-            const got = await graph.getNode<{
-                id: string;
-                content: string;
-                metadata: Record<string, unknown>;
-            }>(id);
+            const got = await graph.getNode<
+                { id: string; content: string; metadata: Record<string, unknown> } & {
+                    [k: string]: unknown;
+                }
+            >(id);
             expect(got?.content).toBe("hello");
             expect(got?.metadata).toEqual({ source: "test" });
         } finally {
@@ -72,7 +72,9 @@ describe("GraphStore over Postgres", () => {
                 token_count: 0,
             });
             await graph.updateNode(id, { content: "v2", structured_data: { k: 1 } });
-            const got = await graph.getNode<{ content: string; structured_data: unknown }>(id);
+            const got = await graph.getNode<
+                { id: string; content: string; structured_data: unknown } & { [k: string]: unknown }
+            >(id);
             expect(got?.content).toBe("v2");
             expect(got?.structured_data).toEqual({ k: 1 });
         } finally {

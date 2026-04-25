@@ -49,11 +49,9 @@
         "@clack/prompts": "^1.2.0",
         "@electric-sql/pglite": "^0.4.4",
         "@huggingface/transformers": "^4.1.0",
-        "@surrealdb/node": "^3.0.0",
         "jiti": "^2.6.1",
         "js-tiktoken": "^1.0.21",
         "onnxruntime-node": "^1.24.1",
-        "surrealdb": "^2.0.0",
         "tar": "^7.5.13"
     },
     "devDependencies": {

@@ -9,6 +9,7 @@ import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3
 import { fromIni } from "@aws-sdk/credential-providers";
 import * as tar from "tar";
 import type { ConnectionAdapter, S3AdapterConfig } from "../../core/types.js";
+import type { DbConfig } from "../pg/types.js";
 
 type Downloader = () => Promise<Buffer | null>;
 type Uploader = (data: Buffer) => Promise<void>;
@@ -85,15 +86,13 @@ class S3ConnectionAdapter implements ConnectionAdapter {
         return this.localDir;
     }
 
-    async resolve(): Promise<string> {
+    async resolve(): Promise<DbConfig> {
         mkdirSync(this.localDir, { recursive: true });
-
         const archive = await this.downloader();
         if (archive) {
             await this.extract(archive);
         }
-
-        return `surrealkv://${this.localDir}/db`;
+        return { kind: "pglite", dataDir: join(this.localDir, "db") };
     }
 
     async save(): Promise<void> {

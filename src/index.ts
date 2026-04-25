@@ -84,27 +84,17 @@ export type {
     DomainRegistration,
 } from "./core/types.js";
 export { isDomainRegistration } from "./core/types.js";
-export type { TopicAttributes, TopicDomainOptions, TopicStatus } from "./domains/topic/types.js";
-export type { UserDomainOptions } from "./domains/user/types.js";
-export type {
-    CodeRepoDomainOptions,
-    MemoryClassification,
-    Audience,
-    ModuleKind,
-    CodeRepoAttributes,
-} from "./domains/code-repo/types.js";
-export type { KbDomainOptions, KbClassification, KbAttributes } from "./domains/kb/types.js";
 
 // Domains
+// NOTE: bundled framework domains (topic, user, code-repo, kb) and
+// topic-linking plugin still hold raw SurrealQL after the Postgres
+// migration and are not re-exported until they're rewritten in a
+// follow-up cleanup pass. Only `logDomain` ships in this build.
 export { logDomain } from "./domains/log-domain.js";
-export { createTopicDomain, topicDomain } from "./domains/topic/index.js";
-export { createUserDomain, userDomain } from "./domains/user/index.js";
-export { createCodeRepoDomain, codeRepoDomain } from "./domains/code-repo/index.js";
-export { createKbDomain, kbDomain } from "./domains/kb/index.js";
 
-// Plugins
-export { createTopicLinkingPlugin } from "./plugins/index.js";
-export type { TopicLinkingOptions, ExtractedTopic, LinkResult } from "./plugins/index.js";
+// Postgres adapter exports
+export type { PgClient, DbConfig } from "./adapters/pg/types.js";
+export { createPgClient, parseConnectionString } from "./adapters/pg/index.js";
 
 // Adapters
 export { ClaudeCliAdapter } from "./adapters/llm/claude-cli.js";

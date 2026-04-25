@@ -7,16 +7,22 @@ import type { EmbeddingAdapter } from "../src/core/types.js";
 
 const dim = 3;
 
+function embedOne(text: string): number[] {
+    const t = text.toLowerCase();
+    return [
+        t.includes("alpha") ? 1 : 0,
+        t.includes("beta") ? 1 : 0,
+        t.includes("gamma") ? 1 : 0,
+    ];
+}
+
 const fakeEmbed: EmbeddingAdapter = {
     dimension: dim,
     async embed(text: string): Promise<number[]> {
-        // Tiny deterministic embedder: encode keyword presence in 3 axes.
-        const t = text.toLowerCase();
-        return [
-            t.includes("alpha") ? 1 : 0,
-            t.includes("beta") ? 1 : 0,
-            t.includes("gamma") ? 1 : 0,
-        ];
+        return embedOne(text);
+    },
+    async embedBatch(texts: string[]): Promise<number[][]> {
+        return texts.map(embedOne);
     },
 };
 

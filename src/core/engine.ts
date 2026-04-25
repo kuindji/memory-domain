@@ -1,5 +1,6 @@
-import { Surreal, StringRecordId } from "surrealdb";
-import { createNodeEngines } from "@surrealdb/node";
+import type { PgClient } from "../adapters/pg/types.js";
+import { createPgClient } from "../adapters/pg/factory.js";
+import { parseConnectionString } from "../adapters/pg/parse-connection.js";
 import { GraphStore } from "./graph-store.js";
 import { TunableParamRegistry } from "./tunable-params.js";
 import type { TunableParamDefinition } from "./tunable-params.js";
@@ -79,7 +80,7 @@ function askCacheKey(domainId: string, question: string, skill: string): string 
 }
 
 class MemoryEngine {
-    private db: Surreal | null = null;
+    private db: PgClient | null = null;
     private graph!: GraphStore;
     private schema!: SchemaRegistry;
     private searchEngine!: SearchEngine;
@@ -100,21 +101,17 @@ class MemoryEngine {
     private pluginRequirements = new Map<string, string[]>();
 
     async initialize(config: EngineConfig): Promise<void> {
-        const connection = config.adapter ? await config.adapter.resolve() : config.connection;
-
-        if (!connection) {
-            throw new Error("EngineConfig requires either a 'connection' string or an 'adapter'");
+        let dbConfig = config.db;
+        if (!dbConfig && config.adapter) dbConfig = await config.adapter.resolve();
+        if (!dbConfig && config.connection) dbConfig = parseConnectionString(config.connection);
+        if (!dbConfig) {
+            throw new Error(
+                "EngineConfig requires one of: 'db', 'adapter', or 'connection' (legacy).",
+            );
         }
 
         this.adapter = config.adapter;
-
-        const db = new Surreal({ engines: createNodeEngines() });
-        await db.connect(connection);
-        await db.use({
-            namespace: config.namespace ?? "default",
-            database: config.database ?? "memory",
-        });
-
+        const db = await createPgClient(dbConfig);
         this.db = db;
         this.llm = config.llm;
         this.embedding = config.embedding;
@@ -337,25 +334,20 @@ class MemoryEngine {
         }
 
         if (options.attributes !== undefined) {
-            // Merge attributes into owned_by edge for all owners
-            const owners = await this.graph.query<{ out: unknown; attributes: unknown }[]>(
-                "SELECT out, attributes FROM owned_by WHERE in = $memId",
-                { memId: new StringRecordId(id) },
+            const owners = await this.graph.query<{ out_id: string; attributes: unknown }>(
+                `SELECT out_id, attributes FROM owned_by WHERE in_id = $1`,
+                [id],
             );
-            if (owners) {
-                for (const owner of owners) {
-                    const existing = (owner.attributes as Record<string, unknown>) ?? {};
-                    const merged = { ...existing, ...options.attributes };
-                    const fullDomainId = String(owner.out);
-                    await this.graph.query(
-                        "UPDATE owned_by SET attributes = $attrs WHERE in = $memId AND out = $domainId",
-                        {
-                            memId: new StringRecordId(id),
-                            domainId: new StringRecordId(fullDomainId),
-                            attrs: merged,
-                        },
-                    );
-                }
+            for (const owner of owners) {
+                const existing =
+                    owner.attributes && typeof owner.attributes === "object"
+                        ? (owner.attributes as Record<string, unknown>)
+                        : {};
+                const merged = { ...existing, ...options.attributes };
+                await this.graph.query(
+                    `UPDATE owned_by SET attributes = $1 WHERE in_id = $2 AND out_id = $3`,
+                    [JSON.stringify(merged), id, owner.out_id],
+                );
             }
         }
     }
@@ -364,18 +356,16 @@ class MemoryEngine {
         const node = await this.graph.getNode(id);
         if (!node) throw new Error(`Memory not found: ${id}`);
 
-        // Get all owners and release ownership (cascades to delete when no owners remain)
-        const owners = await this.graph.query<{ out: unknown }[]>(
-            "SELECT out FROM owned_by WHERE in = $memId",
-            { memId: new StringRecordId(id) },
+        const owners = await this.graph.query<{ out_id: string }>(
+            `SELECT out_id FROM owned_by WHERE in_id = $1`,
+            [id],
         );
-        if (owners && owners.length > 0) {
+        if (owners.length > 0) {
             for (const owner of owners) {
-                const domainId = String(owner.out).replace(/^domain:/, "");
+                const domainId = owner.out_id.replace(/^domain:/, "");
                 await this.releaseOwnership(id, domainId);
             }
         } else {
-            // No owners — delete directly
             await this.graph.deleteNode(id);
         }
     }
@@ -398,11 +388,13 @@ class MemoryEngine {
     }
 
     async getMemoryTags(id: string): Promise<string[]> {
-        const rows = await this.graph.query<string[]>(
-            "SELECT VALUE out.label FROM tagged WHERE in = $memId",
-            { memId: new StringRecordId(id) },
+        const rows = await this.graph.query<{ label: string }>(
+            `SELECT t.label FROM tagged tg
+             JOIN tag t ON t.id = tg.out_id
+             WHERE tg.in_id = $1`,
+            [id],
         );
-        return (rows ?? []).filter((label): label is string => typeof label === "string");
+        return rows.map((r) => r.label);
     }
 
     async getEdges(
@@ -415,10 +407,12 @@ class MemoryEngine {
         }
 
         const dir = direction ?? "both";
-        const conditions: string[] = [];
-        if (dir === "out" || dir === "both") conditions.push("in = $nodeId");
-        if (dir === "in" || dir === "both") conditions.push("out = $nodeId");
-        const where = conditions.join(" OR ");
+        const where =
+            dir === "out"
+                ? "in_id = $1"
+                : dir === "in"
+                  ? "out_id = $1"
+                  : "in_id = $1 OR out_id = $1";
 
         const coreEdges = [
             "tagged",
@@ -434,13 +428,12 @@ class MemoryEngine {
         const allEdges = [...new Set([...coreEdges, ...registeredEdges])];
 
         const results: Edge[] = [];
-        const nodeRef = new StringRecordId(nodeId);
         for (const edgeName of allEdges) {
-            const rows = await this.graph.query<Edge[]>(
-                `SELECT * FROM ${edgeName} WHERE ${where}`,
-                { nodeId: nodeRef },
+            const rows = await this.graph.query<Edge>(
+                `SELECT *, in_id AS "in", out_id AS "out" FROM ${edgeName} WHERE ${where}`,
+                [nodeId],
             );
-            if (rows) results.push(...rows);
+            results.push(...rows);
         }
         return results;
     }
@@ -479,20 +472,16 @@ class MemoryEngine {
             const nextFrontier: string[] = [];
 
             for (const nodeId of frontier) {
-                const nodeRef = new StringRecordId(nodeId);
-
                 for (const edgeType of edgeTypes) {
                     const querySource = domainId
                         ? this.createDomainContext(domainId).graph
                         : this.graph;
-                    const rows = await querySource.query<{ out: unknown }[]>(
-                        `SELECT out FROM ${edgeType} WHERE in = $nodeId`,
-                        { nodeId: nodeRef },
+                    const rows = await querySource.query<{ out_id: string }>(
+                        `SELECT out_id FROM ${edgeType} WHERE in_id = $1`,
+                        [nodeId],
                     );
-
-                    if (!rows) continue;
                     for (const row of rows) {
-                        const outId = String(row.out);
+                        const outId = row.out_id;
                         if (!visited.has(outId)) {
                             visited.add(outId);
                             nextFrontier.push(outId);
@@ -516,22 +505,19 @@ class MemoryEngine {
 
     private async queryCoreMemories(domainId: string): Promise<CoreMemory[]> {
         const coreTag = this.coreTagFor(domainId);
-        const tagRef = new StringRecordId(`tag:${coreTag}`);
-        const rows = await this.graph.query<
-            Array<{ id: unknown; content: string; created_at: number }>
-        >(
-            `SELECT in AS id,
-                (SELECT content FROM ONLY $parent.in).content AS content,
-                (SELECT created_at FROM ONLY $parent.in).created_at AS created_at
-             FROM tagged WHERE out = $tagId`,
-            { tagId: tagRef },
+        const tagId = `tag:${coreTag}`;
+        const rows = await this.graph.query<{
+            id: string;
+            content: string;
+            created_at: number;
+        }>(
+            `SELECT m.id, m.content, m.created_at
+             FROM tagged tg
+             JOIN memory m ON m.id = tg.in_id
+             WHERE tg.out_id = $1`,
+            [tagId],
         );
-        if (!rows || rows.length === 0) return [];
-        return rows.map((r) => ({
-            id: String(r.id),
-            content: r.content,
-            createdAt: r.created_at,
-        }));
+        return rows.map((r) => ({ id: r.id, content: r.content, createdAt: r.created_at }));
     }
 
     async addCoreMemory(domainId: string, content: string): Promise<string> {
@@ -595,22 +581,24 @@ class MemoryEngine {
 
                 // Dedup check
                 if (!options?.skipDedup && embeddingVec && this.repetitionConfig) {
+                    const vecLit = `[${embeddingVec.join(",")}]`;
                     const similar = await this.debug.time(
                         "ingest.dedupQuery",
                         () =>
-                            this.graph.query<(Record<string, unknown> & { score: number })[]>(
-                                `SELECT *, vector::similarity::cosine(embedding, $queryVec) AS score
-             FROM memory
-             WHERE embedding <|5,40|> $queryVec
-             ORDER BY score DESC`,
-                                { queryVec: embeddingVec },
+                            this.graph.query<{ id: string; score: number }>(
+                                `SELECT id, 1 - (embedding <=> $1::vector) AS score
+                                 FROM memory
+                                 WHERE embedding IS NOT NULL
+                                 ORDER BY embedding <=> $1::vector ASC
+                                 LIMIT 5`,
+                                [vecLit],
                             ),
                         { chars: text.length },
                     );
 
-                    if (similar && similar.length > 0) {
+                    if (similar.length > 0) {
                         const top = similar[0];
-                        const existingId = String(top.id);
+                        const existingId = top.id;
 
                         if (top.score >= this.repetitionConfig.duplicateThreshold) {
                             this.debug.log("ingest.skippedDuplicate", { existingId });
@@ -807,7 +795,7 @@ class MemoryEngine {
     }
 
     private async ensureInboxTag(label: string, now: number): Promise<string> {
-        const tagId = `tag:\`${label}\``;
+        const tagId = `tag:${label}`;
         try {
             await this.graph.createNodeWithId(tagId, { label, created_at: now });
         } catch {
@@ -869,34 +857,21 @@ class MemoryEngine {
 
         this.events.emit("ownershipRemoved", { memoryId, domainId });
 
-        // Count remaining owners
-        const remaining = await this.graph.query<{ count: number }[]>(
-            "SELECT count() AS count FROM owned_by WHERE in = $memId GROUP ALL",
-            { memId: new StringRecordId(memoryId) },
+        const remaining = await this.graph.query<{ count: number }>(
+            `SELECT COUNT(*)::int AS count FROM owned_by WHERE in_id = $1`,
+            [memoryId],
         );
+        const count = remaining[0]?.count ?? 0;
 
-        const count = remaining && remaining.length > 0 ? remaining[0].count : 0;
-
-        // Delete memory if no owners remain
         if (count === 0) {
-            // Remove all edges first
-            await this.graph.query("DELETE tagged WHERE in = $memId", {
-                memId: new StringRecordId(memoryId),
-            });
-            await this.graph.query("DELETE reinforces WHERE in = $memId OR out = $memId", {
-                memId: new StringRecordId(memoryId),
-            });
-            await this.graph.query("DELETE contradicts WHERE in = $memId OR out = $memId", {
-                memId: new StringRecordId(memoryId),
-            });
-            await this.graph.query("DELETE summarizes WHERE in = $memId OR out = $memId", {
-                memId: new StringRecordId(memoryId),
-            });
-            await this.graph.query("DELETE refines WHERE in = $memId OR out = $memId", {
-                memId: new StringRecordId(memoryId),
-            });
+            await this.graph.query(`DELETE FROM tagged WHERE in_id = $1`, [memoryId]);
+            for (const edgeName of ["reinforces", "contradicts", "summarizes", "refines"]) {
+                await this.graph.query(
+                    `DELETE FROM ${edgeName} WHERE in_id = $1 OR out_id = $1`,
+                    [memoryId],
+                );
+            }
 
-            // Clean domain-registered edges
             const coreEdges = new Set([
                 "tagged",
                 "owned_by",
@@ -909,14 +884,14 @@ class MemoryEngine {
             ]);
             for (const edgeName of this.schema.getRegisteredEdgeNames()) {
                 if (!coreEdges.has(edgeName)) {
-                    await this.graph.query(`DELETE ${edgeName} WHERE in = $memId OR out = $memId`, {
-                        memId: new StringRecordId(memoryId),
-                    });
+                    await this.graph.query(
+                        `DELETE FROM ${edgeName} WHERE in_id = $1 OR out_id = $1`,
+                        [memoryId],
+                    );
                 }
             }
 
             await this.graph.deleteNode(memoryId);
-
             this.events.emit("deleted", { memoryId });
         }
     }
@@ -969,15 +944,14 @@ class MemoryEngine {
         const llm = wrapLLMAdapter(baseLlm, debug, "llm");
 
         async function isMemoryVisible(memoryId: string): Promise<boolean> {
-            const owners = await graph.query<{ out: unknown }[]>(
-                "SELECT out FROM owned_by WHERE in = $memId",
-                { memId: new StringRecordId(memoryId) },
+            const owners = await graph.query<{ out_id: string }>(
+                `SELECT out_id FROM owned_by WHERE in_id = $1`,
+                [memoryId],
             );
-            if (!owners || owners.length === 0) return false;
-            return owners.some((o) => {
-                const ownerDomainId = String(o.out).replace(/^domain:/, "");
-                return visibleDomains.includes(ownerDomainId);
-            });
+            if (owners.length === 0) return false;
+            return owners.some((o) =>
+                visibleDomains.includes(o.out_id.replace(/^domain:/, "")),
+            );
         }
 
         return {
@@ -1019,54 +993,53 @@ class MemoryEngine {
                     return results;
                 }
 
-                // Build composable query for owned memories
                 const requestedDomains = filter?.domains ?? visibleDomains;
                 const targetDomains = requestedDomains.filter((d) => visibleDomains.includes(d));
-                const domainRefs = targetDomains.map(
-                    (d) => new StringRecordId(d.startsWith("domain:") ? d : `domain:${d}`),
+                const domainIds = targetDomains.map((d) =>
+                    d.startsWith("domain:") ? d : `domain:${d}`,
                 );
 
-                const conditions: string[] = ["out IN $domainRefs"];
-                const vars: Record<string, unknown> = { domainRefs };
+                const params: unknown[] = [domainIds];
+                const where: string[] = [`out_id = ANY($1::text[])`];
+                let pi = 2;
 
                 if (filter?.since != null) {
-                    conditions.push("owned_at >= $since");
-                    vars.since = filter.since;
+                    where.push(`owned_at >= $${pi}`);
+                    params.push(filter.since);
+                    pi++;
                 }
 
                 if (filter?.attributes) {
                     for (const [key, value] of Object.entries(filter.attributes)) {
-                        const paramName = `attr_${key}`;
-                        conditions.push(`attributes.${key} = $${paramName}`);
-                        vars[paramName] = value;
+                        // jsonb path equality. attributes is jsonb; lookup key with ->>.
+                        where.push(`attributes->>${"'" + key.replace(/'/g, "''") + "'"} = $${pi}`);
+                        params.push(typeof value === "string" ? value : JSON.stringify(value));
+                        pi++;
                     }
                 }
 
-                const where = conditions.join(" AND ");
-                const limitClause = filter?.limit != null ? " LIMIT $limit" : "";
-                if (filter?.limit != null) vars.limit = filter.limit;
+                let limitClause = "";
+                if (filter?.limit != null) {
+                    limitClause = ` LIMIT $${pi}`;
+                    params.push(filter.limit);
+                    pi++;
+                }
 
-                const surql = `SELECT in FROM owned_by WHERE ${where}${limitClause}`;
-                const rows = await graph.query<{ in: unknown }[]>(surql, vars);
-                if (!rows) return [];
+                const rows = await graph.query<{ in_id: string }>(
+                    `SELECT in_id FROM owned_by WHERE ${where.join(" AND ")}${limitClause}`,
+                    params,
+                );
+                let memoryIds = rows.map((r) => r.in_id);
 
-                let memoryIds = rows.map((r) => String(r.in));
-
-                // Apply tag filter if specified
                 if (filter?.tags && filter.tags.length > 0) {
-                    const tagRefs = filter.tags.map(
-                        (t) => new StringRecordId(t.startsWith("tag:") ? t : `tag:${t}`),
+                    const tagIds = filter.tags.map((t) => (t.startsWith("tag:") ? t : `tag:${t}`));
+                    const taggedRows = await graph.query<{ in_id: string }>(
+                        `SELECT in_id FROM tagged
+                         WHERE in_id = ANY($1::text[]) AND out_id = ANY($2::text[])`,
+                        [memoryIds, tagIds],
                     );
-                    const taggedRows = await graph.query<{ in: unknown }[]>(
-                        `SELECT in FROM tagged WHERE in IN $memIds AND out IN $tagRefs`,
-                        { memIds: memoryIds.map((id) => new StringRecordId(id)), tagRefs },
-                    );
-                    if (taggedRows) {
-                        const taggedIds = new Set(taggedRows.map((r) => String(r.in)));
-                        memoryIds = memoryIds.filter((id) => taggedIds.has(id));
-                    } else {
-                        memoryIds = [];
-                    }
+                    const taggedIds = new Set(taggedRows.map((r) => r.in_id));
+                    memoryIds = memoryIds.filter((id) => taggedIds.has(id));
                 }
 
                 const results: MemoryEntry[] = [];
@@ -1153,18 +1126,16 @@ class MemoryEngine {
                 let frontier = [tagId];
 
                 for (let depth = 0; depth < 10 && frontier.length > 0; depth++) {
-                    const refs = frontier.map((id) => new StringRecordId(id));
-                    const children = await graph.query<string[]>(
-                        "SELECT VALUE in FROM child_of WHERE out IN $parentIds",
-                        { parentIds: refs },
+                    const children = await graph.query<{ in_id: string }>(
+                        `SELECT in_id FROM child_of WHERE out_id = ANY($1::text[])`,
+                        [frontier],
                     );
-                    if (!children || children.length === 0) break;
+                    if (children.length === 0) break;
                     frontier = [];
                     for (const child of children) {
-                        const childStr = String(child);
-                        if (!allDescendants.has(childStr) && childStr !== tagId) {
-                            allDescendants.add(childStr);
-                            frontier.push(childStr);
+                        if (!allDescendants.has(child.in_id) && child.in_id !== tagId) {
+                            allDescendants.add(child.in_id);
+                            frontier.push(child.in_id);
                         }
                     }
                 }
@@ -1204,12 +1175,9 @@ class MemoryEngine {
                     ? domainId
                     : `domain:${domainId}`;
                 await graph.query(
-                    "UPDATE owned_by SET attributes = $attrs WHERE in = $memId AND out = $domainId",
-                    {
-                        memId: new StringRecordId(memoryId),
-                        domainId: new StringRecordId(fullDomainId),
-                        attrs: attributes,
-                    },
+                    `UPDATE owned_by SET attributes = $1
+                     WHERE in_id = $2 AND out_id = $3`,
+                    [JSON.stringify(attributes), memoryId, fullDomainId],
                 );
             },
 
@@ -1239,22 +1207,23 @@ class MemoryEngine {
 
             async getMemoryTags(memoryId: string): Promise<string[]> {
                 if (!(await isMemoryVisible(memoryId))) return [];
-                const rows = await graph.query<string[]>(
-                    "SELECT VALUE out.label FROM tagged WHERE in = $memId",
-                    { memId: new StringRecordId(memoryId) },
+                const rows = await graph.query<{ label: string }>(
+                    `SELECT t.label FROM tagged tg
+                     JOIN tag t ON t.id = tg.out_id
+                     WHERE tg.in_id = $1`,
+                    [memoryId],
                 );
-                return (rows ?? []).filter((label): label is string => typeof label === "string");
+                return rows.map((r) => r.label);
             },
 
             async getNodeEdges(nodeId: string, direction?: "in" | "out" | "both"): Promise<Edge[]> {
                 const dir = direction ?? "both";
-                const conditions: string[] = [];
-                // SurrealDB edge.in = source, edge.out = target
-                // direction 'out' = edges going out from this node (node is source → in = nodeId)
-                // direction 'in' = edges coming into this node (node is target → out = nodeId)
-                if (dir === "out" || dir === "both") conditions.push("in = $nodeId");
-                if (dir === "in" || dir === "both") conditions.push("out = $nodeId");
-                const where = conditions.join(" OR ");
+                const where =
+                    dir === "out"
+                        ? "in_id = $1"
+                        : dir === "in"
+                          ? "out_id = $1"
+                          : "in_id = $1 OR out_id = $1";
 
                 const edgeNames = schema.getRegisteredEdgeNames();
                 const coreEdges = [
@@ -1270,30 +1239,22 @@ class MemoryEngine {
                 const allEdges = [...new Set([...coreEdges, ...edgeNames])];
 
                 const results: Edge[] = [];
-                const nodeRef = new StringRecordId(nodeId);
                 for (const edgeName of allEdges) {
-                    const rows = await graph.query<Edge[]>(
-                        `SELECT * FROM ${edgeName} WHERE ${where}`,
-                        { nodeId: nodeRef },
+                    const rows = await graph.query<Edge>(
+                        `SELECT *, in_id AS "in", out_id AS "out" FROM ${edgeName} WHERE ${where}`,
+                        [nodeId],
                     );
-                    if (rows) results.push(...rows);
+                    results.push(...rows);
                 }
 
-                // Filter edges that connect to memory nodes from non-visible domains
                 const filtered: Edge[] = [];
                 for (const edge of results) {
                     const inId = String(edge.in);
                     const outId = String(edge.out);
-                    // Determine the "other" node — the one that isn't the queried node
                     const otherId = inId === nodeId ? outId : inId;
-
-                    // Only check visibility for memory nodes
                     if (otherId.startsWith("memory:")) {
-                        if (await isMemoryVisible(otherId)) {
-                            filtered.push(edge);
-                        }
+                        if (await isMemoryVisible(otherId)) filtered.push(edge);
                     } else {
-                        // Non-memory nodes (tags, domains, user nodes, etc.) pass through
                         filtered.push(edge);
                     }
                 }

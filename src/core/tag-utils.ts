@@ -1,6 +1,7 @@
 export function formatTagId(label: string): string {
     const stripped = label.startsWith("tag:") ? label.slice(4) : label;
-    return stripped.includes("/") ? `tag:\`${stripped}\`` : `tag:${stripped}`;
+    // Text PKs under Postgres need no escaping — slashes, colons, spaces all OK.
+    return `tag:${stripped}`;
 }
 
 export function tagLabel(label: string): string {

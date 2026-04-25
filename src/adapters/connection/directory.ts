@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { ConnectionAdapter } from "../../core/types.js";
+import type { DbConfig } from "../pg/types.js";
 
 interface DirectoryAdapterConfig {
     /** Absolute path to a directory containing a pre-extracted `db/` subdirectory. */
@@ -8,15 +9,9 @@ interface DirectoryAdapterConfig {
 }
 
 /**
- * Opens an already-extracted SurrealKV database directory in place.
- *
- * Use when a container image bakes an extracted KB or a dev loop builds
- * the DB into a stable location, avoiding the tar extraction cost of
- * FileConnectionAdapter.
- *
- * Read-intended: pair with the Lambda read-only profile. `save()` is a
- * no-op. Do not open the same path twice in one process — SurrealKV
- * expects exclusive access per directory.
+ * Opens an already-extracted PGLite database directory in place. Use when a
+ * container image bakes an extracted DB or a dev loop builds it into a stable
+ * location. `save()` is a no-op — pair with read-only deployments.
  */
 class DirectoryConnectionAdapter implements ConnectionAdapter {
     constructor(private readonly config: DirectoryAdapterConfig) {}
@@ -25,21 +20,20 @@ class DirectoryConnectionAdapter implements ConnectionAdapter {
         return this.config.path;
     }
 
-    resolve(): Promise<string> {
+    resolve(): Promise<DbConfig> {
         const dbPath = join(this.config.path, "db");
         if (!existsSync(dbPath)) {
             return Promise.reject(
                 new Error(
                     `DirectoryConnectionAdapter: ${dbPath} does not exist. ` +
-                        `Expected a pre-extracted SurrealKV database directory.`,
+                        `Expected a pre-extracted PGLite database directory.`,
                 ),
             );
         }
-        return Promise.resolve(`surrealkv://${dbPath}`);
+        return Promise.resolve({ kind: "pglite", dataDir: dbPath });
     }
 
     save(): Promise<void> {
-        // no-op — read-intended adapter
         return Promise.resolve();
     }
 }

@@ -7,6 +7,7 @@ import { pipeline } from "node:stream/promises";
 import { createGunzip } from "node:zlib";
 import * as tar from "tar";
 import type { ConnectionAdapter } from "../../core/types.js";
+import type { DbConfig } from "../pg/types.js";
 
 interface FileAdapterConfig {
     /** Absolute path to the tar.gz archive on disk. */
@@ -30,14 +31,14 @@ class FileConnectionAdapter implements ConnectionAdapter {
         return this.localDir;
     }
 
-    async resolve(): Promise<string> {
+    async resolve(): Promise<DbConfig> {
         mkdirSync(this.localDir, { recursive: true });
         if (existsSync(this.config.file)) {
             const archive = readFileSync(this.config.file);
             const stream = Readable.from(archive);
             await pipeline(stream, createGunzip(), tar.extract({ cwd: this.localDir }));
         }
-        return `surrealkv://${this.localDir}/db`;
+        return { kind: "pglite", dataDir: join(this.localDir, "db") };
     }
 
     async save(): Promise<void> {
