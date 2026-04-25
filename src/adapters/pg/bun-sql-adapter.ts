@@ -39,7 +39,7 @@ class BunSqlClient implements PgClient {
     ) {}
 
     async query<T = Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<T[]> {
-        return this.sql.unsafe<T>(sql, params);
+        return this.sql.unsafe<T>(sql, params.map(encodeParam));
     }
 
     async run(sql: string): Promise<void> {
@@ -59,6 +59,29 @@ class BunSqlClient implements PgClient {
         const closer = this.sql.close ?? this.sql.end.bind(this.sql);
         await closer.call(this.sql);
     }
+}
+
+/**
+ * Bun.SQL's `unsafe(sql, params)` does not serialize JS arrays into Postgres
+ * array literals — it falls back to `Array.toString()` which yields a comma-
+ * joined string, which Postgres then rejects with "malformed array literal".
+ * We pre-format arrays of primitives into the `{val1,val2}` syntax Postgres
+ * expects so call sites can pass plain JS arrays bound against `::text[]`,
+ * `::int[]`, etc.
+ *
+ * Strings are double-quoted with `"` and `\` backslash-escaped. NULL elements
+ * become the literal `NULL`. Nested arrays are not supported (no caller needs
+ * them yet).
+ */
+function encodeParam(value: unknown): unknown {
+    if (!Array.isArray(value)) return value;
+    const parts = value.map((el) => {
+        if (el === null || el === undefined) return "NULL";
+        if (typeof el === "number" || typeof el === "boolean") return String(el);
+        const s = String(el);
+        return `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+    });
+    return `{${parts.join(",")}}`;
 }
 
 export function createBunSqlClient(config: Extract<DbConfig, { kind: "postgres" }>): PgClient {
