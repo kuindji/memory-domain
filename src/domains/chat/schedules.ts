@@ -93,11 +93,14 @@ export async function promoteWorkingMemory(
 
             if (contents.length === 0) continue;
 
-            const facts = await context.debug.time(
-                "chat.schedule.promote.extractFacts",
-                () => context.llmAt("low").extract(contents.join("\n")),
-                { memories: promotedIds.length },
-            );
+            const lowLlm = context.llmAt("low");
+            const facts = lowLlm.extract
+                ? await context.debug.time(
+                    "chat.schedule.promote.extractFacts",
+                    () => lowLlm.extract!(contents.join("\n")),
+                    { memories: promotedIds.length },
+                )
+                : [];
             if (!facts || facts.length === 0) {
                 for (const memId of promotedIds) {
                     await context.releaseOwnership(memId, context.domain);
@@ -263,11 +266,14 @@ export async function consolidateEpisodic(
 
             // Fallback to plain consolidate if extractStructured unavailable or returned nothing
             if (!summary) {
-                summary = await context.debug.time(
-                    "chat.schedule.consolidate.summary",
-                    () => context.llmAt("medium").consolidate(contents),
-                    { memories: contents.length },
-                );
+                const medLlm = context.llmAt("medium");
+                if (medLlm.consolidate) {
+                    summary = await context.debug.time(
+                        "chat.schedule.consolidate.summary",
+                        () => medLlm.consolidate!(contents),
+                        { memories: contents.length },
+                    );
+                }
             }
 
             if (!summary) continue;
@@ -358,11 +364,14 @@ export async function consolidateEpisodic(
                 const dupTarget = dedupCandidates[0];
 
                 // Merge via LLM consolidate
-                const merged = await context.debug.time(
-                    "chat.schedule.consolidate.semanticMerge",
-                    () => context.llmAt("medium").consolidate([summary, dupTarget.content]),
-                    { memories: 2 },
-                );
+                const medLlm = context.llmAt("medium");
+                const merged = medLlm.consolidate
+                    ? await context.debug.time(
+                        "chat.schedule.consolidate.semanticMerge",
+                        () => medLlm.consolidate!([summary, dupTarget.content]),
+                        { memories: 2 },
+                    )
+                    : undefined;
 
                 if (merged) {
                     // Update the new semantic memory with merged content

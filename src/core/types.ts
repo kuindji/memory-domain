@@ -478,9 +478,14 @@ export interface AgentRunResult {
 // --- Adapter types ---
 
 export interface LLMAdapter {
-    extract(text: string, prompt?: string): Promise<string[]>;
+    // All methods are optional. NoLlmAdapter omits every method; callers
+    // MUST gate every invocation on the method's presence
+    // (`if (context.llm.extract) ...`) so that "LLM-free" code paths are
+    // genuinely free of LLM calls instead of relying on try/catch to swallow
+    // a thrown error after the fact.
+    extract?(text: string, prompt?: string): Promise<string[]>;
     extractStructured?(text: string, schema: string, prompt?: string): Promise<unknown[]>;
-    consolidate(memories: string[]): Promise<string>;
+    consolidate?(memories: string[]): Promise<string>;
     assess?(content: string, existingContext: string[]): Promise<number>;
     rerank?(query: string, candidates: { id: string; content: string }[]): Promise<string[]>;
     synthesize?(

@@ -334,6 +334,7 @@ function createTopicLinkingPlugin(options?: TopicLinkingOptions): DomainPlugin {
     ): Promise<Map<string, ExtractedTopic[]>> {
         const result = new Map<string, ExtractedTopic[]>();
         const llm = context.llmAt("low");
+        if (!llm.extractStructured && !llm.extract) return result;
         const topicPrompt = await loadPrompt(PLUGIN_BASE_DIR, "topic-extraction");
 
         const numberedItems = entries.map((e, i) => `${i}. ${e.memory.content}`).join("\n\n");
@@ -364,15 +365,17 @@ function createTopicLinkingPlugin(options?: TopicLinkingOptions): DomainPlugin {
             }
         }
 
-        for (const entry of entries) {
-            try {
-                const topics = await llm.extract(entry.memory.content);
-                result.set(
-                    entry.memory.id,
-                    topics.map((name) => ({ name })),
-                );
-            } catch {
-                result.set(entry.memory.id, []);
+        if (llm.extract) {
+            for (const entry of entries) {
+                try {
+                    const topics = await llm.extract(entry.memory.content);
+                    result.set(
+                        entry.memory.id,
+                        topics.map((name) => ({ name })),
+                    );
+                } catch {
+                    result.set(entry.memory.id, []);
+                }
             }
         }
 
