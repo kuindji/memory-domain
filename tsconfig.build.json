@@ -5,6 +5,24 @@
         "outDir": "dist",
         "rootDir": "src"
     },
-    "include": ["src"],
+    "include": [
+        "src/index.ts",
+        "src/config-loader.ts",
+        "src/core/**/*.ts",
+        "src/adapters/pg/**/*.ts",
+        "src/adapters/connection/**/*.ts",
+        "src/adapters/llm/**/*.ts",
+        "src/adapters/bge-m3-embedding.ts",
+        "src/adapters/cached-embedding.ts",
+        "src/adapters/onnx-embedding.ts",
+        "src/adapters/wordpiece-tokenizer.ts",
+        "src/bin/**/*.ts",
+        "src/cli/**/*.ts",
+        "src/serve/**/*.ts",
+        "src/tui/**/*.ts",
+        "src/domains/log-domain.ts",
+        "src/domains/topic/**/*.ts",
+        "src/plugins/topic-linking.ts"
+    ],
     "exclude": ["src/**/*.test.ts", "src/**/*.spec.ts"]
 }

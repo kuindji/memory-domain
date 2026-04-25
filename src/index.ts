@@ -86,11 +86,13 @@ export type {
 export { isDomainRegistration } from "./core/types.js";
 
 // Domains
-// NOTE: bundled framework domains (topic, user, code-repo, kb) and
-// topic-linking plugin still hold raw SurrealQL after the Postgres
-// migration and are not re-exported until they're rewritten in a
-// follow-up cleanup pass. Only `logDomain` ships in this build.
+// NOTE: bundled framework domains (user, code-repo, kb) still hold raw
+// SurrealQL after the Postgres migration and are not re-exported until
+// they're rewritten in a follow-up cleanup pass.
 export { logDomain } from "./domains/log-domain.js";
+export { createTopicDomain, topicDomain } from "./domains/topic/index.js";
+export { createTopicLinkingPlugin } from "./plugins/topic-linking.js";
+export type { TopicLinkingOptions, ExtractedTopic, LinkResult } from "./plugins/topic-linking.js";
 
 // Postgres adapter exports
 export type { PgClient, DbConfig } from "./adapters/pg/types.js";

@@ -1,6 +1,5 @@
 import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
-import { StringRecordId } from "surrealdb";
 import { loadPrompt } from "../core/prompt-loader.js";
 import type {
     DomainPlugin,
@@ -99,12 +98,8 @@ async function updateTopicOwnershipAttributes(
     attributes: Record<string, unknown>,
 ): Promise<void> {
     await context.graph.query(
-        "UPDATE owned_by SET attributes = $attrs WHERE in = $memId AND out = $domainId",
-        {
-            memId: new StringRecordId(memoryId),
-            domainId: new StringRecordId(`domain:${topicDomainId}`),
-            attrs: attributes,
-        },
+        "UPDATE owned_by SET attributes = $1 WHERE in_id = $2 AND out_id = $3",
+        [JSON.stringify(attributes), memoryId, `domain:${topicDomainId}`],
     );
 }
 
@@ -159,34 +154,29 @@ function createTopicLinkingPlugin(options?: TopicLinkingOptions): DomainPlugin {
         const topicName = topic.name;
         const key = normalizeTopicName(topicName);
         const providedMemoryId = topic.id ? `memory:${topic.id}` : undefined;
-        const domainRef = new StringRecordId(`domain:${topicDomainId}`);
+        const domainId = `domain:${topicDomainId}`;
 
         let topicMemoryId: string | undefined;
         let existingAttrs: Record<string, unknown> | undefined;
         let isNew = false;
 
-        // Tier 0: caller-provided stable id → direct record-id lookup (~0.3ms RecordIdScan).
-        // On hit, skip name/semantic dedup entirely. On miss, fall through so existing
-        // tiers can still catch a name-equivalent topic that a prior run wrote under a
-        // different id.
+        // Tier 0: caller-provided stable id → direct record-id lookup.
         if (providedMemoryId) {
             topicMemoryId = await context.debug.time(
                 "topicLinking.tier0",
                 async () => {
                     try {
-                        const rows = await context.graph.query<
-                            Array<{ id: string; attrs?: Record<string, unknown> | null }>
-                        >(
-                            `SELECT id,
-                                    (SELECT VALUE attributes FROM owned_by
-                                       WHERE in = $parent.id AND out = $domainId)[0] AS attrs
-                             FROM memory WHERE id = $memId LIMIT 1`,
-                            {
-                                memId: new StringRecordId(providedMemoryId),
-                                domainId: domainRef,
-                            },
+                        const rows = await context.graph.query<{
+                            id: string;
+                            attrs: Record<string, unknown> | null;
+                        }>(
+                            `SELECT m.id AS id,
+                                    (SELECT ob.attributes FROM owned_by ob
+                                       WHERE ob.in_id = m.id AND ob.out_id = $2 LIMIT 1) AS attrs
+                             FROM memory m WHERE m.id = $1 LIMIT 1`,
+                            [providedMemoryId, domainId],
                         );
-                        const first = Array.isArray(rows) ? rows[0] : undefined;
+                        const first = rows[0];
                         if (!first?.id) return undefined;
                         if (first.attrs && typeof first.attrs === "object") {
                             existingAttrs = first.attrs;
@@ -209,23 +199,23 @@ function createTopicLinkingPlugin(options?: TopicLinkingOptions): DomainPlugin {
             }
         }
 
-        // Tier B: indexed exact-match DB lookup on cache miss. O(log N) via idx_memory_name_normalized.
-        // Also fetches existing domain attributes so the updateAttributes call below doesn't clobber them.
+        // Tier B: indexed exact-match DB lookup on cache miss.
         if (!topicMemoryId && key) {
             topicMemoryId = await context.debug.time(
                 "topicLinking.exactLookup",
                 async () => {
                     try {
-                        const rows = await context.graph.query<
-                            Array<{ id: string; attrs?: Record<string, unknown> | null }>
-                        >(
-                            `SELECT id,
-                                    (SELECT VALUE attributes FROM owned_by
-                                       WHERE in = $parent.id AND out = $domainId)[0] AS attrs
-                             FROM memory WHERE name_normalized = $key LIMIT 1`,
-                            { key, domainId: domainRef },
+                        const rows = await context.graph.query<{
+                            id: string;
+                            attrs: Record<string, unknown> | null;
+                        }>(
+                            `SELECT m.id AS id,
+                                    (SELECT ob.attributes FROM owned_by ob
+                                       WHERE ob.in_id = m.id AND ob.out_id = $2 LIMIT 1) AS attrs
+                             FROM memory m WHERE m.name_normalized = $1 LIMIT 1`,
+                            [key, domainId],
                         );
-                        const first = Array.isArray(rows) ? rows[0] : undefined;
+                        const first = rows[0];
                         if (!first?.id) return undefined;
                         if (first.attrs && typeof first.attrs === "object") {
                             existingAttrs = first.attrs;
@@ -240,8 +230,6 @@ function createTopicLinkingPlugin(options?: TopicLinkingOptions): DomainPlugin {
         }
 
         // Tier C (existing): similarity search — catches near-name matches the exact tiers miss.
-        // Vector-only: HNSW is O(log N) and dedup is exact-match-adjacent — fulltext/graph
-        // contribute drift without recall benefit for short topic names.
         if (!topicMemoryId) {
             const searchResult = await context.debug.time(
                 "topicLinking.dedupSearch",
@@ -296,10 +284,10 @@ function createTopicLinkingPlugin(options?: TopicLinkingOptions): DomainPlugin {
                 if (key) {
                     // Populate denormalized exact-match field so tier B hits on next occurrence.
                     try {
-                        await context.graph.query("UPDATE $id SET name_normalized = $key", {
-                            id: new StringRecordId(newId),
-                            key,
-                        });
+                        await context.graph.query(
+                            "UPDATE memory SET name_normalized = $1 WHERE id = $2",
+                            [key, newId],
+                        );
                     } catch {
                         /* best-effort — next bootstrap backfill will catch it */
                     }
@@ -458,10 +446,10 @@ function createTopicLinkingPlugin(options?: TopicLinkingOptions): DomainPlugin {
                     await context.debug.time(
                         "topicLinking.denormalize",
                         () =>
-                            context.graph.query("UPDATE $memId SET topics = $topics", {
-                                memId: new StringRecordId(entry.memory.id),
-                                topics: topicNames,
-                            }),
+                            context.graph.query(
+                                "UPDATE memory SET topics = $1 WHERE id = $2",
+                                [JSON.stringify(topicNames), entry.memory.id],
+                            ),
                         { topicCount: topicNames.length },
                     );
                 } catch {
@@ -479,12 +467,15 @@ function createTopicLinkingPlugin(options?: TopicLinkingOptions): DomainPlugin {
                 .filter((w) => w.length > 3);
             if (words.length === 0) return [];
 
-            const topicTagId = new StringRecordId(`tag:${topicTag}`);
-            const results = await graph.query<Array<{ id: string; content: string }>>(
-                `SELECT in as id, (SELECT content FROM ONLY $parent.in).content as content FROM tagged WHERE out = $tagId`,
-                { tagId: topicTagId },
+            const topicTagId = `tag:${topicTag}`;
+            // Join tagged → memory to get content of all topic-tagged memories.
+            const results = await graph.query<{ id: string; content: string }>(
+                `SELECT t.in_id AS id, m.content AS content
+                 FROM tagged t JOIN memory m ON m.id = t.in_id
+                 WHERE t.out_id = $1`,
+                [topicTagId],
             );
-            if (!Array.isArray(results) || results.length === 0) return [];
+            if (results.length === 0) return [];
 
             return results
                 .filter((r) => {
@@ -556,45 +547,49 @@ function createTopicLinkingPlugin(options?: TopicLinkingOptions): DomainPlugin {
             async bootstrap(context: DomainContext): Promise<void> {
                 // One-time backfill: populate name_normalized on existing topic memories so tier B
                 // (indexed exact-match) can find them on first occurrence in a new process. Idempotent
-                // via the IS NONE guard — later runs are no-ops.
+                // via the IS NULL guard — later runs are no-ops.
                 try {
-                    const topicTagRef = new StringRecordId(`tag:${topicTag}`);
+                    const topicTagRef = `tag:${topicTag}`;
                     await context.graph.query(
-                        `UPDATE (SELECT VALUE in FROM tagged WHERE out = $tagId)
-                         SET name_normalized = string::lowercase(string::trim(content))
-                         WHERE name_normalized IS NONE`,
-                        { tagId: topicTagRef },
+                        `UPDATE memory
+                            SET name_normalized = lower(btrim(content))
+                          WHERE name_normalized IS NULL
+                            AND id IN (SELECT in_id FROM tagged WHERE out_id = $1)`,
+                        [topicTagRef],
                     );
                 } catch {
                     /* best-effort — missing field just means tier B misses on legacy rows */
                 }
 
                 if (denormalize) {
-                    const domainRef = new StringRecordId(`domain:${context.domain}`);
-                    const rows = await context.graph.query<
-                        Array<{ in: string; attributes: Record<string, unknown> }>
-                    >(
-                        `SELECT in, attributes FROM owned_by WHERE out = $domainId AND in.topics IS NONE`,
-                        { domainId: domainRef },
+                    const domainId = `domain:${context.domain}`;
+                    const rows = await context.graph.query<{
+                        in: string;
+                        attributes: Record<string, unknown> | null;
+                    }>(
+                        `SELECT ob.in_id AS "in", ob.attributes AS attributes
+                           FROM owned_by ob
+                           JOIN memory m ON m.id = ob.in_id
+                          WHERE ob.out_id = $1 AND m.topics IS NULL`,
+                        [domainId],
                     );
 
-                    if (rows && rows.length > 0) {
+                    if (rows.length > 0) {
                         for (const row of rows) {
-                            const topicRows = await context.graph.query<Array<{ content: string }>>(
-                                `SELECT (SELECT content FROM ONLY $parent.out).content AS content FROM about_topic WHERE in = $memId`,
-                                { memId: new StringRecordId(row.in) },
+                            const topicRows = await context.graph.query<{ content: string }>(
+                                `SELECT m.content AS content
+                                   FROM about_topic at JOIN memory m ON m.id = at.out_id
+                                  WHERE at.in_id = $1`,
+                                [row.in],
                             );
-                            if (topicRows && topicRows.length > 0) {
+                            if (topicRows.length > 0) {
                                 const topics = topicRows
                                     .map((t) => t.content)
                                     .filter((c) => typeof c === "string" && c.length > 0);
                                 if (topics.length > 0) {
                                     await context.graph.query(
-                                        "UPDATE $memId SET topics = $topics",
-                                        {
-                                            memId: new StringRecordId(row.in),
-                                            topics,
-                                        },
+                                        "UPDATE memory SET topics = $1 WHERE id = $2",
+                                        [JSON.stringify(topics), row.in],
                                     );
                                 }
                             }

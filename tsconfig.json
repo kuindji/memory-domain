@@ -28,6 +28,8 @@
         "src/serve/**/*.ts",
         "src/tui/**/*.ts",
         "src/domains/log-domain.ts",
+        "src/domains/topic/**/*.ts",
+        "src/plugins/topic-linking.ts",
         "tests/pg-adapters.test.ts",
         "tests/schema-registry-pg.test.ts",
         "tests/graph-store-pg.test.ts",
