@@ -716,15 +716,42 @@ class InboxProcessor {
                     : null;
 
                 const [node, allTags, ownedByEdges] = await Promise.all([
-                    this.store.getNode<Node & RawMemoryRow>(memId),
-                    this.store.query<string[]>(
-                        `SELECT VALUE out.label FROM tagged WHERE in = $memId`,
-                        { memId: memIdRef },
+                    this.debug.time(
+                        "buildSimilarityBatch.buildOwnedMemoryEntries.getNode",
+                        () => this.store.getNode<Node & RawMemoryRow>(memId),
+                    ),
+                    this.debug.time(
+                        "buildSimilarityBatch.buildOwnedMemoryEntries.fetchTags",
+                        () =>
+                            this.store.query<string[]>(
+                                `SELECT VALUE out.label FROM tagged WHERE in = $memId`,
+                                { memId: memIdRef },
+                            ),
                     ),
                     domainIdRef
-                        ? this.store.query<RawOwnedByEdge[]>(
-                            "SELECT attributes, owned_at FROM owned_by WHERE in = $memId AND out = $domainId",
-                            { memId: memIdRef, domainId: domainIdRef },
+                        ? this.debug.time(
+                            "buildSimilarityBatch.buildOwnedMemoryEntries.fetchOwnedBy",
+                            // Filter on `in` only — Surreal's planner picks the
+                            // less selective `idx_owned_by_out` when both `in`
+                            // and `out` are constrained, then falls back to a
+                            // Filter predicate that scans every edge to the
+                            // domain (super-linear in corpus size). `in =` alone
+                            // hits `idx_owned_by_in` directly. Each memory has
+                            // ≤ N domains worth of edges, so we filter the
+                            // matching `out` in JS.
+                            async () => {
+                                const rows = await this.store.query<
+                                    Array<RawOwnedByEdge & { out?: string }>
+                                >(
+                                    "SELECT attributes, owned_at, out FROM owned_by WHERE in = $memId",
+                                    { memId: memIdRef },
+                                );
+                                if (!rows) return null;
+                                const target = `domain:${domainId}`;
+                                return rows.filter(
+                                    (row) => String(row.out) === target,
+                                );
+                            },
                         )
                         : Promise.resolve(null),
                 ]);
