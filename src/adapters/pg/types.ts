@@ -28,6 +28,17 @@ export interface PgClient {
     close(): Promise<void>;
 }
 
+/**
+ * Marker that opts a parameter out of the BunSqlAdapter's PG-array-literal
+ * encoding. Use it whenever the value's column is jsonb — Bun.SQL serializes
+ * JS objects and arrays to JSONB natively, so the adapter must NOT pre-format
+ * them as `{a,b}` text-array literals (which would otherwise be required for
+ * `::text[]` IN-clauses). The PGLite adapter ignores the wrapper.
+ */
+export class JsonbParam {
+    constructor(public readonly value: unknown) {}
+}
+
 export type DbConfig =
     | {
           kind: "pglite";
@@ -40,4 +51,21 @@ export type DbConfig =
           url: string;
           /** Enable TLS. `true` for default TLS, an object for fine-grained options. */
           ssl?: boolean | { rejectUnauthorized?: boolean; ca?: string };
+          /** Max pool size passed to Bun.SQL. Defaults to 8. */
+          max?: number;
+          /** Idle connection timeout (seconds) passed to Bun.SQL. Defaults to 30. */
+          idleTimeout?: number;
+          /**
+           * Per-query watchdog timeout in milliseconds. If the underlying
+           * `Bun.SQL.unsafe` Promise does not settle within this window the
+           * client rejects with a `BunSqlQueryTimeoutError` and (if retries
+           * remain) re-issues the same statement. Defaults to 60000ms.
+           * Set to 0 to disable the watchdog.
+           */
+          queryTimeoutMs?: number;
+          /**
+           * How many times to retry a query that hits the watchdog timeout
+           * before bubbling the error. Defaults to 2 (so up to 3 attempts).
+           */
+          queryRetries?: number;
       };

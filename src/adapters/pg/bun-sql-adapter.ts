@@ -1,4 +1,5 @@
 import type { PgClient, DbConfig } from "./types.js";
+import { JsonbParam } from "./types.js";
 
 /**
  * Minimal subset of `Bun.SQL` we rely on. Typed locally so we don't depend on
@@ -29,6 +30,69 @@ function getBunSql(): BunSqlConstructor {
     return bun.SQL;
 }
 
+type BunSqlClientOpts = {
+    /** Per-query watchdog (ms). 0 disables the watchdog. */
+    queryTimeoutMs: number;
+    /** Retries on watchdog timeout (so total attempts = retries + 1). */
+    queryRetries: number;
+};
+
+const DEFAULT_QUERY_TIMEOUT_MS = 60_000;
+const DEFAULT_QUERY_RETRIES = 2;
+
+export class BunSqlQueryTimeoutError extends Error {
+    constructor(public sql: string, public elapsedMs: number) {
+        super(`Bun.SQL query exceeded watchdog (${elapsedMs}ms): ${sql.slice(0, 200)}`);
+        this.name = "BunSqlQueryTimeoutError";
+    }
+}
+
+/**
+ * Runs `op` under a watchdog timer. If the Promise doesn't settle inside
+ * `timeoutMs`, retries up to `retries` times before rejecting with
+ * `BunSqlQueryTimeoutError`. Set `allowRetry=false` for transactions —
+ * re-issuing inside an aborted tx would target a different connection
+ * and the original tx state is unrecoverable.
+ *
+ * Exported so it can be unit-tested without standing up a Bun.SQL pool.
+ */
+export async function runQueryWithWatchdog<T>(
+    sql: string,
+    op: () => Promise<unknown[]>,
+    timeoutMs: number,
+    retries: number,
+    allowRetry: boolean,
+): Promise<T[]> {
+    if (timeoutMs <= 0) return op() as Promise<T[]>;
+
+    const maxAttempts = allowRetry ? retries + 1 : 1;
+    let lastErr: unknown;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const start = Date.now();
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        try {
+            const result = await new Promise<unknown[]>((resolve, reject) => {
+                timer = setTimeout(() => {
+                    reject(new BunSqlQueryTimeoutError(sql, Date.now() - start));
+                }, timeoutMs);
+                op().then(resolve, reject);
+            });
+            return result as T[];
+        } catch (err) {
+            lastErr = err;
+            if (!(err instanceof BunSqlQueryTimeoutError)) throw err;
+            if (attempt >= maxAttempts) break;
+            console.warn(
+                `[BunSqlAdapter] query timeout after ${err.elapsedMs}ms, retry ${attempt}/${maxAttempts - 1}: ${sql.slice(0, 120)}`,
+            );
+        } finally {
+            if (timer) clearTimeout(timer);
+        }
+    }
+    throw lastErr;
+}
+
 class BunSqlClient implements PgClient {
     private closed = false;
 
@@ -36,21 +100,37 @@ class BunSqlClient implements PgClient {
         private sql: BunSqlTag,
         private isTransaction: boolean,
         private owns: boolean,
+        private opts: BunSqlClientOpts,
     ) {}
 
     async query<T = Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<T[]> {
-        return this.sql.unsafe<T>(sql, params.map(encodeParam));
+        const encoded = params.map(encodeParam);
+        return runQueryWithWatchdog<T>(
+            sql,
+            () => this.sql.unsafe<T>(sql, encoded),
+            this.opts.queryTimeoutMs,
+            this.opts.queryRetries,
+            !this.isTransaction,
+        );
     }
 
     async run(sql: string): Promise<void> {
-        await this.sql.unsafe(sql);
+        await runQueryWithWatchdog<unknown>(
+            sql,
+            () => this.sql.unsafe(sql) as Promise<unknown[]>,
+            this.opts.queryTimeoutMs,
+            this.opts.queryRetries,
+            !this.isTransaction,
+        );
     }
 
     async transaction<T>(fn: (tx: PgClient) => Promise<T>): Promise<T> {
         if (this.isTransaction) {
             return fn(this);
         }
-        return this.sql.begin(async (tx) => fn(new BunSqlClient(tx, true, false)));
+        return this.sql.begin(async (tx) =>
+            fn(new BunSqlClient(tx, true, false, this.opts)),
+        );
     }
 
     async close(): Promise<void> {
@@ -59,6 +139,7 @@ class BunSqlClient implements PgClient {
         const closer = this.sql.close ?? this.sql.end.bind(this.sql);
         await closer.call(this.sql);
     }
+
 }
 
 /**
@@ -74,6 +155,10 @@ class BunSqlClient implements PgClient {
  * them yet).
  */
 function encodeParam(value: unknown): unknown {
+    // JsonbParam opts out: Bun.SQL serializes JS objects/arrays to JSONB
+    // natively, and pre-formatting as a PG text-array literal would corrupt
+    // them (the inner objects would `String()` to "[object Object]").
+    if (value instanceof JsonbParam) return value.value;
     if (!Array.isArray(value)) return value;
     const parts = value.map((el) => {
         if (el === null || el === undefined) return "NULL";
@@ -88,6 +173,12 @@ export function createBunSqlClient(config: Extract<DbConfig, { kind: "postgres" 
     const SQL = getBunSql();
     const options: Record<string, unknown> = { url: config.url };
     if (config.ssl !== undefined) options.tls = config.ssl;
+    options.max = config.max ?? 8;
+    options.idleTimeout = config.idleTimeout ?? 30;
     const sql = new SQL(options);
-    return new BunSqlClient(sql, false, true);
+    const opts: BunSqlClientOpts = {
+        queryTimeoutMs: config.queryTimeoutMs ?? DEFAULT_QUERY_TIMEOUT_MS,
+        queryRetries: config.queryRetries ?? DEFAULT_QUERY_RETRIES,
+    };
+    return new BunSqlClient(sql, false, true, opts);
 }
