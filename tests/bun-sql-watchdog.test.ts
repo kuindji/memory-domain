@@ -96,6 +96,45 @@ describe("runQueryWithWatchdog", () => {
         expect(rows).toEqual([{ n: 42 }]);
     });
 
+    test("swallows unique_violation on retry (treats prior commit as success)", async () => {
+        let attempt = 0;
+        const rows = await runQueryWithWatchdog(
+            "INSERT INTO mentions_person (id, in_id, out_id) VALUES ($1, $2, $3)",
+            () => {
+                attempt += 1;
+                if (attempt === 1) {
+                    return new Promise<unknown[]>(() => {});
+                }
+                const err = Object.assign(new Error("duplicate key value"), {
+                    errno: "23505",
+                });
+                return Promise.reject(err);
+            },
+            10,
+            2,
+            true,
+        );
+        expect(attempt).toBe(2);
+        expect(rows).toEqual([]);
+    });
+
+    test("does not swallow unique_violation on the first attempt", async () => {
+        const err = Object.assign(new Error("duplicate key value"), { errno: "23505" });
+        let attempt = 0;
+        const promise = runQueryWithWatchdog(
+            "INSERT INTO foo VALUES ($1)",
+            () => {
+                attempt += 1;
+                return Promise.reject(err);
+            },
+            100,
+            2,
+            true,
+        );
+        await expect(promise).rejects.toBe(err);
+        expect(attempt).toBe(1);
+    });
+
     test("includes elapsedMs and SQL prefix in the timeout error", async () => {
         try {
             await runQueryWithWatchdog(

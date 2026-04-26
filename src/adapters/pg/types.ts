@@ -51,9 +51,13 @@ export type DbConfig =
           url: string;
           /** Enable TLS. `true` for default TLS, an object for fine-grained options. */
           ssl?: boolean | { rejectUnauthorized?: boolean; ca?: string };
-          /** Max pool size passed to Bun.SQL. Defaults to 8. */
+          /** Max pool size passed to Bun.SQL. Omit to use Bun's default. */
           max?: number;
-          /** Idle connection timeout (seconds) passed to Bun.SQL. Defaults to 30. */
+          /**
+           * Idle connection timeout (seconds) passed to Bun.SQL. Omit to use
+           * Bun's default. Note: setting this can break long-running batch
+           * workloads (Bun closes pooled connections mid-flight on timeout).
+           */
           idleTimeout?: number;
           /**
            * Per-query watchdog timeout in milliseconds. If the underlying

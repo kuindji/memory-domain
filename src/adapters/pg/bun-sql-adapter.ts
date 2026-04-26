@@ -81,6 +81,17 @@ export async function runQueryWithWatchdog<T>(
             return result as T[];
         } catch (err) {
             lastErr = err;
+            // On retry attempts, a unique-violation almost certainly means
+            // the previous attempt's write actually committed before its JS
+            // Promise was lost. Treat it as success (return empty rows —
+            // none of the framework's INSERT paths consume the result row
+            // count beyond "did it throw?").
+            if (attempt > 1 && isUniqueViolation(err)) {
+                console.warn(
+                    `[BunSqlAdapter] retry hit unique_violation, treating as committed: ${sql.slice(0, 120)}`,
+                );
+                return [] as T[];
+            }
             if (!(err instanceof BunSqlQueryTimeoutError)) throw err;
             if (attempt >= maxAttempts) break;
             console.warn(
@@ -91,6 +102,12 @@ export async function runQueryWithWatchdog<T>(
         }
     }
     throw lastErr;
+}
+
+function isUniqueViolation(err: unknown): boolean {
+    if (!err || typeof err !== "object") return false;
+    const e = err as { errno?: unknown; code?: unknown };
+    return e.errno === "23505" || e.code === "23505";
 }
 
 class BunSqlClient implements PgClient {
@@ -173,8 +190,11 @@ export function createBunSqlClient(config: Extract<DbConfig, { kind: "postgres" 
     const SQL = getBunSql();
     const options: Record<string, unknown> = { url: config.url };
     if (config.ssl !== undefined) options.tls = config.ssl;
-    options.max = config.max ?? 8;
-    options.idleTimeout = config.idleTimeout ?? 30;
+    // Only override pool defaults when the caller asked us to. Bun.SQL's
+    // idleTimeout closes pooled connections mid-workload when set, which
+    // breaks the long-running ingest path.
+    if (config.max !== undefined) options.max = config.max;
+    if (config.idleTimeout !== undefined) options.idleTimeout = config.idleTimeout;
     const sql = new SQL(options);
     const opts: BunSqlClientOpts = {
         queryTimeoutMs: config.queryTimeoutMs ?? DEFAULT_QUERY_TIMEOUT_MS,
