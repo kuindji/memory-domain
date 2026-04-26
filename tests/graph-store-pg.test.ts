@@ -7,7 +7,7 @@ async function setup() {
     const db = await createPgliteClient();
     const reg = new SchemaRegistry(db);
     await reg.registerCore(4);
-    return { db, graph: new GraphStore(db) };
+    return { db, graph: new GraphStore(db, (t, c) => reg.isJsonbColumn(t, c)) };
 }
 
 describe("GraphStore over Postgres", () => {
@@ -214,6 +214,78 @@ describe("GraphStore over Postgres", () => {
 
             const after = await graph.outgoing(m, "tagged");
             expect(after).toHaveLength(0);
+        } finally {
+            await db.close();
+        }
+    });
+
+    test("jsonb columns round-trip as objects, not stringified text", async () => {
+        // Regression: bindValue JSON.stringifies objects, and Bun.SQL/PGLite
+        // bind positional params without column-type info. Without an explicit
+        // ::jsonb cast, PG stores the JSON string as a JSONB string literal,
+        // so reads return a string and `typeof v === 'object'` checks fail
+        // across topic-linking, ownership-attribute consumers, etc.
+        const { db, graph } = await setup();
+        try {
+            const id = await graph.createNode("memory", {
+                content: "jsonb",
+                created_at: 1,
+                token_count: 0,
+                structured_data: { country: "BFA", cameo_root: "14", actors: ["BFA", "BFAGOV"] },
+                metadata: { tag: "x" },
+            });
+            const row = await db.query<{
+                structured_data: unknown;
+                metadata: unknown;
+            }>("SELECT structured_data, metadata FROM memory WHERE id = $1", [id]);
+            const sd = row[0].structured_data as Record<string, unknown>;
+            const md = row[0].metadata as Record<string, unknown>;
+            expect(typeof sd).toBe("object");
+            expect(sd).not.toBeNull();
+            expect(sd.country).toBe("BFA");
+            expect(sd.cameo_root).toBe("14");
+            expect(sd.actors).toEqual(["BFA", "BFAGOV"]);
+            expect(typeof md).toBe("object");
+            expect((md as { tag: string }).tag).toBe("x");
+
+            // Update path also needs the cast.
+            await graph.updateNode(id, {
+                structured_data: { country: "UKR", cameo_root: "19" },
+            });
+            const after = await db.query<{ structured_data: unknown }>(
+                "SELECT structured_data FROM memory WHERE id = $1",
+                [id],
+            );
+            const sd2 = after[0].structured_data as Record<string, unknown>;
+            expect(typeof sd2).toBe("object");
+            expect(sd2.country).toBe("UKR");
+        } finally {
+            await db.close();
+        }
+    });
+
+    test("owned_by.attributes round-trips as object on relate()", async () => {
+        const { db, graph } = await setup();
+        try {
+            const memId = await graph.createNode("memory", {
+                content: "m",
+                created_at: 1,
+                token_count: 0,
+            });
+            await graph.createNodeWithId("domain:test", { name: "test" });
+            await graph.relate(memId, "owned_by", "domain:test", {
+                attributes: { kind: "indicator", contextWeight: 0.5 },
+                owned_at: 123,
+            });
+            const rows = await db.query<{ attributes: unknown }>(
+                "SELECT attributes FROM owned_by WHERE in_id = $1 AND out_id = $2",
+                [memId, "domain:test"],
+            );
+            const attrs = rows[0].attributes as Record<string, unknown>;
+            expect(typeof attrs).toBe("object");
+            expect(attrs).not.toBeNull();
+            expect(attrs.kind).toBe("indicator");
+            expect(attrs.contextWeight).toBe(0.5);
         } finally {
             await db.close();
         }

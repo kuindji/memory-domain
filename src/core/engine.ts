@@ -1,4 +1,5 @@
 import type { PgClient } from "../adapters/pg/types.js";
+import { JsonbParam } from "../adapters/pg/types.js";
 import { createPgClient } from "../adapters/pg/factory.js";
 import { parseConnectionString } from "../adapters/pg/parse-connection.js";
 import { GraphStore } from "./graph-store.js";
@@ -133,7 +134,9 @@ class MemoryEngine {
         await this.schema.registerCore(config.embedding?.dimension);
 
         // Create inbox tag
-        this.graph = new GraphStore(db);
+        this.graph = new GraphStore(db, (table, column) =>
+            this.schema.isJsonbColumn(table, column),
+        );
         try {
             await this.graph.createNodeWithId("tag:inbox", {
                 label: "inbox",
@@ -346,7 +349,7 @@ class MemoryEngine {
                 const merged = { ...existing, ...options.attributes };
                 await this.graph.query(
                     `UPDATE owned_by SET attributes = $1 WHERE in_id = $2 AND out_id = $3`,
-                    [JSON.stringify(merged), id, owner.out_id],
+                    [new JsonbParam(merged), id, owner.out_id],
                 );
             }
         }
@@ -1177,7 +1180,7 @@ class MemoryEngine {
                 await graph.query(
                     `UPDATE owned_by SET attributes = $1
                      WHERE in_id = $2 AND out_id = $3`,
-                    [JSON.stringify(attributes), memoryId, fullDomainId],
+                    [new JsonbParam(attributes), memoryId, fullDomainId],
                 );
             },
 

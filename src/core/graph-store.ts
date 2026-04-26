@@ -1,6 +1,14 @@
 import { randomUUID } from "node:crypto";
 import type { PgClient } from "../adapters/pg/types.js";
+import { JsonbParam } from "../adapters/pg/types.js";
 import type { Edge, GraphApi, Node } from "./types.js";
+
+/**
+ * Lookup hook the engine plugs in so GraphStore knows which columns are jsonb.
+ * When unset (e.g. unit tests with raw GraphStore), all columns are treated as
+ * non-jsonb — same behavior as before this fix.
+ */
+type JsonbLookup = (table: string, column: string) => boolean;
 
 /**
  * Postgres-backed graph store. Ids retain the SurrealDB-era `<table>:<uuid>`
@@ -24,8 +32,19 @@ function newRecordId(table: string): string {
     return `${table}:${randomUUID()}`;
 }
 
-function bindValue(value: unknown): unknown {
+function bindValue(value: unknown, jsonb: boolean): unknown {
     if (value === null || value === undefined) return null;
+    if (jsonb) {
+        // JSONB columns: hand the raw object/array (or scalar) off to the
+        // adapter wrapped in JsonbParam. Bun.SQL serializes JS objects to
+        // jsonb natively; pre-stringifying causes Bun.SQL to JSON-encode the
+        // string AGAIN, leaving a quoted string literal in the jsonb cell
+        // (the silent corruption that broke conflict-topic-linking and
+        // owned_by.attributes after the SurrealDB→Postgres migration). PGLite
+        // unwraps and JSON.stringifies in its adapter to match its own
+        // binding contract.
+        return new JsonbParam(value);
+    }
     if (typeof value === "object") return JSON.stringify(value);
     return value;
 }
@@ -36,7 +55,12 @@ interface InsertParts {
     values: unknown[];
 }
 
-function buildInsert(idColValue: string, data: Record<string, unknown>): InsertParts {
+function buildInsert(
+    table: string,
+    idColValue: string,
+    data: Record<string, unknown>,
+    isJsonb: JsonbLookup,
+): InsertParts {
     const columns = ["id"];
     const placeholders = ["$1"];
     const values: unknown[] = [idColValue];
@@ -45,7 +69,7 @@ function buildInsert(idColValue: string, data: Record<string, unknown>): InsertP
         if (v === undefined) continue;
         columns.push(k);
         placeholders.push(`$${i}`);
-        values.push(bindValue(v));
+        values.push(bindValue(v, isJsonb(table, k)));
         i++;
     }
     return { columns, placeholders, values };
@@ -56,21 +80,30 @@ interface UpdateParts {
     values: unknown[];
 }
 
-function buildUpdate(data: Record<string, unknown>, paramOffset: number): UpdateParts {
+function buildUpdate(
+    table: string,
+    data: Record<string, unknown>,
+    paramOffset: number,
+    isJsonb: JsonbLookup,
+): UpdateParts {
     const sets: string[] = [];
     const values: unknown[] = [];
     let i = paramOffset;
     for (const [k, v] of Object.entries(data)) {
         if (v === undefined) continue;
         sets.push(`${k} = $${i}`);
-        values.push(bindValue(v));
+        values.push(bindValue(v, isJsonb(table, k)));
         i++;
     }
     return { sets, values };
 }
 
 class GraphStore implements GraphApi {
-    constructor(private db: PgClient) {}
+    private isJsonb: JsonbLookup;
+
+    constructor(private db: PgClient, isJsonb?: JsonbLookup) {
+        this.isJsonb = isJsonb ?? (() => false);
+    }
 
     async createNode(table: string, data: Record<string, unknown>): Promise<string> {
         const id = newRecordId(table);
@@ -79,7 +112,7 @@ class GraphStore implements GraphApi {
 
     async createNodeWithId(id: string, data: Record<string, unknown>): Promise<string> {
         const table = TABLE_FROM_ID(id);
-        const { columns, placeholders, values } = buildInsert(id, data);
+        const { columns, placeholders, values } = buildInsert(table, id, data, this.isJsonb);
         await this.db.query(
             `INSERT INTO ${table} (${columns.join(", ")}) VALUES (${placeholders.join(", ")})`,
             values,
@@ -116,7 +149,7 @@ class GraphStore implements GraphApi {
 
     async updateNode(id: string, data: Record<string, unknown>): Promise<void> {
         const table = TABLE_FROM_ID(id);
-        const { sets, values } = buildUpdate(data, 2);
+        const { sets, values } = buildUpdate(table, data, 2, this.isJsonb);
         if (sets.length === 0) return;
         await this.db.query(
             `UPDATE ${table} SET ${sets.join(", ")} WHERE id = $1`,
@@ -155,7 +188,7 @@ class GraphStore implements GraphApi {
     ): Promise<string> {
         const id = `${edge}:${randomUUID()}`;
         const payload: Record<string, unknown> = { in_id: from, out_id: to, ...(data ?? {}) };
-        const { columns, placeholders, values } = buildInsert(id, payload);
+        const { columns, placeholders, values } = buildInsert(edge, id, payload, this.isJsonb);
         await this.db.query(
             `INSERT INTO ${edge} (${columns.join(", ")}) VALUES (${placeholders.join(", ")})`,
             values,
@@ -225,7 +258,7 @@ class GraphStore implements GraphApi {
     }
 
     async transaction<T>(fn: (tx: GraphApi) => Promise<T>): Promise<T> {
-        return this.db.transaction(async (txDb) => fn(new GraphStore(txDb)));
+        return this.db.transaction(async (txDb) => fn(new GraphStore(txDb, this.isJsonb)));
     }
 }
 

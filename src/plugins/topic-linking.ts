@@ -1,5 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
+import { JsonbParam } from "../adapters/pg/types.js";
 import { loadPrompt } from "../core/prompt-loader.js";
 import type {
     DomainPlugin,
@@ -99,7 +100,7 @@ async function updateTopicOwnershipAttributes(
 ): Promise<void> {
     await context.graph.query(
         "UPDATE owned_by SET attributes = $1 WHERE in_id = $2 AND out_id = $3",
-        [JSON.stringify(attributes), memoryId, `domain:${topicDomainId}`],
+        [new JsonbParam(attributes), memoryId, `domain:${topicDomainId}`],
     );
 }
 
@@ -448,7 +449,7 @@ function createTopicLinkingPlugin(options?: TopicLinkingOptions): DomainPlugin {
                         () =>
                             context.graph.query(
                                 "UPDATE memory SET topics = $1 WHERE id = $2",
-                                [JSON.stringify(topicNames), entry.memory.id],
+                                [new JsonbParam(topicNames), entry.memory.id],
                             ),
                         { topicCount: topicNames.length },
                     );
@@ -589,7 +590,7 @@ function createTopicLinkingPlugin(options?: TopicLinkingOptions): DomainPlugin {
                                 if (topics.length > 0) {
                                     await context.graph.query(
                                         "UPDATE memory SET topics = $1 WHERE id = $2",
-                                        [JSON.stringify(topics), row.in],
+                                        [new JsonbParam(topics), row.in],
                                     );
                                 }
                             }

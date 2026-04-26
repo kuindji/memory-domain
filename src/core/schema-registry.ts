@@ -31,8 +31,43 @@ const CORE_EDGES = [
 class SchemaRegistry {
     private registeredNodes = new Map<string, RegisteredNode>();
     private registeredEdges = new Map<string, RegisteredEdge>();
+    // <table> -> set of columns whose pg type is jsonb. Consulted by
+    // GraphStore so it can emit `$N::jsonb` casts on INSERT/UPDATE — without
+    // an explicit cast, Bun.SQL's positional-param binding stores JS objects
+    // as JSON-string literals inside JSONB cells (double-encoded), which
+    // silently breaks every consumer that does `typeof v === 'object'`.
+    private jsonbColumns = new Map<string, Set<string>>();
 
-    constructor(private db: PgClient) {}
+    constructor(private db: PgClient) {
+        // Hardcoded JSONB columns that registerCore creates inline.
+        this.markJsonb("memory", [
+            "request_context",
+            "structured_data",
+            "metadata",
+        ]);
+        this.markJsonb("domain", ["settings"]);
+    }
+
+    isJsonbColumn(table: string, column: string): boolean {
+        return this.jsonbColumns.get(table)?.has(column) ?? false;
+    }
+
+    private markJsonb(table: string, columns: string[]): void {
+        let set = this.jsonbColumns.get(table);
+        if (!set) {
+            set = new Set();
+            this.jsonbColumns.set(table, set);
+        }
+        for (const col of columns) set.add(col);
+    }
+
+    private trackJsonbFields(table: string, fields: FieldDef[]): void {
+        const cols: string[] = [];
+        for (const f of fields) {
+            if (translateFieldType(f.type).pgType === "jsonb") cols.push(f.name);
+        }
+        if (cols.length > 0) this.markJsonb(table, cols);
+    }
 
     async registerCore(embeddingDimension?: number): Promise<void> {
         await this.db.run("CREATE EXTENSION IF NOT EXISTS vector");
@@ -108,6 +143,7 @@ class SchemaRegistry {
             { name: "attributes", type: "option<object>" },
             { name: "owned_at", type: "option<int>" },
         ]);
+        this.markJsonb("owned_by", ["attributes"]);
 
         // Indexes on edge endpoints. Two indexes per edge (one per direction)
         // to support traversal from either side.
@@ -262,6 +298,7 @@ class SchemaRegistry {
                     await this.addColumn(node.name, field);
                 }
                 existing.fields.push(...newFields);
+                this.trackJsonbFields(node.name, newFields);
 
                 if (node.indexes) {
                     for (const idx of node.indexes) {
@@ -286,6 +323,7 @@ class SchemaRegistry {
                     indexes: node.indexes ? [...node.indexes] : [],
                     contributors: [contributor],
                 });
+                this.trackJsonbFields(node.name, node.fields);
             }
         }
     }
@@ -299,20 +337,24 @@ class SchemaRegistry {
             if (existing) {
                 existing.contributors.push(contributor);
                 if (edge.fields) {
+                    const newFields: FieldDef[] = [];
                     for (const field of edge.fields) {
                         const existingField = existing.fields?.find((f) => f.name === field.name);
                         if (!existingField) {
                             await this.addColumn(edge.name, field);
                             existing.fields = existing.fields ?? [];
                             existing.fields.push(field);
+                            newFields.push(field);
                         }
                     }
+                    if (newFields.length > 0) this.trackJsonbFields(edge.name, newFields);
                 }
             } else {
                 await this.createEdgeTable(edge.name, edge.fields ?? []);
                 await this.createSimpleIndex(edge.name, `idx_${edge.name}_in`, ["in_id"]);
                 await this.createSimpleIndex(edge.name, `idx_${edge.name}_out`, ["out_id"]);
                 this.registeredEdges.set(edge.name, { ...edge, contributors: [contributor] });
+                if (edge.fields) this.trackJsonbFields(edge.name, edge.fields);
             }
         }
     }

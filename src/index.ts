@@ -96,6 +96,7 @@ export type { TopicLinkingOptions, ExtractedTopic, LinkResult } from "./plugins/
 
 // Postgres adapter exports
 export type { PgClient, DbConfig } from "./adapters/pg/types.js";
+export { JsonbParam } from "./adapters/pg/types.js";
 export { createPgClient, parseConnectionString } from "./adapters/pg/index.js";
 
 // Adapters

@@ -1,6 +1,7 @@
 import { PGlite } from "@electric-sql/pglite";
 import { vector } from "@electric-sql/pglite/vector";
 import type { PgClient } from "./types.js";
+import { JsonbParam } from "./types.js";
 
 type PgliteHandle = {
     query<T>(sql: string, params?: unknown[]): Promise<{ rows: T[] }>;
@@ -20,7 +21,20 @@ class PgliteClient implements PgClient {
     ) {}
 
     async query<T = Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<T[]> {
-        const result = await this.handle.query<T>(sql, params);
+        // PGLite serializes JS objects/arrays into JSONB natively. Unwrap
+        // JsonbParam (used by callers to bypass the BunSqlAdapter's
+        // text-array literal formatting) so the raw value reaches PGLite.
+        // PGLite needs JSON-serialized strings for JSONB binding, so we
+        // stringify here — different from Bun.SQL, which encodes natively.
+        const bound = params.map((p) => {
+            if (p instanceof JsonbParam) {
+                const v = p.value;
+                if (v === null || v === undefined) return null;
+                return JSON.stringify(v);
+            }
+            return p;
+        });
+        const result = await this.handle.query<T>(sql, bound);
         return result.rows;
     }
 
