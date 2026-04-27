@@ -242,9 +242,11 @@ class InboxProcessor {
             batchIds = await this.debug.time(
                 "buildSimilarityBatch.findSimilarNeighbors",
                 () =>
-                    this.findSimilarNeighbors(
-                        { ...seed, embedding: seedEmbedding },
-                        candidateRowsSansSeed,
+                    Promise.resolve(
+                        this.findSimilarNeighbors(
+                            { ...seed, embedding: seedEmbedding },
+                            candidateRowsSansSeed,
+                        ),
                     ),
                 { neighbors: candidateRowsSansSeed.length },
             );
@@ -268,10 +270,10 @@ class InboxProcessor {
         return { batchId, entries, memoryIds: batchIds, requestContext };
     }
 
-    private async findSimilarNeighbors(
+    private findSimilarNeighbors(
         seed: RawMemoryRow & { embedding: number[] },
         candidateRows: RawMemoryRow[],
-    ): Promise<string[]> {
+    ): string[] {
         if (candidateRows.length === 0) return [];
         const seedId = seed.id;
         const limit = this.batchLimit - 1;
@@ -541,10 +543,10 @@ class InboxProcessor {
     private async removeBatchProcessingTag(batchId: string): Promise<void> {
         const tagId = `tag:inbox:processing:${batchId}`;
         await this.store.query(`DELETE FROM tagged WHERE out_id = $1`, [tagId]);
-        await this.store.query(
-            `DELETE FROM child_of WHERE in_id = $1 AND out_id = $2`,
-            [tagId, PROCESSING_ROOT_TAG_ID],
-        );
+        await this.store.query(`DELETE FROM child_of WHERE in_id = $1 AND out_id = $2`, [
+            tagId,
+            PROCESSING_ROOT_TAG_ID,
+        ]);
         try {
             await this.store.deleteNode(tagId);
         } catch {
@@ -638,24 +640,20 @@ class InboxProcessor {
         // owned_by still filters `out_id` in JS to keep the single-side index
         // path (PG planner picks idx_owned_by_out when both sides constrained).
         const [nodeRows, tagRows, ownedByRows] = await Promise.all([
-            this.debug.time(
-                "buildSimilarityBatch.buildOwnedMemoryEntries.getNode",
-                () =>
-                    this.store.query<RawMemoryRow>(
-                        `SELECT id, content, event_time, created_at, token_count, structured_data
+            this.debug.time("buildSimilarityBatch.buildOwnedMemoryEntries.getNode", () =>
+                this.store.query<RawMemoryRow>(
+                    `SELECT id, content, event_time, created_at, token_count, structured_data
                          FROM memory WHERE id = ANY($1::text[])`,
-                        [memoryIds],
-                    ),
+                    [memoryIds],
+                ),
             ),
-            this.debug.time(
-                "buildSimilarityBatch.buildOwnedMemoryEntries.fetchTags",
-                () =>
-                    this.store.query<{ in_id: string; label: string }>(
-                        `SELECT tg.in_id, t.label FROM tagged tg
+            this.debug.time("buildSimilarityBatch.buildOwnedMemoryEntries.fetchTags", () =>
+                this.store.query<{ in_id: string; label: string }>(
+                    `SELECT tg.in_id, t.label FROM tagged tg
                          JOIN tag t ON t.id = tg.out_id
                          WHERE tg.in_id = ANY($1::text[])`,
-                        [memoryIds],
-                    ),
+                    [memoryIds],
+                ),
             ),
             targetDomainId
                 ? this.debug.time(
@@ -728,7 +726,7 @@ class InboxProcessor {
             let structuredData: unknown;
             if (sd && typeof sd === "object") {
                 if (domainId && domainId in sd) {
-                    structuredData = (sd as Record<string, unknown>)[domainId];
+                    structuredData = sd[domainId];
                 } else {
                     structuredData = sd;
                 }
@@ -807,12 +805,10 @@ class InboxProcessor {
                             } catch {
                                 /* already exists */
                             }
-                            await this.store.relateMany(
-                                claimedIds,
-                                "owned_by",
-                                fullDomainId,
-                                { attributes: {}, owned_at: Date.now() },
-                            );
+                            await this.store.relateMany(claimedIds, "owned_by", fullDomainId, {
+                                attributes: {},
+                                owned_at: Date.now(),
+                            });
                             await this.store.relateMany(claimedIds, "tagged", inboxTagId);
                         }
 
@@ -844,11 +840,7 @@ class InboxProcessor {
                                 in: domainMemoryIds,
                                 out: assertTagId,
                             });
-                            await this.store.relateMany(
-                                domainMemoryIds,
-                                "tagged",
-                                failedTagId,
-                            );
+                            await this.store.relateMany(domainMemoryIds, "tagged", failedTagId);
                         }
                     }
                 }
@@ -910,10 +902,9 @@ class InboxProcessor {
                     }
 
                     if (orphanIds.length > 0) {
-                        await this.store.query(
-                            `DELETE FROM tagged WHERE in_id = ANY($1::text[])`,
-                            [orphanIds],
-                        );
+                        await this.store.query(`DELETE FROM tagged WHERE in_id = ANY($1::text[])`, [
+                            orphanIds,
+                        ]);
                         await this.store.deleteNodes(orphanIds);
                         for (const id of orphanIds) {
                             this.events.emit("deleted", {
@@ -969,7 +960,10 @@ class InboxProcessor {
                 const domain = this.domainRegistry.get(did);
                 if (!domain) continue;
 
-                const batch = await this.buildSimilarityBatch({ type: "domain", domainId: did }, did);
+                const batch = await this.buildSimilarityBatch(
+                    { type: "domain", domainId: did },
+                    did,
+                );
                 if (!batch) continue;
 
                 const { batchId, entries, memoryIds, requestContext } = batch;
@@ -1098,7 +1092,7 @@ class InboxProcessor {
             const parsed: unknown = JSON.parse(existing.value);
             const lockedAt =
                 parsed && typeof parsed === "object" && "lockedAt" in parsed
-                    ? (parsed as { lockedAt: unknown }).lockedAt
+                    ? parsed.lockedAt
                     : undefined;
             if (typeof lockedAt === "number") {
                 const age = Date.now() - lockedAt;

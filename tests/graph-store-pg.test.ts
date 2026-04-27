@@ -205,12 +205,17 @@ describe("GraphStore over Postgres", () => {
             });
             const t = await graph.createNodeWithId("tag:r", { label: "r", created_at: 1 });
 
-            await expect(
-                graph.transaction(async (tx) => {
+            let txErr: unknown;
+            try {
+                await graph.transaction(async (tx) => {
                     await tx.relate(m, "tagged", t);
                     throw new Error("nope");
-                }),
-            ).rejects.toThrow("nope");
+                });
+            } catch (err) {
+                txErr = err;
+            }
+            expect(txErr).toBeInstanceOf(Error);
+            expect((txErr as Error).message).toContain("nope");
 
             const after = await graph.outgoing(m, "tagged");
             expect(after).toHaveLength(0);

@@ -3,30 +3,26 @@ import { MemoryEngine } from "../src/core/engine.js";
 import type { LLMAdapter, EmbeddingAdapter } from "../src/core/types.js";
 
 const fakeLlm: LLMAdapter = {
-    async extract(): Promise<string[]> {
-        return [];
+    extract(): Promise<string[]> {
+        return Promise.resolve([]);
     },
-    async consolidate(): Promise<string> {
-        return "";
+    consolidate(): Promise<string> {
+        return Promise.resolve("");
     },
 };
 
 function embedOne(text: string): number[] {
     const t = text.toLowerCase();
-    return [
-        t.includes("alpha") ? 1 : 0,
-        t.includes("beta") ? 1 : 0,
-        t.includes("gamma") ? 1 : 0,
-    ];
+    return [t.includes("alpha") ? 1 : 0, t.includes("beta") ? 1 : 0, t.includes("gamma") ? 1 : 0];
 }
 
 const fakeEmbed: EmbeddingAdapter = {
     dimension: 3,
-    async embed(text: string): Promise<number[]> {
-        return embedOne(text);
+    embed(text: string): Promise<number[]> {
+        return Promise.resolve(embedOne(text));
     },
-    async embedBatch(texts: string[]): Promise<number[][]> {
-        return texts.map(embedOne);
+    embedBatch(texts: string[]): Promise<number[][]> {
+        return Promise.resolve(texts.map(embedOne));
     },
 };
 

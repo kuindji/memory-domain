@@ -297,7 +297,10 @@ describe("formatOutput - pretty mode: ask", () => {
             answer: "The answer to your question.",
             rounds: 1,
             turns: [
-                { call: { command: "memory-domain", args: ["domains"] }, result: { stdout: "", stderr: "", exitCode: 0 } },
+                {
+                    call: { command: "memory-domain", args: ["domains"] },
+                    result: { stdout: "", stderr: "", exitCode: 0 },
+                },
             ],
         };
         const result = formatOutput("ask", data, true);

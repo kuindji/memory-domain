@@ -129,7 +129,7 @@ class S3ConnectionAdapter implements ConnectionAdapter {
         const chunks: Uint8Array[] = [];
         const stream = tar.create({ gzip: true, cwd: this.localDir }, ["db"]);
         for await (const chunk of stream) {
-            chunks.push(chunk as Uint8Array);
+            chunks.push(chunk);
         }
         return Buffer.concat(chunks);
     }

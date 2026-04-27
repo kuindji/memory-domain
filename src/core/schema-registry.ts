@@ -40,11 +40,7 @@ class SchemaRegistry {
 
     constructor(private db: PgClient) {
         // Hardcoded JSONB columns that registerCore creates inline.
-        this.markJsonb("memory", [
-            "request_context",
-            "structured_data",
-            "metadata",
-        ]);
+        this.markJsonb("memory", ["request_context", "structured_data", "metadata"]);
         this.markJsonb("domain", ["settings"]);
     }
 
@@ -74,9 +70,7 @@ class SchemaRegistry {
 
         // memory table — embedding column only added when dimension is known,
         // matching the existing prime-then-define HNSW pattern.
-        const embeddingCol = embeddingDimension
-            ? `embedding vector(${embeddingDimension}),`
-            : "";
+        const embeddingCol = embeddingDimension ? `embedding vector(${embeddingDimension}),` : "";
         await this.db.run(`
             CREATE TABLE IF NOT EXISTS memory (
                 id text PRIMARY KEY,
@@ -467,14 +461,8 @@ class SchemaRegistry {
         );
     }
 
-    private async createSimpleIndex(
-        table: string,
-        name: string,
-        fields: string[],
-    ): Promise<void> {
-        await this.db.run(
-            `CREATE INDEX IF NOT EXISTS ${name} ON ${table} (${fields.join(", ")})`,
-        );
+    private async createSimpleIndex(table: string, name: string, fields: string[]): Promise<void> {
+        await this.db.run(`CREATE INDEX IF NOT EXISTS ${name} ON ${table} (${fields.join(", ")})`);
     }
 
     private async defineIndex(table: string, idx: IndexDef): Promise<void> {
@@ -486,9 +474,7 @@ class SchemaRegistry {
         if (idx.type === "search") {
             // Functional GIN tsvector index. Combines all listed fields with
             // coalesce so nullable columns don't break to_tsvector.
-            const expr = idx.fields
-                .map((f) => `coalesce(${f}, '')`)
-                .join(" || ' ' || ");
+            const expr = idx.fields.map((f) => `coalesce(${f}, '')`).join(" || ' ' || ");
             await this.db.run(
                 `CREATE INDEX IF NOT EXISTS ${idx.name}
                  ON ${table} USING GIN (to_tsvector('english', ${expr}))`,

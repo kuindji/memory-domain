@@ -244,12 +244,7 @@ class SearchEngine {
         const limit = query.limit ?? 10;
 
         // $1 = vector literal, $2 = limit, then any filter params.
-        const filter = buildFilterClauses(
-            query.filters,
-            query.beforeTime,
-            query.afterTime,
-            3,
-        );
+        const filter = buildFilterClauses(query.filters, query.beforeTime, query.afterTime, 3);
         const filterSql = filter.sql.length > 0 ? ` AND ${filter.sql.join(" AND ")}` : "";
 
         // 1 - cosine_distance gives us a similarity in [0, 2] inverted; for
@@ -299,12 +294,7 @@ class SearchEngine {
         if (!query.text) return candidates;
 
         const limit = query.limit ?? 10;
-        const filter = buildFilterClauses(
-            query.filters,
-            query.beforeTime,
-            query.afterTime,
-            3,
-        );
+        const filter = buildFilterClauses(query.filters, query.beforeTime, query.afterTime, 3);
         const filterSql = filter.sql.length > 0 ? ` AND ${filter.sql.join(" AND ")}` : "";
 
         const tsq = `plainto_tsquery('english', $1)`;
@@ -596,24 +586,24 @@ class SearchEngine {
 
         // owned_by uses `attributes` jsonb column when domains store per-memory metadata.
         // The column may not exist if no domain has registered it yet — guard with try/catch.
-        let rows: Array<{ in_id: string; out_id: string; attributes: unknown }> = [];
+        let rows: Array<{ in_id: string; out_id: string; attributes: unknown }>;
         try {
             rows = await this.store.query<{
                 in_id: string;
                 out_id: string;
                 attributes: unknown;
-            }>(
-                `SELECT in_id, out_id, attributes FROM owned_by WHERE in_id = ANY($1::text[])`,
-                [ids],
-            );
+            }>(`SELECT in_id, out_id, attributes FROM owned_by WHERE in_id = ANY($1::text[])`, [
+                ids,
+            ]);
         } catch {
             rows = await this.store.query<{
                 in_id: string;
                 out_id: string;
                 attributes: unknown;
-            }>(`SELECT in_id, out_id, NULL AS attributes FROM owned_by WHERE in_id = ANY($1::text[])`, [
-                ids,
-            ]);
+            }>(
+                `SELECT in_id, out_id, NULL AS attributes FROM owned_by WHERE in_id = ANY($1::text[])`,
+                [ids],
+            );
         }
 
         const attrMap = new Map<string, Record<string, Record<string, unknown>>>();

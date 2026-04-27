@@ -163,9 +163,7 @@ describe("cosineSimilarityF32", () => {
 
     test("returns 0 on empty or mismatched inputs", () => {
         expect(cosineSimilarityF32(new Float32Array(), new Float32Array())).toBe(0);
-        expect(
-            cosineSimilarityF32(new Float32Array([1, 2]), new Float32Array([1, 2, 3])),
-        ).toBe(0);
+        expect(cosineSimilarityF32(new Float32Array([1, 2]), new Float32Array([1, 2, 3]))).toBe(0);
     });
 
     test("returns 0 when either vector has zero norm", () => {

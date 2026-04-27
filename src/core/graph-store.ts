@@ -101,7 +101,10 @@ function buildUpdate(
 class GraphStore implements GraphApi {
     private isJsonb: JsonbLookup;
 
-    constructor(private db: PgClient, isJsonb?: JsonbLookup) {
+    constructor(
+        private db: PgClient,
+        isJsonb?: JsonbLookup,
+    ) {
         this.isJsonb = isJsonb ?? (() => false);
     }
 
@@ -151,10 +154,10 @@ class GraphStore implements GraphApi {
         const table = TABLE_FROM_ID(id);
         const { sets, values } = buildUpdate(table, data, 2, this.isJsonb);
         if (sets.length === 0) return;
-        await this.db.query(
-            `UPDATE ${table} SET ${sets.join(", ")} WHERE id = $1`,
-            [id, ...values],
-        );
+        await this.db.query(`UPDATE ${table} SET ${sets.join(", ")} WHERE id = $1`, [
+            id,
+            ...values,
+        ]);
     }
 
     async deleteNode(id: string): Promise<boolean> {
@@ -286,7 +289,6 @@ class GraphStore implements GraphApi {
                 clauses.push(`out_id = $${i}`);
                 values.push(where.out);
             }
-            i++;
         }
         if (clauses.length === 0) return;
         await this.db.query(`DELETE FROM ${edge} WHERE ${clauses.join(" AND ")}`, values);

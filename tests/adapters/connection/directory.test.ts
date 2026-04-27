@@ -16,11 +16,11 @@ describe("DirectoryConnectionAdapter", () => {
         if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
     });
 
-    it("resolve returns surrealkv url under path/db when db subdir exists", async () => {
+    it("resolve returns a pglite DbConfig under path/db when db subdir exists", async () => {
         mkdirSync(join(dir, "db"), { recursive: true });
         const adapter = new DirectoryConnectionAdapter({ path: dir });
-        const url = await adapter.resolve();
-        expect(url).toBe(`surrealkv://${join(dir, "db")}`);
+        const config = await adapter.resolve();
+        expect(config).toEqual({ kind: "pglite", dataDir: join(dir, "db") });
     });
 
     it("getLocalDir returns the configured path", () => {

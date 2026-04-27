@@ -876,10 +876,9 @@ class MemoryEngine {
         if (count === 0) {
             await this.graph.query(`DELETE FROM tagged WHERE in_id = $1`, [memoryId]);
             for (const edgeName of ["reinforces", "contradicts", "summarizes", "refines"]) {
-                await this.graph.query(
-                    `DELETE FROM ${edgeName} WHERE in_id = $1 OR out_id = $1`,
-                    [memoryId],
-                );
+                await this.graph.query(`DELETE FROM ${edgeName} WHERE in_id = $1 OR out_id = $1`, [
+                    memoryId,
+                ]);
             }
 
             const coreEdges = new Set([
@@ -959,9 +958,7 @@ class MemoryEngine {
                 [memoryId],
             );
             if (owners.length === 0) return false;
-            return owners.some((o) =>
-                visibleDomains.includes(o.out_id.replace(/^domain:/, "")),
-            );
+            return owners.some((o) => visibleDomains.includes(o.out_id.replace(/^domain:/, "")));
         }
 
         return {
@@ -1032,7 +1029,6 @@ class MemoryEngine {
                 if (filter?.limit != null) {
                     limitClause = ` LIMIT $${pi}`;
                     params.push(filter.limit);
-                    pi++;
                 }
 
                 const rows = await graph.query<{ in_id: string }>(
@@ -1380,18 +1376,13 @@ class MemoryEngine {
         }
         const fn = hook.templates[name];
         if (!fn) {
-            throw new Error(
-                `runTemplate: domain "${domainId}" has no template named "${name}"`,
-            );
+            throw new Error(`runTemplate: domain "${domainId}" has no template named "${name}"`);
         }
         const ctx = this.createDomainContext(domainId, options?.context);
         return fn(params, ctx);
     }
 
-    async searchTable(
-        domainId: string,
-        filter: FilterSpec,
-    ): Promise<TableResult> {
+    async searchTable(domainId: string, filter: FilterSpec): Promise<TableResult> {
         const domain = this.domainRegistry.get(domainId);
         if (!domain) {
             throw new Error(`searchTable: unknown domain "${domainId}"`);
@@ -1414,15 +1405,12 @@ class MemoryEngine {
 
     async ask(question: string, options?: AskOptions): Promise<AskResult> {
         if (!options?.domains?.length || options.domains.length !== 1) {
-            throw new Error(
-                "ask() requires exactly one target domain via options.domains",
-            );
+            throw new Error("ask() requires exactly one target domain via options.domains");
         }
         const domainId = options.domains[0];
 
-        const adapter = options?.effort && this.llm.withLevel
-            ? this.llm.withLevel(options.effort)
-            : this.llm;
+        const adapter =
+            options?.effort && this.llm.withLevel ? this.llm.withLevel(options.effort) : this.llm;
 
         if (!adapter.runAgent) {
             throw new Error(
@@ -1485,9 +1473,10 @@ class MemoryEngine {
         return result;
     }
 
-    private buildAskToolExec(
-        _domainId: string,
-    ): (call: { command: string; args: string[] }) => Promise<{
+    private buildAskToolExec(_domainId: string): (call: {
+        command: string;
+        args: string[];
+    }) => Promise<{
         stdout: string;
         stderr: string;
         exitCode: number;
@@ -1503,8 +1492,7 @@ class MemoryEngine {
             if (call.args[0] === "ask") {
                 return {
                     stdout: "",
-                    stderr:
-                        "ask is not available inside ask(); answer from the data you already have.",
+                    stderr: "ask is not available inside ask(); answer from the data you already have.",
                     exitCode: 2,
                 };
             }

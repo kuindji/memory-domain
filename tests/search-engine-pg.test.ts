@@ -9,20 +9,16 @@ const dim = 3;
 
 function embedOne(text: string): number[] {
     const t = text.toLowerCase();
-    return [
-        t.includes("alpha") ? 1 : 0,
-        t.includes("beta") ? 1 : 0,
-        t.includes("gamma") ? 1 : 0,
-    ];
+    return [t.includes("alpha") ? 1 : 0, t.includes("beta") ? 1 : 0, t.includes("gamma") ? 1 : 0];
 }
 
 const fakeEmbed: EmbeddingAdapter = {
     dimension: dim,
-    async embed(text: string): Promise<number[]> {
-        return embedOne(text);
+    embed(text: string): Promise<number[]> {
+        return Promise.resolve(embedOne(text));
     },
-    async embedBatch(texts: string[]): Promise<number[][]> {
-        return texts.map(embedOne);
+    embedBatch(texts: string[]): Promise<number[][]> {
+        return Promise.resolve(texts.map(embedOne));
     },
 };
 
@@ -115,9 +111,7 @@ describe("SearchEngine over Postgres", () => {
                 out_id text NOT NULL
             )`);
             const t1 = "topic:nuclear";
-            await graph.run(
-                `INSERT INTO topic (id, label) VALUES ('${t1}', 'nuclear')`,
-            );
+            await graph.run(`INSERT INTO topic (id, label) VALUES ('${t1}', 'nuclear')`);
             const m1 = await makeMemory(graph, "nuclear test", [0, 0, 0]);
             await graph.relate(m1, "about_topic", t1);
 

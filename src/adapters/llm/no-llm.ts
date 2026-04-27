@@ -1,4 +1,10 @@
-import type { LLMAdapter, ScoredMemory, ModelLevel, AgentRunSpec, AgentRunResult } from "../../core/types.js";
+import type {
+    LLMAdapter,
+    ScoredMemory,
+    ModelLevel,
+    AgentRunSpec,
+    AgentRunResult,
+} from "../../core/types.js";
 
 /**
  * `NoLlmAdapter` is an opt-out adapter. Every method throws with a stack

@@ -353,11 +353,7 @@ export interface DomainConfig {
         execute?(filter: FilterSpec, context: DomainContext): Promise<TableResult>;
     };
     buildContext?:
-        | ((
-              text: string,
-              budgetTokens: number,
-              context: DomainContext,
-          ) => Promise<ContextResult>)
+        | ((text: string, budgetTokens: number, context: DomainContext) => Promise<ContextResult>)
         | BuildContextApi;
     describe?(): string;
     schedules?: DomainSchedule[];
@@ -434,11 +430,7 @@ export type TemplateFn = (
 ) => Promise<TemplateResult>;
 
 export interface BuildContextApi {
-    fromText?(
-        text: string,
-        budgetTokens: number,
-        context: DomainContext,
-    ): Promise<ContextResult>;
+    fromText?(text: string, budgetTokens: number, context: DomainContext): Promise<ContextResult>;
     templates?: Record<string, TemplateFn>;
 }
 

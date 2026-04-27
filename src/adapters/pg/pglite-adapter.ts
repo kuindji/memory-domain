@@ -47,9 +47,7 @@ class PgliteClient implements PgClient {
         if (this.isTransaction) {
             return fn(this);
         }
-        const txFn = this.handle[TX_METHOD] as (
-            cb: (tx: PgliteHandle) => Promise<T>,
-        ) => Promise<T>;
+        const txFn = this.handle[TX_METHOD] as (cb: (tx: PgliteHandle) => Promise<T>) => Promise<T>;
         return txFn.call(this.handle, async (tx: PgliteHandle) =>
             fn(new PgliteClient(tx, true, false)),
         );

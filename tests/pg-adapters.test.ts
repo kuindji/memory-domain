@@ -47,12 +47,17 @@ describe("PgliteAdapter", () => {
             await db.run("CREATE TABLE t (id text PRIMARY KEY)");
             await db.query("INSERT INTO t (id) VALUES ($1)", ["seed"]);
 
-            await expect(
-                db.transaction(async (tx) => {
+            let txErr: unknown;
+            try {
+                await db.transaction(async (tx) => {
                     await tx.query("INSERT INTO t (id) VALUES ($1)", ["doomed"]);
                     throw new Error("boom");
-                }),
-            ).rejects.toThrow("boom");
+                });
+            } catch (err) {
+                txErr = err;
+            }
+            expect(txErr).toBeInstanceOf(Error);
+            expect((txErr as Error).message).toContain("boom");
 
             const rows = await db.query<{ id: string }>("SELECT id FROM t ORDER BY id");
             expect(rows.map((r) => r.id)).toEqual(["seed"]);
@@ -70,14 +75,8 @@ describe("PgliteAdapter", () => {
                     embedding vector(3)
                 );
             `);
-            await db.query("INSERT INTO items (id, embedding) VALUES ($1, $2)", [
-                "a",
-                "[1,0,0]",
-            ]);
-            await db.query("INSERT INTO items (id, embedding) VALUES ($1, $2)", [
-                "b",
-                "[0,1,0]",
-            ]);
+            await db.query("INSERT INTO items (id, embedding) VALUES ($1, $2)", ["a", "[1,0,0]"]);
+            await db.query("INSERT INTO items (id, embedding) VALUES ($1, $2)", ["b", "[0,1,0]"]);
             await db.query("INSERT INTO items (id, embedding) VALUES ($1, $2)", [
                 "c",
                 "[0.9,0.1,0]",

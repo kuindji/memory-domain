@@ -2,7 +2,9 @@ import { describe, test, expect } from "bun:test";
 import { createPgliteClient } from "../src/adapters/pg/pglite-adapter.js";
 import { SchemaRegistry, CORE_EDGES } from "../src/core/schema-registry.js";
 
-async function tableNames(db: Awaited<ReturnType<typeof createPgliteClient>>): Promise<Set<string>> {
+async function tableNames(
+    db: Awaited<ReturnType<typeof createPgliteClient>>,
+): Promise<Set<string>> {
     const rows = await db.query<{ table_name: string }>(
         `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'`,
     );
@@ -164,10 +166,11 @@ describe("SchemaRegistry over Postgres", () => {
             const reg = new SchemaRegistry(db);
             await reg.registerCore();
 
-            await db.query(
-                `INSERT INTO memory (id, content, created_at) VALUES ($1, $2, $3)`,
-                ["memory:1", "the quick brown fox jumps over the lazy dog", Date.now()],
-            );
+            await db.query(`INSERT INTO memory (id, content, created_at) VALUES ($1, $2, $3)`, [
+                "memory:1",
+                "the quick brown fox jumps over the lazy dog",
+                Date.now(),
+            ]);
             const rows = await db.query<{ id: string }>(
                 `SELECT id FROM memory
                  WHERE to_tsvector('english', content) @@ plainto_tsquery('english', $1)`,

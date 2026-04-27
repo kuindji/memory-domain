@@ -7,7 +7,10 @@ import { JsonbParam } from "./types.js";
  * template literal callable that also has methods on it.
  */
 type BunSqlTag = {
-    <T = Record<string, unknown>>(strings: TemplateStringsArray, ...params: unknown[]): Promise<T[]>;
+    <T = Record<string, unknown>>(
+        strings: TemplateStringsArray,
+        ...params: unknown[]
+    ): Promise<T[]>;
     unsafe<T = Record<string, unknown>>(query: string, params?: unknown[]): Promise<T[]>;
     begin<T>(fn: (tx: BunSqlTag) => Promise<T>): Promise<T>;
     end(): Promise<void>;
@@ -41,7 +44,10 @@ const DEFAULT_QUERY_TIMEOUT_MS = 60_000;
 const DEFAULT_QUERY_RETRIES = 2;
 
 export class BunSqlQueryTimeoutError extends Error {
-    constructor(public sql: string, public elapsedMs: number) {
+    constructor(
+        public sql: string,
+        public elapsedMs: number,
+    ) {
         super(`Bun.SQL query exceeded watchdog (${elapsedMs}ms): ${sql.slice(0, 200)}`);
         this.name = "BunSqlQueryTimeoutError";
     }
@@ -134,7 +140,7 @@ class BunSqlClient implements PgClient {
     async run(sql: string): Promise<void> {
         await runQueryWithWatchdog<unknown>(
             sql,
-            () => this.sql.unsafe(sql) as Promise<unknown[]>,
+            () => this.sql.unsafe(sql),
             this.opts.queryTimeoutMs,
             this.opts.queryRetries,
             !this.isTransaction,
@@ -145,9 +151,7 @@ class BunSqlClient implements PgClient {
         if (this.isTransaction) {
             return fn(this);
         }
-        return this.sql.begin(async (tx) =>
-            fn(new BunSqlClient(tx, true, false, this.opts)),
-        );
+        return this.sql.begin(async (tx) => fn(new BunSqlClient(tx, true, false, this.opts)));
     }
 
     async close(): Promise<void> {
@@ -156,7 +160,6 @@ class BunSqlClient implements PgClient {
         const closer = this.sql.close ?? this.sql.end.bind(this.sql);
         await closer.call(this.sql);
     }
-
 }
 
 /**

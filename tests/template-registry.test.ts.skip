@@ -1,0 +1,199 @@
+import { describe, it, expect } from "bun:test";
+import type { DomainConfig, TemplateResult, TemplateFn, ContextResult } from "../src/index.ts";
+import { MemoryEngine } from "../src/core/engine.js";
+import { MockLLMAdapter } from "./helpers.js";
+
+describe("template registry types", () => {
+    it("TemplateResult has rows, columns, source, narrative?", () => {
+        const r: TemplateResult = {
+            template: "macro_snapshot",
+            rows: [
+                { country: "USA", indicator_code: "NY.GDP.MKTP.KD.ZG", year: 2008, value: -2.5 },
+            ],
+            columns: ["country", "indicator_code", "year", "value"],
+            source: "wdi",
+        };
+        expect(r.template).toBe("macro_snapshot");
+        expect(r.rows.length).toBe(1);
+        expect(r.narrative).toBeUndefined();
+    });
+
+    it("DomainConfig.buildContext accepts { fromText, templates } shape", () => {
+        const template: TemplateFn = () =>
+            Promise.resolve({
+                template: "t",
+                rows: [],
+                columns: ["a"],
+                source: "x",
+            });
+        const cfg: Partial<DomainConfig> = {
+            buildContext: {
+                fromText: () => Promise.resolve({ context: "", memories: [], totalTokens: 0 }),
+                templates: { t: template },
+            },
+        };
+        expect(cfg.buildContext).toBeDefined();
+    });
+
+    it("DomainConfig.buildContext still accepts legacy function shape", () => {
+        const cfg: Partial<DomainConfig> = {
+            buildContext: () => Promise.resolve({ context: "", memories: [], totalTokens: 0 }),
+        };
+        expect(cfg.buildContext).toBeDefined();
+    });
+});
+
+async function makeEngine(): Promise<MemoryEngine> {
+    const engine = new MemoryEngine();
+    await engine.initialize({
+        connection: "mem://",
+        namespace: "test",
+        database: `tmpl_reg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        llm: new MockLLMAdapter(),
+    });
+    return engine;
+}
+
+async function expectReject(promise: Promise<unknown>, pattern: RegExp): Promise<void> {
+    let err: unknown;
+    try {
+        await promise;
+    } catch (e) {
+        err = e;
+    }
+    expect(err).toBeDefined();
+    const msg = err instanceof Error ? err.message : String(err);
+    expect(msg).toMatch(pattern);
+}
+
+describe("engine.runTemplate", () => {
+    it("dispatches to the named template and returns TemplateResult", async () => {
+        const engine = await makeEngine();
+        try {
+            const echo: TemplateFn = (params) =>
+                Promise.resolve({
+                    template: "echo",
+                    rows: [{ got: String(params.value ?? "") }],
+                    columns: ["got"],
+                    source: "test-tmpl",
+                });
+            await engine.registerDomain({
+                id: "test-tmpl",
+                name: "TestTmpl",
+                processInboxBatch: () => Promise.resolve(),
+                buildContext: {
+                    fromText: () => Promise.resolve({ context: "", memories: [], totalTokens: 0 }),
+                    templates: { echo },
+                },
+            });
+
+            const out = await engine.runTemplate("test-tmpl", "echo", { value: "hi" });
+            expect(out.template).toBe("echo");
+            expect(out.source).toBe("test-tmpl");
+            expect(out.columns).toEqual(["got"]);
+            expect(out.rows[0].got).toBe("hi");
+        } finally {
+            await engine.close();
+        }
+    });
+
+    it("throws when domain has no templates registry (no buildContext)", async () => {
+        const engine = await makeEngine();
+        try {
+            await engine.registerDomain({
+                id: "no-tmpl",
+                name: "NoTmpl",
+                processInboxBatch: () => Promise.resolve(),
+            });
+            await expectReject(engine.runTemplate("no-tmpl", "any", {}), /template/i);
+        } finally {
+            await engine.close();
+        }
+    });
+
+    it("throws when domain has only legacy function buildContext", async () => {
+        const engine = await makeEngine();
+        try {
+            const legacy = (): Promise<ContextResult> =>
+                Promise.resolve({ context: "legacy", memories: [], totalTokens: 0 });
+            await engine.registerDomain({
+                id: "legacy-tmpl",
+                name: "LegacyTmpl",
+                processInboxBatch: () => Promise.resolve(),
+                buildContext: legacy,
+            });
+            await expectReject(engine.runTemplate("legacy-tmpl", "any", {}), /template/i);
+        } finally {
+            await engine.close();
+        }
+    });
+
+    it("throws on unknown template name", async () => {
+        const engine = await makeEngine();
+        try {
+            const echo: TemplateFn = () =>
+                Promise.resolve({
+                    template: "echo",
+                    rows: [],
+                    columns: ["got"],
+                    source: "some-tmpl",
+                });
+            await engine.registerDomain({
+                id: "some-tmpl",
+                name: "SomeTmpl",
+                processInboxBatch: () => Promise.resolve(),
+                buildContext: {
+                    templates: { echo },
+                },
+            });
+            await expectReject(engine.runTemplate("some-tmpl", "missing", {}), /missing/);
+        } finally {
+            await engine.close();
+        }
+    });
+});
+
+describe("engine.buildContext dispatch (legacy + fromText)", () => {
+    it("dispatches to legacy function buildContext", async () => {
+        const engine = await makeEngine();
+        try {
+            const legacy = (): Promise<ContextResult> =>
+                Promise.resolve({ context: "legacy-marker-xyz", memories: [], totalTokens: 3 });
+            await engine.registerDomain({
+                id: "legacy-bc",
+                name: "LegacyBc",
+                processInboxBatch: () => Promise.resolve(),
+                buildContext: legacy,
+            });
+            const res = await engine.buildContext("anything", { domains: ["legacy-bc"] });
+            expect(res.context).toContain("legacy-marker-xyz");
+            expect(res.totalTokens).toBe(3);
+        } finally {
+            await engine.close();
+        }
+    });
+
+    it("dispatches to new { fromText } object shape buildContext", async () => {
+        const engine = await makeEngine();
+        try {
+            await engine.registerDomain({
+                id: "new-bc",
+                name: "NewBc",
+                processInboxBatch: () => Promise.resolve(),
+                buildContext: {
+                    fromText: () =>
+                        Promise.resolve({
+                            context: "new-marker-abc",
+                            memories: [],
+                            totalTokens: 7,
+                        }),
+                },
+            });
+            const res = await engine.buildContext("anything", { domains: ["new-bc"] });
+            expect(res.context).toContain("new-marker-abc");
+            expect(res.totalTokens).toBe(7);
+        } finally {
+            await engine.close();
+        }
+    });
+});

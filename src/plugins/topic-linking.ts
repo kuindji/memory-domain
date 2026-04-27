@@ -247,9 +247,7 @@ function createTopicLinkingPlugin(options?: TopicLinkingOptions): DomainPlugin {
             );
             if (searchResult.entries.length > 0) {
                 topicMemoryId = searchResult.entries[0].id;
-                existingAttrs = searchResult.entries[0].domainAttributes[topicDomainId] as
-                    | Record<string, unknown>
-                    | undefined;
+                existingAttrs = searchResult.entries[0].domainAttributes[topicDomainId];
             }
         }
 
@@ -450,10 +448,10 @@ function createTopicLinkingPlugin(options?: TopicLinkingOptions): DomainPlugin {
                     await context.debug.time(
                         "topicLinking.denormalize",
                         () =>
-                            context.graph.query(
-                                "UPDATE memory SET topics = $1 WHERE id = $2",
-                                [new JsonbParam(topicNames), entry.memory.id],
-                            ),
+                            context.graph.query("UPDATE memory SET topics = $1 WHERE id = $2", [
+                                new JsonbParam(topicNames),
+                                entry.memory.id,
+                            ]),
                         { topicCount: topicNames.length },
                     );
                 } catch {

@@ -97,7 +97,7 @@ async function dispatchCommand(
         result.output &&
         typeof result.output === "object" &&
         "error" in result.output &&
-        typeof (result.output as { error: unknown }).error === "string"
+        typeof result.output.error === "string"
     ) {
         return failure(
             "VALIDATION_ERROR",

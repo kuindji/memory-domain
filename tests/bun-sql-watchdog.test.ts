@@ -8,7 +8,7 @@ describe("runQueryWithWatchdog", () => {
     test("resolves when op settles before timeout", async () => {
         const rows = await runQueryWithWatchdog<{ id: number }>(
             "SELECT 1",
-            async () => [{ id: 1 }],
+            () => Promise.resolve([{ id: 1 }]),
             100,
             2,
             true,
@@ -38,57 +38,72 @@ describe("runQueryWithWatchdog", () => {
 
     test("throws BunSqlQueryTimeoutError after exhausting retries", async () => {
         let attempt = 0;
-        const promise = runQueryWithWatchdog(
-            "DELETE FROM tagged WHERE in_id = $1 AND out_id = $2",
-            () => {
-                attempt += 1;
-                return new Promise<unknown[]>(() => {});
-            },
-            10,
-            2,
-            true,
-        );
-        await expect(promise).rejects.toBeInstanceOf(BunSqlQueryTimeoutError);
+        let caught: unknown;
+        try {
+            await runQueryWithWatchdog(
+                "DELETE FROM tagged WHERE in_id = $1 AND out_id = $2",
+                () => {
+                    attempt += 1;
+                    return new Promise<unknown[]>(() => {});
+                },
+                10,
+                2,
+                true,
+            );
+        } catch (err) {
+            caught = err;
+        }
+        expect(caught).toBeInstanceOf(BunSqlQueryTimeoutError);
         expect(attempt).toBe(3);
     });
 
     test("does not retry inside a transaction (allowRetry=false)", async () => {
         let attempt = 0;
-        const promise = runQueryWithWatchdog(
-            "UPDATE memory SET structured_data = NULL WHERE id = $1",
-            () => {
-                attempt += 1;
-                return new Promise<unknown[]>(() => {});
-            },
-            10,
-            2,
-            false,
-        );
-        await expect(promise).rejects.toBeInstanceOf(BunSqlQueryTimeoutError);
+        let caught: unknown;
+        try {
+            await runQueryWithWatchdog(
+                "UPDATE memory SET structured_data = NULL WHERE id = $1",
+                () => {
+                    attempt += 1;
+                    return new Promise<unknown[]>(() => {});
+                },
+                10,
+                2,
+                false,
+            );
+        } catch (err) {
+            caught = err;
+        }
+        expect(caught).toBeInstanceOf(BunSqlQueryTimeoutError);
         expect(attempt).toBe(1);
     });
 
     test("propagates non-timeout errors without retry", async () => {
         let attempt = 0;
         const boom = new Error("syntax error at or near 'FROOM'");
-        const promise = runQueryWithWatchdog(
-            "SELECT FROOM thing",
-            () => {
-                attempt += 1;
-                return Promise.reject(boom);
-            },
-            100,
-            2,
-            true,
-        );
-        await expect(promise).rejects.toBe(boom);
+        let caught: unknown;
+        try {
+            await runQueryWithWatchdog(
+                "SELECT FROOM thing",
+                () => {
+                    attempt += 1;
+                    return Promise.reject(boom);
+                },
+                100,
+                2,
+                true,
+            );
+        } catch (err) {
+            caught = err;
+        }
+        expect(caught).toBe(boom);
         expect(attempt).toBe(1);
     });
 
     test("disables watchdog when timeoutMs=0", async () => {
         const rows = await runQueryWithWatchdog<{ n: number }>(
             "SELECT 42",
-            async () => [{ n: 42 }],
+            () => Promise.resolve([{ n: 42 }]),
             0,
             2,
             true,
@@ -121,17 +136,22 @@ describe("runQueryWithWatchdog", () => {
     test("does not swallow unique_violation on the first attempt", async () => {
         const err = Object.assign(new Error("duplicate key value"), { errno: "23505" });
         let attempt = 0;
-        const promise = runQueryWithWatchdog(
-            "INSERT INTO foo VALUES ($1)",
-            () => {
-                attempt += 1;
-                return Promise.reject(err);
-            },
-            100,
-            2,
-            true,
-        );
-        await expect(promise).rejects.toBe(err);
+        let caught: unknown;
+        try {
+            await runQueryWithWatchdog(
+                "INSERT INTO foo VALUES ($1)",
+                () => {
+                    attempt += 1;
+                    return Promise.reject(err);
+                },
+                100,
+                2,
+                true,
+            );
+        } catch (e) {
+            caught = e;
+        }
+        expect(caught).toBe(err);
         expect(attempt).toBe(1);
     });
 

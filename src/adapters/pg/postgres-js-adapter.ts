@@ -16,7 +16,7 @@ class PostgresJsClient implements PgClient {
     async query<T = Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<T[]> {
         const encoded = params.map(encodeParam) as Parameters<Sql["unsafe"]>[1];
         const rows = await this.sql.unsafe<T[]>(sql, encoded);
-        return rows as unknown as T[];
+        return rows;
     }
 
     async run(sql: string): Promise<void> {
@@ -49,7 +49,13 @@ function encodeParam(value: unknown): unknown {
         if (v === null || v === undefined) return null;
         return JSON.stringify(v);
     }
-    if (value && typeof value === "object" && !Array.isArray(value) && !(value instanceof Date) && !ArrayBuffer.isView(value)) {
+    if (
+        value &&
+        typeof value === "object" &&
+        !Array.isArray(value) &&
+        !(value instanceof Date) &&
+        !ArrayBuffer.isView(value)
+    ) {
         // Plain objects bound to jsonb columns — stringify so postgres.js sends
         // them as text, then PG casts via the column type / explicit ::jsonb.
         return JSON.stringify(value);
@@ -77,7 +83,7 @@ export function createPostgresJsClient(config: Extract<DbConfig, { kind: "postgr
             ? { statement_timeout: config.queryTimeoutMs }
             : {}),
     };
-    if (config.ssl !== undefined) opts.ssl = config.ssl as never;
+    if (config.ssl !== undefined) opts.ssl = config.ssl;
     const sql = postgres(config.url, opts);
     return new PostgresJsClient(sql, false, true);
 }

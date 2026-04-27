@@ -10,7 +10,6 @@ import type {
     ModelLevel,
     AgentRunSpec,
     AgentRunResult,
-    AgentRunTurn,
 } from "../../core/types.js";
 import { parseJsonResponse } from "./json-response.js";
 import { runWithRetry } from "./retry.js";
@@ -328,9 +327,7 @@ ${memoryList}`;
         clearTimeout(timeoutId);
 
         if (timedOut) {
-            throw new Error(
-                `Claude CLI timed out after ${timeout}ms: ${previewOutput(stderr)}`,
-            );
+            throw new Error(`Claude CLI timed out after ${timeout}ms: ${previewOutput(stderr)}`);
         }
         if (exitCode !== 0) {
             throw new Error(`Claude CLI exited ${exitCode}: ${previewOutput(stderr)}`);
