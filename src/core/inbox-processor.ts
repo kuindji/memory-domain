@@ -482,13 +482,45 @@ class InboxProcessor {
     }
 
     private async clearRootInboxIfNoActiveTags(memId: string): Promise<void> {
-        const remaining = await this.countActiveInboxTags(memId);
-        if (remaining === 0) {
-            await this.store.unrelate(memId, "tagged", "tag:inbox");
-            await this.store.query(`UPDATE memory SET structured_data = NULL WHERE id = $1`, [
-                memId,
-            ]);
-            this.events.emit("inboxProcessed", { memoryId: memId });
+        await this.clearRootInboxForBatch([memId]);
+    }
+
+    /**
+     * Batched form: count active inbox tags for many memories in one query,
+     * then in a single statement clear the root-inbox edge and structured_data
+     * for the subset whose count is zero. Replaces N×3 round-trips with at
+     * most 3 round-trips total. Used by both the assertion and the
+     * processing finalize paths.
+     */
+    private async clearRootInboxForBatch(memIds: string[]): Promise<void> {
+        if (memIds.length === 0) return;
+        const rows = await this.store.query<{ in_id: string; cnt: number }>(
+            `WITH ids AS (SELECT unnest($1::text[]) AS in_id)
+             SELECT ids.in_id, COALESCE(c.cnt, 0)::int AS cnt
+             FROM ids
+             LEFT JOIN (
+               SELECT tg.in_id, COUNT(*) AS cnt
+               FROM tagged tg JOIN tag t ON t.id = tg.out_id
+               WHERE tg.in_id = ANY($1::text[])
+                 AND t.label LIKE 'inbox:%'
+                 AND t.label NOT LIKE 'inbox:processing:%'
+                 AND t.label NOT LIKE 'inbox:failed%'
+               GROUP BY tg.in_id
+             ) c ON c.in_id = ids.in_id`,
+            [memIds],
+        );
+        const clearIds: string[] = [];
+        for (const row of rows) {
+            if (row.cnt === 0) clearIds.push(row.in_id);
+        }
+        if (clearIds.length === 0) return;
+        await this.store.deleteEdges("tagged", { in: clearIds, out: "tag:inbox" });
+        await this.store.query(
+            `UPDATE memory SET structured_data = NULL WHERE id = ANY($1::text[])`,
+            [clearIds],
+        );
+        for (const id of clearIds) {
+            this.events.emit("inboxProcessed", { memoryId: id });
         }
     }
 
@@ -512,9 +544,7 @@ class InboxProcessor {
         await this.store.createNodeWithId(tagId, { label, created_at: now });
         await this.store.relate(tagId, "child_of", PROCESSING_ROOT_TAG_ID);
 
-        await Promise.all(
-            memoryIds.map((memId) => this.store.relate(memId, "tagged", tagId)),
-        );
+        await this.store.relateMany(memoryIds, "tagged", tagId);
         return batchId;
     }
 
@@ -776,12 +806,8 @@ class InboxProcessor {
                             requestContext,
                         );
 
-                        for (const memId of claimedIds) {
+                        if (claimedIds.length > 0) {
                             const fullDomainId = `domain:${did}`;
-                            await this.store.relate(memId, "owned_by", fullDomainId, {
-                                attributes: {},
-                                owned_at: Date.now(),
-                            });
                             const inboxTagId = `tag:inbox:${did}`;
                             try {
                                 await this.store.createNodeWithId(inboxTagId, {
@@ -791,11 +817,20 @@ class InboxProcessor {
                             } catch {
                                 /* already exists */
                             }
-                            await this.store.relate(memId, "tagged", inboxTagId);
+                            await this.store.relateMany(
+                                claimedIds,
+                                "owned_by",
+                                fullDomainId,
+                                { attributes: {}, owned_at: Date.now() },
+                            );
+                            await this.store.relateMany(claimedIds, "tagged", inboxTagId);
                         }
 
-                        for (const memId of domainMemoryIds) {
-                            await this.store.unrelate(memId, "tagged", assertTagId);
+                        if (domainMemoryIds.length > 0) {
+                            await this.store.deleteEdges("tagged", {
+                                in: domainMemoryIds,
+                                out: assertTagId,
+                            });
                         }
                     } catch (err) {
                         this.events.emit("error", {
@@ -811,42 +846,106 @@ class InboxProcessor {
                             requestContext,
                             err,
                         );
-                        if (failure.status === "quarantined") {
+                        if (failure.status === "quarantined" && domainMemoryIds.length > 0) {
                             const failedTagId = await this.ensureTag(
                                 `inbox:failed-assert-claim:${did}`,
                             );
-                            for (const memId of domainMemoryIds) {
-                                await this.store.unrelate(memId, "tagged", assertTagId);
-                                await this.store.relate(memId, "tagged", failedTagId);
-                            }
+                            await this.store.deleteEdges("tagged", {
+                                in: domainMemoryIds,
+                                out: assertTagId,
+                            });
+                            await this.store.relateMany(
+                                domainMemoryIds,
+                                "tagged",
+                                failedTagId,
+                            );
                         }
                     }
                 }
 
-                for (const memId of memoryIds) {
-                    const owners = await this.store.query<{ count: number }>(
-                        `SELECT COUNT(*)::int AS count FROM owned_by WHERE in_id = $1`,
-                        [memId],
-                    );
-                    const ownerCount = owners[0]?.count ?? 0;
-                    const activeAssertCount = await this.countTagsByPrefix(
-                        memId,
-                        "inbox:assert-claim:",
-                    );
-                    const failedAssertCount = await this.countTagsByPrefix(
-                        memId,
-                        "inbox:failed-assert-claim:",
+                if (memoryIds.length > 0) {
+                    const counts = await this.store.query<{
+                        in_id: string;
+                        owner_count: number;
+                        active_assert: number;
+                        failed_assert: number;
+                        active_inbox: number;
+                    }>(
+                        `WITH ids AS (SELECT unnest($1::text[]) AS in_id)
+                         SELECT
+                           ids.in_id,
+                           COALESCE(ob.cnt, 0)::int AS owner_count,
+                           COALESCE(tt.assert_cnt, 0)::int AS active_assert,
+                           COALESCE(tt.failed_cnt, 0)::int AS failed_assert,
+                           COALESCE(tt.active_cnt, 0)::int AS active_inbox
+                         FROM ids
+                         LEFT JOIN (
+                           SELECT in_id, COUNT(*) AS cnt
+                           FROM owned_by
+                           WHERE in_id = ANY($1::text[])
+                           GROUP BY in_id
+                         ) ob ON ob.in_id = ids.in_id
+                         LEFT JOIN (
+                           SELECT tg.in_id,
+                             COUNT(*) FILTER (WHERE t.label LIKE 'inbox:assert-claim:%') AS assert_cnt,
+                             COUNT(*) FILTER (WHERE t.label LIKE 'inbox:failed-assert-claim:%') AS failed_cnt,
+                             COUNT(*) FILTER (
+                               WHERE t.label LIKE 'inbox:%'
+                                 AND t.label NOT LIKE 'inbox:processing:%'
+                                 AND t.label NOT LIKE 'inbox:failed%'
+                             ) AS active_cnt
+                           FROM tagged tg JOIN tag t ON t.id = tg.out_id
+                           WHERE tg.in_id = ANY($1::text[]) AND t.label LIKE 'inbox:%'
+                           GROUP BY tg.in_id
+                         ) tt ON tt.in_id = ids.in_id`,
+                        [memoryIds],
                     );
 
-                    if (ownerCount === 0 && activeAssertCount === 0 && failedAssertCount === 0) {
-                        await this.removeOrphanedMemory(memId);
-                    } else {
-                        await this.clearRootInboxIfNoActiveTags(memId);
+                    const orphanIds: string[] = [];
+                    const clearRootIds: string[] = [];
+                    for (const row of counts) {
+                        if (
+                            row.owner_count === 0 &&
+                            row.active_assert === 0 &&
+                            row.failed_assert === 0
+                        ) {
+                            orphanIds.push(row.in_id);
+                        } else if (row.active_inbox === 0) {
+                            clearRootIds.push(row.in_id);
+                        }
+                        this.events.emit("inboxClaimAsserted", {
+                            memoryId: row.in_id,
+                            claimed: row.owner_count > 0,
+                        });
                     }
-                    this.events.emit("inboxClaimAsserted", {
-                        memoryId: memId,
-                        claimed: ownerCount > 0,
-                    });
+
+                    if (orphanIds.length > 0) {
+                        await this.store.query(
+                            `DELETE FROM tagged WHERE in_id = ANY($1::text[])`,
+                            [orphanIds],
+                        );
+                        await this.store.deleteNodes(orphanIds);
+                        for (const id of orphanIds) {
+                            this.events.emit("deleted", {
+                                memoryId: id,
+                                reason: "unclaimed",
+                            });
+                        }
+                    }
+
+                    if (clearRootIds.length > 0) {
+                        await this.store.deleteEdges("tagged", {
+                            in: clearRootIds,
+                            out: "tag:inbox",
+                        });
+                        await this.store.query(
+                            `UPDATE memory SET structured_data = NULL WHERE id = ANY($1::text[])`,
+                            [clearRootIds],
+                        );
+                        for (const id of clearRootIds) {
+                            this.events.emit("inboxProcessed", { memoryId: id });
+                        }
+                    }
                 }
             } finally {
                 await this.removeBatchProcessingTag(batchId);
@@ -909,31 +1008,31 @@ class InboxProcessor {
                             requestContext,
                             err,
                         );
-                        if (failure.status === "quarantined") {
+                        if (failure.status === "quarantined" && memoryIds.length > 0) {
                             const failedTagId = await this.ensureTag(`inbox:failed:${did}`);
-                            await Promise.all(
-                                memoryIds.map(async (memId) => {
-                                    await this.store.unrelate(memId, "tagged", inboxTagId);
-                                    await this.store.relate(memId, "tagged", failedTagId);
-                                    await this.clearRootInboxIfNoActiveTags(memId);
-                                }),
-                            );
+                            await this.store.deleteEdges("tagged", {
+                                in: memoryIds,
+                                out: inboxTagId,
+                            });
+                            await this.store.relateMany(memoryIds, "tagged", failedTagId);
+                            await this.clearRootInboxForBatch(memoryIds);
                         }
                         continue;
                     }
 
-                    await Promise.all(
-                        memoryIds.map(async (memId) => {
-                            await this.store.unrelate(memId, "tagged", inboxTagId);
+                    if (memoryIds.length > 0) {
+                        await this.store.deleteEdges("tagged", {
+                            in: memoryIds,
+                            out: inboxTagId,
+                        });
+                        for (const memId of memoryIds) {
                             this.events.emit("inboxDomainProcessed", {
                                 memoryId: memId,
                                 domainId: did,
                             });
-                        }),
-                    );
-                    await Promise.all(
-                        memoryIds.map((memId) => this.clearRootInboxIfNoActiveTags(memId)),
-                    );
+                        }
+                        await this.clearRootInboxForBatch(memoryIds);
+                    }
 
                     totalProcessed += memoryIds.length;
                 } finally {

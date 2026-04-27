@@ -54,6 +54,18 @@ export interface GraphApi {
     deleteNode(id: string): Promise<boolean>;
     deleteNodes(ids: string[]): Promise<void>;
     relate(from: string, edge: string, to: string, data?: Record<string, unknown>): Promise<string>;
+    /**
+     * Bulk-create N edges that share the same `to` node and the same `data`
+     * payload. Collapses N round-trips to a single multi-row INSERT. Used on
+     * inbox hot paths where a batch of memories all get tagged or owned by
+     * the same target. Returns the generated edge ids in input order.
+     */
+    relateMany(
+        fromIds: string[],
+        edge: string,
+        to: string,
+        data?: Record<string, unknown>,
+    ): Promise<string[]>;
     unrelate(from: string, edge: string, to: string): Promise<boolean>;
     outgoing<T = Edge>(from: string, edge: string): Promise<T[]>;
     incoming<T = Edge>(to: string, edge: string): Promise<T[]>;

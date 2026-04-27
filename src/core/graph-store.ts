@@ -196,6 +196,49 @@ class GraphStore implements GraphApi {
         return id;
     }
 
+    async relateMany(
+        fromIds: string[],
+        edge: string,
+        to: string,
+        data?: Record<string, unknown>,
+    ): Promise<string[]> {
+        if (fromIds.length === 0) return [];
+
+        const baseData = data ?? {};
+        const dataKeys: string[] = [];
+        for (const k of Object.keys(baseData)) {
+            if (baseData[k] !== undefined) dataKeys.push(k);
+        }
+        const columns = ["id", "in_id", "out_id", ...dataKeys];
+
+        const ids: string[] = [];
+        const rowPlaceholders: string[] = [];
+        const values: unknown[] = [];
+        let p = 1;
+        for (const from of fromIds) {
+            const id = `${edge}:${randomUUID()}`;
+            ids.push(id);
+            const placeholders: string[] = [];
+            placeholders.push(`$${p++}`);
+            values.push(id);
+            placeholders.push(`$${p++}`);
+            values.push(from);
+            placeholders.push(`$${p++}`);
+            values.push(to);
+            for (const k of dataKeys) {
+                placeholders.push(`$${p++}`);
+                values.push(bindValue(baseData[k], this.isJsonb(edge, k)));
+            }
+            rowPlaceholders.push(`(${placeholders.join(", ")})`);
+        }
+
+        await this.db.query(
+            `INSERT INTO ${edge} (${columns.join(", ")}) VALUES ${rowPlaceholders.join(", ")}`,
+            values,
+        );
+        return ids;
+    }
+
     async unrelate(from: string, edge: string, to: string): Promise<boolean> {
         const rows = await this.db.query<{ id: string }>(
             `DELETE FROM ${edge} WHERE in_id = $1 AND out_id = $2 RETURNING id`,
