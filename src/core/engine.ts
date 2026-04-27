@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { PgClient } from "../adapters/pg/types.js";
 import { JsonbParam } from "../adapters/pg/types.js";
 import { createPgClient } from "../adapters/pg/factory.js";
@@ -672,10 +673,16 @@ class MemoryEngine {
         if (options?.metadata && Object.keys(options.metadata).length > 0) {
             memData.metadata = options.metadata;
         }
-        const memId = await this.graph.createNode("memory", memData);
-
-        // Tag with inbox
-        await this.graph.relate(memId, "tagged", "tag:inbox");
+        // Compute the memory id client-side so we can fan the row insert and
+        // the inbox-tag edge insert out in parallel — they have no DB-level
+        // dependency on each other and the two round-trips were ~14ms each
+        // sequentially, dominating per-narrative ingest cost during bulk
+        // ingestion (e.g. GDELT 6k narratives/month).
+        const memId = `memory:${randomUUID()}`;
+        await Promise.all([
+            this.graph.createNodeWithId(memId, memData),
+            this.graph.relate(memId, "tagged", "tag:inbox"),
+        ]);
 
         // Add extra tags
         if (options?.tags && options.tags.length > 0) {

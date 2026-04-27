@@ -177,32 +177,22 @@ class InboxProcessor {
     private async fetchMemoryRows(ids: string[]): Promise<RawMemoryRow[]> {
         if (ids.length === 0) return [];
 
-        const nodes = await Promise.all(
-            ids.map((id) =>
-                this.store.query<RawMemoryRow>(
-                    `SELECT id, content, embedding::text AS embedding,
-                            event_time, created_at, token_count,
-                            request_context, structured_data
-                     FROM memory WHERE id = $1`,
-                    [id],
-                ),
-            ),
+        const nodes = await this.store.query<RawMemoryRow>(
+            `SELECT id, content, embedding::text AS embedding,
+                    event_time, created_at, token_count,
+                    request_context, structured_data
+             FROM memory WHERE id = ANY($1::text[])`,
+            [ids],
         );
-        const rows: RawMemoryRow[] = [];
-        for (const result of nodes) {
-            const node = result[0];
-            if (!node) continue;
-            rows.push({
-                id: node.id,
-                content: node.content,
-                embedding: parseEmbedding(node.embedding),
-                event_time: node.event_time,
-                created_at: node.created_at,
-                token_count: node.token_count,
-                request_context: this.normalizeRequestContext(node.request_context),
-            });
-        }
-        return rows;
+        return nodes.map((node) => ({
+            id: node.id,
+            content: node.content,
+            embedding: parseEmbedding(node.embedding),
+            event_time: node.event_time,
+            created_at: node.created_at,
+            token_count: node.token_count,
+            request_context: this.normalizeRequestContext(node.request_context),
+        }));
     }
 
     // --- Similarity Batch Building ---
