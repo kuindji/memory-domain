@@ -85,7 +85,10 @@ describe("KB inbox processing with classification and topic linking (real)", () 
 
         // Verify tagged with kb and kb/fact
         const graph = engine.getGraph();
-        const topicEdges = await graph.traverse(result.id!, "->about_topic->memory");
+        const topicEdges = await graph.query<{ out_id: string }>(
+            "SELECT out_id FROM about_topic WHERE in_id = $1",
+            [result.id!],
+        );
         console.log(`[TOPIC LINKING] Fact linked to ${topicEdges.length} topic(s)`);
         expect(topicEdges.length).toBeGreaterThan(0);
     });
@@ -226,7 +229,10 @@ describe("Supersession detection (real)", () => {
 
         // Check if supersedes edge was created
         const graph = engine.getGraph();
-        const supersededEdges = await graph.traverse(second.id!, "->supersedes->memory");
+        const supersededEdges = await graph.query<{ out_id: string }>(
+            "SELECT out_id FROM supersedes WHERE in_id = $1",
+            [second.id!],
+        );
 
         if (supersededEdges.length > 0) {
             console.log(
@@ -306,7 +312,10 @@ describe("Related knowledge linking (real)", () => {
 
         // Check for related_knowledge edges
         const graph = engine.getGraph();
-        const relatedEdges = await graph.traverse(second.id!, "->related_knowledge->memory");
+        const relatedEdges = await graph.query<{ out_id: string }>(
+            "SELECT out_id FROM related_knowledge WHERE in_id = $1",
+            [second.id!],
+        );
 
         if (relatedEdges.length > 0) {
             console.log(`[PASS] Related knowledge detected: ${relatedEdges.length} link(s)`);
@@ -562,7 +571,10 @@ describe("Knowledge consolidation schedule (real)", () => {
             // Verify supersedes edges exist
             const graph = engine.getGraph();
             for (const nonSup of afterNonSuperseded) {
-                const edges = await graph.traverse(nonSup.id, "->supersedes->memory");
+                const edges = await graph.query<{ out_id: string }>(
+                    "SELECT out_id FROM supersedes WHERE in_id = $1",
+                    [nonSup.id],
+                );
                 if (edges.length > 0) {
                     console.log(`  Consolidated entry supersedes ${edges.length} original(s)`);
                 }
@@ -672,7 +684,7 @@ describe("Search expansion and ask() (real)", () => {
         });
 
         console.log('\n[ASK] "What indexing options are available in PostgreSQL?"');
-        console.log(`  Rounds: ${askResult.rounds}, Memories: ${askResult.memories.length}`);
+        console.log(`  Rounds: ${askResult.rounds}, Turns: ${askResult.turns?.length ?? 0}`);
         console.log(`  Answer: ${askResult.answer}`);
 
         const answerLower = askResult.answer.toLowerCase();

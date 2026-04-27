@@ -1,4 +1,3 @@
-import { StringRecordId } from "surrealdb";
 import type { OwnedMemory, DomainContext } from "../../core/types.js";
 import { USER_TAG, DEFAULT_USER_IMPORTANCE } from "./types.js";
 import type { UserFactClassification } from "./types.js";
@@ -109,12 +108,8 @@ export async function processInboxBatch(
                         // Denormalize classification and answers_question onto memory record
                         try {
                             await context.graph.query(
-                                "UPDATE $memId SET classification = $cls, answers_question = $aq",
-                                {
-                                    memId: new StringRecordId(entry.memory.id),
-                                    cls: classification,
-                                    aq: answersQuestion ?? null,
-                                },
+                                "UPDATE memory SET classification = $1, answers_question = $2 WHERE id = $3",
+                                [classification, answersQuestion ?? null, entry.memory.id],
                             );
                         } catch {
                             /* best-effort denormalization */
@@ -169,12 +164,9 @@ async function ensureAboutUserEdge(
 
     try {
         // Check for existing about_user edge between this memory and user
-        const existing = await context.graph.query<Array<{ id: unknown }>>(
-            "SELECT id FROM about_user WHERE in = $memId AND out = $userId LIMIT 1",
-            {
-                memId: new StringRecordId(memoryId),
-                userId: new StringRecordId(userNodeId),
-            },
+        const existing = await context.graph.query<{ id: string }>(
+            "SELECT id FROM about_user WHERE in_id = $1 AND out_id = $2 LIMIT 1",
+            [memoryId, userNodeId],
         );
         if (existing && existing.length > 0) return;
 
@@ -347,26 +339,26 @@ async function fetchExistingUserFacts(
     const newIds = new Set(newEntries.map((e) => e.memory.id));
 
     try {
-        const userRef = new StringRecordId(userNodeId);
-        const domainRef = new StringRecordId(`domain:${context.domain}`);
-
-        // Fetch memories linked via about_user to this user
-        const rows = await context.graph.query<
-            Array<{ in: unknown; content: string; attributes: Record<string, unknown> }>
-        >(
-            `SELECT in,
-                    (SELECT content FROM ONLY $parent.in).content AS content,
-                    (SELECT attributes FROM ONLY owned_by WHERE in = $parent.in AND out = $domainId LIMIT 1).attributes AS attributes
-             FROM about_user
-             WHERE out = $userId`,
-            { userId: userRef, domainId: domainRef },
+        // Fetch memories linked via about_user to this user, joined with the
+        // memory row and (optional) owned_by attributes for the user domain.
+        const rows = await context.graph.query<{
+            in_id: string;
+            content: string | null;
+            attributes: Record<string, unknown> | null;
+        }>(
+            `SELECT au.in_id, m.content, ob.attributes
+             FROM about_user au
+             JOIN memory m ON m.id = au.in_id
+             LEFT JOIN owned_by ob ON ob.in_id = au.in_id AND ob.out_id = $2
+             WHERE au.out_id = $1`,
+            [userNodeId, `domain:${context.domain}`],
         );
 
         if (!rows) return [];
 
         const result: ExistingUserFact[] = [];
         for (const row of rows) {
-            const id = String(row.in);
+            const id = row.in_id;
             if (newIds.has(id)) continue;
             const attrs = row.attributes ?? {};
             if (attrs.superseded) continue;

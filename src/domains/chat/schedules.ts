@@ -1,4 +1,3 @@
-import { StringRecordId } from "surrealdb";
 import type { DomainContext } from "../../core/types.js";
 import type { ChatDomainOptions } from "./types.js";
 import {
@@ -17,7 +16,7 @@ import { countTokens } from "../../core/scoring.js";
 import { ensureTag } from "./utils.js";
 
 interface WorkingMemoryRow {
-    in: string;
+    in_id: string;
     attributes: Record<string, unknown>;
 }
 
@@ -29,15 +28,16 @@ export async function promoteWorkingMemory(
         const capacity = options?.workingMemoryCapacity ?? DEFAULT_WORKING_CAPACITY;
         const maxAge = options?.workingMemoryMaxAge ?? DEFAULT_WORKING_MAX_AGE;
 
-        const rows = await context.graph.query<WorkingMemoryRow[]>(
-            'SELECT in, attributes FROM owned_by WHERE out = $domainId AND attributes.layer = "working"',
-            { domainId: new StringRecordId(`domain:${context.domain}`) },
+        const rows = await context.graph.query<WorkingMemoryRow>(
+            `SELECT in_id, attributes FROM owned_by
+             WHERE out_id = $1 AND attributes->>'layer' = 'working'`,
+            [`domain:${context.domain}`],
         );
         if (!rows || rows.length === 0) return;
 
         const groups = new Map<string, { memId: string; attrs: Record<string, unknown> }[]>();
         for (const row of rows) {
-            const memId = String(row.in);
+            const memId = row.in_id;
             const attrs = row.attributes;
             const userId = typeof attrs.userId === "string" ? attrs.userId : "";
             const chatSessionId =
@@ -288,12 +288,12 @@ export async function consolidateEpisodic(
                 if (!older || !newer) continue;
 
                 // Read existing attributes and add invalidAt
-                const attrRows = await context.graph.query<
-                    { attributes: Record<string, unknown> }[]
-                >("SELECT attributes FROM owned_by WHERE in = $memId AND out = $domainId", {
-                    memId: new StringRecordId(older.id),
-                    domainId: new StringRecordId(`domain:${context.domain}`),
-                });
+                const attrRows = await context.graph.query<{
+                    attributes: Record<string, unknown>;
+                }>("SELECT attributes FROM owned_by WHERE in_id = $1 AND out_id = $2", [
+                    older.id,
+                    `domain:${context.domain}`,
+                ]);
                 if (attrRows && attrRows.length > 0) {
                     await context.updateAttributes(older.id, {
                         ...attrRows[0].attributes,
@@ -381,12 +381,12 @@ export async function consolidateEpisodic(
                     });
 
                     // Invalidate the old semantic memory
-                    const oldAttrRows = await context.graph.query<
-                        { attributes: Record<string, unknown> }[]
-                    >("SELECT attributes FROM owned_by WHERE in = $memId AND out = $domainId", {
-                        memId: new StringRecordId(dupTarget.id),
-                        domainId: new StringRecordId(`domain:${context.domain}`),
-                    });
+                    const oldAttrRows = await context.graph.query<{
+                        attributes: Record<string, unknown>;
+                    }>("SELECT attributes FROM owned_by WHERE in_id = $1 AND out_id = $2", [
+                        dupTarget.id,
+                        `domain:${context.domain}`,
+                    ]);
                     if (oldAttrRows && oldAttrRows.length > 0) {
                         await context.updateAttributes(dupTarget.id, {
                             ...oldAttrRows[0].attributes,
@@ -410,16 +410,17 @@ export async function pruneDecayed(
         const lambda = options?.decay?.episodicLambda ?? DEFAULT_EPISODIC_LAMBDA;
         const threshold = options?.decay?.pruneThreshold ?? DEFAULT_PRUNE_THRESHOLD;
 
-        const rows = await context.graph.query<WorkingMemoryRow[]>(
-            'SELECT in, attributes FROM owned_by WHERE out = $domainId AND attributes.layer = "episodic"',
-            { domainId: new StringRecordId(`domain:${context.domain}`) },
+        const rows = await context.graph.query<WorkingMemoryRow>(
+            `SELECT in_id, attributes FROM owned_by
+             WHERE out_id = $1 AND attributes->>'layer' = 'episodic'`,
+            [`domain:${context.domain}`],
         );
         if (!rows || rows.length === 0) return;
 
         const now = Date.now();
 
         for (const row of rows) {
-            const memId = String(row.in);
+            const memId = row.in_id;
             const weight = typeof row.attributes.weight === "number" ? row.attributes.weight : 1.0;
 
             // Skip already-invalidated memories

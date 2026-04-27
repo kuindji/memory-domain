@@ -1,6 +1,7 @@
 import type { PgClient } from "../adapters/pg/types.js";
 import type { DomainSchema, NodeDef, EdgeDef, FieldDef, IndexDef } from "./types.js";
 import { translateFieldType, defaultLiteral } from "./sql/types.js";
+import { quoteIdent } from "./sql/identifiers.js";
 
 interface RegisteredNode {
     name: string;
@@ -358,7 +359,9 @@ class SchemaRegistry {
         for (const field of node.fields) {
             cols.push(this.fieldColumnSql(field));
         }
-        await this.db.run(`CREATE TABLE IF NOT EXISTS ${node.name} (${cols.join(", ")})`);
+        await this.db.run(
+            `CREATE TABLE IF NOT EXISTS ${quoteIdent(node.name)} (${cols.join(", ")})`,
+        );
     }
 
     private async createEdgeTable(name: string, fields: FieldDef[]): Promise<void> {
@@ -370,7 +373,7 @@ class SchemaRegistry {
         for (const field of fields) {
             cols.push(this.fieldColumnSql(field));
         }
-        await this.db.run(`CREATE TABLE IF NOT EXISTS ${name} (${cols.join(", ")})`);
+        await this.db.run(`CREATE TABLE IF NOT EXISTS ${quoteIdent(name)} (${cols.join(", ")})`);
     }
 
     private async addEdgeFields(table: string, fields: FieldDef[]): Promise<void> {
@@ -394,7 +397,7 @@ class SchemaRegistry {
     private async addColumn(table: string, field: FieldDef): Promise<void> {
         const { pgType, nullable } = translateFieldType(field.type);
         const required = field.required !== false && !nullable;
-        let sql = `ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS ${field.name} ${pgType}`;
+        let sql = `ALTER TABLE ${quoteIdent(table)} ADD COLUMN IF NOT EXISTS ${field.name} ${pgType}`;
         if (required) sql += " NOT NULL";
         if (field.default !== undefined && field.default !== null) {
             sql += ` DEFAULT ${defaultLiteral(field.default)}`;
@@ -443,7 +446,7 @@ class SchemaRegistry {
             // Either column is missing dim entirely or has wrong one. Recast.
             await this.db.run(`DROP INDEX IF EXISTS ${name}`);
             await this.db.run(
-                `ALTER TABLE ${table} ALTER COLUMN ${field} TYPE vector(${dimension})`,
+                `ALTER TABLE ${quoteIdent(table)} ALTER COLUMN ${field} TYPE vector(${dimension})`,
             );
         }
 
@@ -457,12 +460,14 @@ class SchemaRegistry {
 
         if (existing) await this.db.run(`DROP INDEX IF EXISTS ${name}`);
         await this.db.run(
-            `CREATE INDEX ${name} ON ${table} USING hnsw (${field} vector_cosine_ops)`,
+            `CREATE INDEX ${name} ON ${quoteIdent(table)} USING hnsw (${field} vector_cosine_ops)`,
         );
     }
 
     private async createSimpleIndex(table: string, name: string, fields: string[]): Promise<void> {
-        await this.db.run(`CREATE INDEX IF NOT EXISTS ${name} ON ${table} (${fields.join(", ")})`);
+        await this.db.run(
+            `CREATE INDEX IF NOT EXISTS ${name} ON ${quoteIdent(table)} (${fields.join(", ")})`,
+        );
     }
 
     private async defineIndex(table: string, idx: IndexDef): Promise<void> {
@@ -477,13 +482,13 @@ class SchemaRegistry {
             const expr = idx.fields.map((f) => `coalesce(${f}, '')`).join(" || ' ' || ");
             await this.db.run(
                 `CREATE INDEX IF NOT EXISTS ${idx.name}
-                 ON ${table} USING GIN (to_tsvector('english', ${expr}))`,
+                 ON ${quoteIdent(table)} USING GIN (to_tsvector('english', ${expr}))`,
             );
             return;
         }
         if (idx.type === "unique") {
             await this.db.run(
-                `CREATE UNIQUE INDEX IF NOT EXISTS ${idx.name} ON ${table} (${idx.fields.join(", ")})`,
+                `CREATE UNIQUE INDEX IF NOT EXISTS ${idx.name} ON ${quoteIdent(table)} (${idx.fields.join(", ")})`,
             );
             return;
         }

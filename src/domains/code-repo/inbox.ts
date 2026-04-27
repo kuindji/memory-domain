@@ -1,4 +1,3 @@
-import { StringRecordId } from "surrealdb";
 import type { OwnedMemory, DomainContext, ScoredMemory } from "../../core/types.js";
 import {
     CODE_REPO_TAG,
@@ -226,12 +225,8 @@ export async function processInboxBatch(
                         // Denormalize classification and answers_question onto memory record
                         try {
                             await context.graph.query(
-                                "UPDATE $memId SET classification = $cls, answers_question = $aq",
-                                {
-                                    memId: new StringRecordId(entry.memory.id),
-                                    cls: classification,
-                                    aq: answersQuestion ?? null,
-                                },
+                                "UPDATE memory SET classification = $1, answers_question = $2 WHERE id = $3",
+                                [classification, answersQuestion ?? null, entry.memory.id],
                             );
                         } catch {
                             /* best-effort denormalization */

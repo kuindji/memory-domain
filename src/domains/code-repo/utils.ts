@@ -226,16 +226,22 @@ export async function ensureTag(context: DomainContext, label: string): Promise<
  * Searches for an existing entity node by type and name, creates if not found.
  * Returns the node ID.
  */
+const ENTITY_TABLES = new Set(["module", "data_entity", "concept", "pattern"]);
+
 export async function findOrCreateEntity(
     context: DomainContext,
     type: string,
     name: string,
     fields?: Record<string, unknown>,
 ): Promise<string> {
-    // Search for existing entity by name
-    const results = await context.graph.query<Array<{ id: string }>>(
-        `SELECT id FROM type::table($type) WHERE name = $name LIMIT 1`,
-        { type, name },
+    if (!ENTITY_TABLES.has(type)) {
+        throw new Error(`Unsupported entity type: ${type}`);
+    }
+    // Search for existing entity by name. `type` is allowlist-validated above
+    // so it is safe to interpolate as a quoted table identifier.
+    const results = await context.graph.query<{ id: string }>(
+        `SELECT id FROM "${type}" WHERE name = $1 LIMIT 1`,
+        [name],
     );
 
     if (Array.isArray(results) && results.length > 0) {

@@ -13,6 +13,7 @@ import { ClaudeCliAdapter } from "../src/adapters/llm/claude-cli.js";
 import { OnnxEmbeddingAdapter } from "../src/adapters/onnx-embedding.js";
 import { createUserDomain, userDomain } from "../src/domains/user/index.js";
 import { topicDomain } from "../src/domains/topic/index.js";
+import { createTopicLinkingPlugin } from "../src/plugins/topic-linking.js";
 import { USER_DOMAIN_ID, USER_TAG } from "../src/domains/user/types.js";
 import { TOPIC_DOMAIN_ID, TOPIC_TAG } from "../src/domains/topic/types.js";
 import { consolidateUserProfile } from "../src/domains/user/schedules.js";
@@ -45,7 +46,7 @@ describe("Topic + User domain coexistence (real)", () => {
             debug: { timing: true },
             context: { userId: "test-user" },
         });
-        await engine.registerDomain(userDomain);
+        await engine.registerDomain({ domain: userDomain, plugins: [createTopicLinkingPlugin()] });
         await engine.registerDomain(topicDomain);
     });
 
@@ -106,9 +107,15 @@ describe("Topic + User domain coexistence (real)", () => {
         expect(userEdges.length).toBe(2); // two facts linked to user
 
         const graph = engine.getGraph();
-        const topicLinks1 = await graph.traverse(fact1Id, "->about_topic->memory");
+        const topicLinks1 = await graph.query<{ out_id: string }>(
+            "SELECT out_id FROM about_topic WHERE in_id = $1",
+            [fact1Id],
+        );
         expect(topicLinks1.length).toBe(1);
-        const topicLinks2 = await graph.traverse(fact2Id, "->about_topic->memory");
+        const topicLinks2 = await graph.query<{ out_id: string }>(
+            "SELECT out_id FROM about_topic WHERE in_id = $1",
+            [fact2Id],
+        );
         expect(topicLinks2.length).toBe(1);
 
         console.log(
@@ -413,7 +420,7 @@ describe("End-to-end lifecycle (real)", () => {
             debug: { timing: true },
             context: { userId: "e2e-user" },
         });
-        await engine.registerDomain(userDomain);
+        await engine.registerDomain({ domain: userDomain, plugins: [createTopicLinkingPlugin()] });
         await engine.registerDomain(topicDomain);
     });
 

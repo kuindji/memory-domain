@@ -8,6 +8,7 @@ import { TunableParamRegistry } from "./tunable-params.js";
 import type { TunableParamDefinition } from "./tunable-params.js";
 import { SchemaRegistry } from "./schema-registry.js";
 import { formatTagId, tagLabel } from "./tag-utils.js";
+import { quoteIdent } from "./sql/identifiers.js";
 import { SearchEngine } from "./search-engine.js";
 import { InboxProcessor } from "./inbox-processor.js";
 import type { InboxProcessorOptions } from "./inbox-processor.js";
@@ -434,7 +435,7 @@ class MemoryEngine {
         const results: Edge[] = [];
         for (const edgeName of allEdges) {
             const rows = await this.graph.query<Edge>(
-                `SELECT *, in_id AS "in", out_id AS "out" FROM ${edgeName} WHERE ${where}`,
+                `SELECT *, in_id AS "in", out_id AS "out" FROM ${quoteIdent(edgeName)} WHERE ${where}`,
                 [nodeId],
             );
             results.push(...rows);
@@ -481,7 +482,7 @@ class MemoryEngine {
                         ? this.createDomainContext(domainId).graph
                         : this.graph;
                     const rows = await querySource.query<{ out_id: string }>(
-                        `SELECT out_id FROM ${edgeType} WHERE in_id = $1`,
+                        `SELECT out_id FROM ${quoteIdent(edgeType)} WHERE in_id = $1`,
                         [nodeId],
                     );
                     for (const row of rows) {
@@ -876,9 +877,10 @@ class MemoryEngine {
         if (count === 0) {
             await this.graph.query(`DELETE FROM tagged WHERE in_id = $1`, [memoryId]);
             for (const edgeName of ["reinforces", "contradicts", "summarizes", "refines"]) {
-                await this.graph.query(`DELETE FROM ${edgeName} WHERE in_id = $1 OR out_id = $1`, [
-                    memoryId,
-                ]);
+                await this.graph.query(
+                    `DELETE FROM ${quoteIdent(edgeName)} WHERE in_id = $1 OR out_id = $1`,
+                    [memoryId],
+                );
             }
 
             const coreEdges = new Set([
@@ -894,7 +896,7 @@ class MemoryEngine {
             for (const edgeName of this.schema.getRegisteredEdgeNames()) {
                 if (!coreEdges.has(edgeName)) {
                     await this.graph.query(
-                        `DELETE FROM ${edgeName} WHERE in_id = $1 OR out_id = $1`,
+                        `DELETE FROM ${quoteIdent(edgeName)} WHERE in_id = $1 OR out_id = $1`,
                         [memoryId],
                     );
                 }
@@ -1247,7 +1249,7 @@ class MemoryEngine {
                 const results: Edge[] = [];
                 for (const edgeName of allEdges) {
                     const rows = await graph.query<Edge>(
-                        `SELECT *, in_id AS "in", out_id AS "out" FROM ${edgeName} WHERE ${where}`,
+                        `SELECT *, in_id AS "in", out_id AS "out" FROM ${quoteIdent(edgeName)} WHERE ${where}`,
                         [nodeId],
                     );
                     results.push(...rows);

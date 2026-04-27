@@ -168,9 +168,9 @@ export async function scanCommits(
 
     // Mark deleted directories as archived
     for (const dir of deletedDirs.keys()) {
-        const results = await context.graph.query<Array<{ id: string }>>(
-            "SELECT id FROM module WHERE path = $path LIMIT 1",
-            { path: dir },
+        const results = await context.graph.query<{ id: string }>(
+            "SELECT id FROM module WHERE path = $1 LIMIT 1",
+            [dir],
         );
         if (Array.isArray(results) && results.length > 0) {
             await context.graph.updateNode(results[0].id, { status: "archived" });

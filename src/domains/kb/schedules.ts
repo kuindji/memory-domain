@@ -1,10 +1,9 @@
-import { StringRecordId } from "surrealdb";
 import type { DomainContext } from "../../core/types.js";
 import { KB_TAG } from "./types.js";
 import { ensureTag } from "./utils.js";
 
 interface OwnershipRow {
-    in: string;
+    in_id: string;
     attributes: Record<string, unknown>;
 }
 
@@ -14,9 +13,12 @@ export async function consolidateKnowledge(context: DomainContext): Promise<void
         const minClusterSize = 3;
 
         // Get all non-superseded KB memories
-        const rows = await context.graph.query<OwnershipRow[]>(
-            "SELECT in, attributes FROM owned_by WHERE out = $domainId AND attributes.superseded = false AND attributes.decomposed != true",
-            { domainId: new StringRecordId(`domain:${context.domain}`) },
+        const rows = await context.graph.query<OwnershipRow>(
+            `SELECT in_id, attributes FROM owned_by
+             WHERE out_id = $1
+               AND attributes->>'superseded' = 'false'
+               AND (attributes->>'decomposed' IS DISTINCT FROM 'true')`,
+            [`domain:${context.domain}`],
         );
         if (!rows || rows.length === 0) return;
 
@@ -26,7 +28,7 @@ export async function consolidateKnowledge(context: DomainContext): Promise<void
             { memId: string; attrs: Record<string, unknown> }[]
         >();
         for (const row of rows) {
-            const memId = String(row.in);
+            const memId = row.in_id;
             const classification = (row.attributes.classification as string) ?? "fact";
             let group = byClassification.get(classification);
             if (!group) {

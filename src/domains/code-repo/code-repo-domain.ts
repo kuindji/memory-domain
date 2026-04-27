@@ -1,6 +1,5 @@
 import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
-import { StringRecordId } from "surrealdb";
 import type {
     DomainConfig,
     DomainRegistration,
@@ -204,15 +203,17 @@ export function createCodeRepoDomain(options?: CodeRepoDomainOptions): DomainReg
             async expand(query: SearchQuery, context: DomainContext): Promise<SearchQuery> {
                 if (!query.text) return query;
 
-                // Search for entity nodes matching query terms
-                const entityTypes = ["module", "data_entity", "concept", "pattern"];
+                // Search for entity nodes matching query terms. Table names
+                // come from the schema-defined allowlist below — never from
+                // user input.
+                const entityTypes = ["module", "data_entity", "concept", "pattern"] as const;
                 const matchedEntityIds: string[] = [];
 
                 for (const type of entityTypes) {
                     try {
-                        const results = await context.graph.query<Array<{ id: string }>>(
-                            `SELECT id FROM type::table($type) WHERE name CONTAINS $text LIMIT 5`,
-                            { type, text: query.text },
+                        const results = await context.graph.query<{ id: string }>(
+                            `SELECT id FROM "${type}" WHERE name ILIKE $1 LIMIT 5`,
+                            [`%${query.text}%`],
                         );
                         if (Array.isArray(results)) {
                             matchedEntityIds.push(...results.map((r) => String(r.id)));
@@ -501,14 +502,9 @@ async function resolveToParents(
             continue;
         }
 
-        const parentDomainRef = new StringRecordId(`domain:${domainId}`);
-        const parentMemRef = new StringRecordId(parentId);
-        const attrRows = await context.graph.query<Array<{ attributes: Record<string, unknown> }>>(
-            "SELECT attributes FROM owned_by WHERE in = $memId AND out = $domainId LIMIT 1",
-            {
-                memId: parentMemRef,
-                domainId: parentDomainRef,
-            },
+        const attrRows = await context.graph.query<{ attributes: Record<string, unknown> }>(
+            "SELECT attributes FROM owned_by WHERE in_id = $1 AND out_id = $2 LIMIT 1",
+            [parentId, `domain:${domainId}`],
         );
 
         const parentAttrs = attrRows?.[0]?.attributes ?? {};
@@ -687,9 +683,11 @@ async function mergeKeywordSearch(
         const matchCounts = new Map<string, number>();
 
         for (const kw of keywords) {
-            const rows = await context.graph.query<MemoryQueryRow[]>(
-                `SELECT * FROM memory WHERE string::contains(string::lowercase(content), $kw) LIMIT 20`,
-                { kw },
+            const rows = await context.graph.query<MemoryQueryRow>(
+                `SELECT * FROM memory
+                 WHERE to_tsvector('english', content) @@ plainto_tsquery('english', $1)
+                 LIMIT 20`,
+                [kw],
             );
             if (!rows) continue;
             for (const row of rows) {
@@ -721,20 +719,20 @@ async function mergeKeywordSearch(
 
         // Fetch ownership attributes + filter by code-repo domain and audience
         const attrMap = new Map<string, Record<string, Record<string, unknown>>>();
-        const surrealIds = newIds.map((id) =>
-            id.startsWith("memory:") ? new StringRecordId(id) : new StringRecordId(`memory:${id}`),
-        );
-        const ownershipEdges = await context.graph.query<
-            Array<{ in: unknown; out: unknown; attributes: Record<string, unknown> }>
-        >("SELECT in, out, attributes FROM owned_by WHERE in IN $ids", {
-            ids: surrealIds,
-        });
+        const normalizedIds = newIds.map((id) => (id.startsWith("memory:") ? id : `memory:${id}`));
+        const ownershipEdges = await context.graph.query<{
+            in_id: string;
+            out_id: string;
+            attributes: Record<string, unknown>;
+        }>("SELECT in_id, out_id, attributes FROM owned_by WHERE in_id = ANY($1::text[])", [
+            normalizedIds,
+        ]);
         if (ownershipEdges) {
             for (const edge of ownershipEdges) {
-                const memId = String(edge.in);
-                const domainId = String(edge.out).replace("domain:", "");
+                const memId = edge.in_id;
+                const ownerDomain = edge.out_id.replace(/^domain:/, "");
                 if (!attrMap.has(memId)) attrMap.set(memId, {});
-                attrMap.get(memId)![domainId] = edge.attributes ?? {};
+                attrMap.get(memId)![ownerDomain] = edge.attributes ?? {};
             }
         }
 
@@ -786,12 +784,13 @@ async function mergeQuestionSearch(
     const now = Date.now();
 
     try {
-        const rows = await context.graph.query<Array<MemoryQueryRow & { score: number }>>(
-            `SELECT *, search::score(1) AS score FROM memory
-             WHERE answers_question @1@ $text
+        const rows = await context.graph.query<MemoryQueryRow & { score: number }>(
+            `SELECT m.*, ts_rank(to_tsvector('english', coalesce(m.answers_question, '')), q) AS score
+             FROM memory m, plainto_tsquery('english', $1) q
+             WHERE to_tsvector('english', coalesce(m.answers_question, '')) @@ q
              ORDER BY score DESC
              LIMIT 20`,
-            { text: queryText },
+            [queryText],
         );
 
         if (!rows || rows.length === 0) return entries;
@@ -813,20 +812,20 @@ async function mergeQuestionSearch(
         if (newIds.length === 0) return entries;
 
         const attrMap = new Map<string, Record<string, Record<string, unknown>>>();
-        const surrealIds = newIds.map((id) =>
-            id.startsWith("memory:") ? new StringRecordId(id) : new StringRecordId(`memory:${id}`),
-        );
-        const ownershipEdges = await context.graph.query<
-            Array<{ in: unknown; out: unknown; attributes: Record<string, unknown> }>
-        >("SELECT in, out, attributes FROM owned_by WHERE in IN $ids", {
-            ids: surrealIds,
-        });
+        const normalizedIds = newIds.map((id) => (id.startsWith("memory:") ? id : `memory:${id}`));
+        const ownershipEdges = await context.graph.query<{
+            in_id: string;
+            out_id: string;
+            attributes: Record<string, unknown>;
+        }>("SELECT in_id, out_id, attributes FROM owned_by WHERE in_id = ANY($1::text[])", [
+            normalizedIds,
+        ]);
         if (ownershipEdges) {
             for (const edge of ownershipEdges) {
-                const memId = String(edge.in);
-                const domainId = String(edge.out).replace("domain:", "");
+                const memId = edge.in_id;
+                const ownerDomain = edge.out_id.replace(/^domain:/, "");
                 if (!attrMap.has(memId)) attrMap.set(memId, {});
-                attrMap.get(memId)![domainId] = edge.attributes ?? {};
+                attrMap.get(memId)![ownerDomain] = edge.attributes ?? {};
             }
         }
 
@@ -953,20 +952,18 @@ async function fetchEmbeddings(ids: string[], graph: GraphApi): Promise<Map<stri
     const map = new Map<string, number[]>();
     if (ids.length === 0) return map;
 
-    const surrealIds = ids.map((id) =>
-        id.startsWith("memory:") ? new StringRecordId(id) : new StringRecordId(`memory:${id}`),
-    );
+    const normalizedIds = ids.map((id) => (id.startsWith("memory:") ? id : `memory:${id}`));
 
     try {
-        const rows = await graph.query<Array<{ id: unknown; embedding: number[] }>>(
-            `SELECT id, embedding FROM memory WHERE id IN $ids`,
-            { ids: surrealIds },
+        const rows = await graph.query<{ id: string; embedding: number[] }>(
+            `SELECT id, embedding FROM memory WHERE id = ANY($1::text[])`,
+            [normalizedIds],
         );
 
         if (rows) {
             for (const row of rows) {
                 if (row.embedding) {
-                    map.set(String(row.id), row.embedding);
+                    map.set(row.id, row.embedding);
                 }
             }
         }

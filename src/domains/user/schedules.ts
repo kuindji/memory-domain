@@ -1,18 +1,15 @@
-import { StringRecordId } from "surrealdb";
 import type { DomainContext } from "../../core/types.js";
 import { USER_TAG } from "./types.js";
 
 export async function consolidateUserProfile(context: DomainContext): Promise<void> {
     // Find all user nodes
-    const userNodes = await context.graph.query<{ id: string; userId: string }[]>(
-        "SELECT id, userId FROM user",
-    );
+    const userNodes = await context.graph.query<{ id: string }>('SELECT id FROM "user"');
     if (!userNodes || userNodes.length === 0) return;
 
     const now = Date.now();
 
     for (const userNode of userNodes) {
-        const userNodeId = String(userNode.id);
+        const userNodeId = userNode.id;
 
         // Get all incoming edges to this user node
         const edges = await context.getNodeEdges(userNodeId, "in");
@@ -28,12 +25,12 @@ export async function consolidateUserProfile(context: DomainContext): Promise<vo
             if (!memory) continue;
 
             // Fetch user-domain attributes for this memory and skip if superseded/expired
-            const attrRows = await context.graph.query<
-                Array<{ attributes: Record<string, unknown> }>
-            >("SELECT attributes FROM owned_by WHERE in = $memId AND out = $domainId LIMIT 1", {
-                memId: new StringRecordId(memId),
-                domainId: new StringRecordId(`domain:${context.domain}`),
-            });
+            const attrRows = await context.graph.query<{
+                attributes: Record<string, unknown>;
+            }>("SELECT attributes FROM owned_by WHERE in_id = $1 AND out_id = $2 LIMIT 1", [
+                memId,
+                `domain:${context.domain}`,
+            ]);
             const attrs = attrRows?.[0]?.attributes ?? {};
             if (attrs.superseded) continue;
             if (typeof attrs.validUntil === "number" && attrs.validUntil < now) continue;

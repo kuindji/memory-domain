@@ -1,4 +1,3 @@
-import { StringRecordId } from "surrealdb";
 import type { OwnedMemory, DomainContext, ScoredMemory } from "../../core/types.js";
 import { KB_TAG, DECOMPOSITION_TOKEN_THRESHOLD } from "./types.js";
 import type { KbClassification } from "./types.js";
@@ -158,17 +157,9 @@ export async function processInboxBatch(
 
                         // Denormalize classification and answers_question onto memory record
                         try {
-                            const updates: Record<string, unknown> = { classification };
-                            if (answersQuestion) {
-                                updates.answers_question = answersQuestion;
-                            }
                             await context.graph.query(
-                                "UPDATE $memId SET classification = $cls, answers_question = $aq",
-                                {
-                                    memId: new StringRecordId(entry.memory.id),
-                                    cls: classification,
-                                    aq: answersQuestion ?? null,
-                                },
+                                "UPDATE memory SET classification = $1, answers_question = $2 WHERE id = $3",
+                                [classification, answersQuestion ?? null, entry.memory.id],
                             );
                         } catch {
                             /* best-effort denormalization */

@@ -2,6 +2,7 @@ import type { GraphApi, EngineConfig, EmbeddingAdapter, DebugTools } from "./typ
 import type { SearchQuery, SearchResult, ScoredMemory } from "./types.js";
 import { countTokens, mergeScores, applyTokenBudget, cosineSimilarityF32 } from "./scoring.js";
 import { createDebugTools } from "./debug.js";
+import { quoteIdent } from "./sql/identifiers.js";
 
 const NOOP_DEBUG: DebugTools = createDebugTools("search", { timing: false });
 
@@ -397,8 +398,8 @@ class SearchEngine {
 
             const rows = await this.store.query<MemoryRow>(
                 `SELECT t.id, t.content, t.token_count, t.event_time, t.created_at
-                 FROM ${parsed.table} t
-                 JOIN ${parsed.edge} e ON e.${joinFromCol} = t.id
+                 FROM ${quoteIdent(parsed.table)} t
+                 JOIN ${quoteIdent(parsed.edge)} e ON e.${joinFromCol} = t.id
                  WHERE e.${matchCol} = ANY($1::text[])`,
                 [fromIds],
             );
@@ -548,7 +549,7 @@ class SearchEngine {
         const allEdges: { id: string; in_id: string; out_id: string; edge: string }[] = [];
         for (const tbl of refTables) {
             const rows = await this.store.query<{ id: string; in_id: string; out_id: string }>(
-                `SELECT id, in_id, out_id FROM ${tbl}
+                `SELECT id, in_id, out_id FROM ${quoteIdent(tbl)}
                  WHERE in_id = ANY($1::text[]) OR out_id = ANY($1::text[])`,
                 [ids],
             );

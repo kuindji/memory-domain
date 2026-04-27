@@ -51,13 +51,9 @@ export interface CodeRepoDomainOptions {
     };
 }
 
-// SurrealDB parses record IDs like `domain:code-repo` as the expression
-// `domain:code - repo`, silently truncating the hyphen-prefixed portion. This
-// breaks owned_by / tag lookups for any domain ID or unescaped tag label
-// containing a hyphen (see isMemoryVisible in core/engine.ts, which compares
-// stored IDs by string prefix). We use underscores here instead. Nested tags
-// (with "/") are backtick-escaped by ensureTag, but the parent tag is not —
-// so the entire namespace uses underscores for consistency.
+// Underscore (not hyphen) for the domain id and the parent tag — chosen
+// originally to avoid SurrealQL identifier parsing pitfalls and kept for
+// continuity now that the storage backend is Postgres.
 export const CODE_REPO_DOMAIN_ID = "code_repo";
 export const CODE_REPO_TAG = "code_repo";
 export const CODE_REPO_TECHNICAL_TAG = "code_repo/technical";

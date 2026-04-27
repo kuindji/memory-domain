@@ -88,17 +88,17 @@ describe("Code repo inbox processing with entity extraction (real)", () => {
 
         // Check if entities were extracted and linked via about_entity edges
         const graph = engine.getGraph();
-        // Traverse to each entity type separately (about_entity is memory -> entity)
-        const entityTypes = ["module", "data_entity", "concept", "pattern"];
+        const entityRefs = await graph.query<{ out_id: string }>(
+            "SELECT out_id FROM about_entity WHERE in_id = $1",
+            [result.id!],
+        );
         let totalEntities = 0;
-        for (const type of entityTypes) {
-            const refs = await graph.traverse<string>(result.id!, `->about_entity->${type}`);
-            for (const ref of refs) {
-                const node = await graph.getNode(String(ref as unknown as string));
-                if (node) {
-                    console.log(`  Entity: "${String(node.name)}" (${type})`);
-                    totalEntities++;
-                }
+        for (const ref of entityRefs) {
+            const type = ref.out_id.split(":")[0];
+            const node = await graph.getNode(ref.out_id);
+            if (node) {
+                console.log(`  Entity: "${String(node.name)}" (${type})`);
+                totalEntities++;
             }
         }
         console.log(`[ENTITY EXTRACTION] Decision linked to ${totalEntities} entity(s)`);
@@ -107,7 +107,10 @@ describe("Code repo inbox processing with entity extraction (real)", () => {
         }
 
         // Verify topics were extracted and linked
-        const topicEdges = await graph.traverse(result.id!, "->about_topic->memory");
+        const topicEdges = await graph.query<{ out_id: string }>(
+            "SELECT out_id FROM about_topic WHERE in_id = $1",
+            [result.id!],
+        );
         console.log(`[TOPIC LINKING] Decision linked to ${topicEdges.length} topic(s)`);
         expect(topicEdges.length).toBeGreaterThan(0);
     });
@@ -214,7 +217,10 @@ describe("Contradiction detection and supersedes edges (real)", () => {
 
         // Check if the LLM detected the contradiction
         const graph = engine.getGraph();
-        const supersededEdges = await graph.traverse(second.id!, "->supersedes->memory");
+        const supersededEdges = await graph.query<{ out_id: string }>(
+            "SELECT out_id FROM supersedes WHERE in_id = $1",
+            [second.id!],
+        );
 
         if (supersededEdges.length > 0) {
             console.log(
@@ -544,16 +550,22 @@ describe("Direct write, entity graph, ask() and buildContext evaluation (real)",
         await graph.relate(orderProcessorId, "manages", orderEntityId, { role: "owner" });
         await graph.relate(paymentServiceId, "implements", paymentConceptId);
 
-        // --- Verify traversal works (traverse returns RecordId objects) ---
-        const connected = await graph.traverse<string>(orderProcessorId, "->connects_to->module");
+        // --- Verify traversal works ---
+        const connected = await graph.query<{ out_id: string }>(
+            "SELECT out_id FROM connects_to WHERE in_id = $1",
+            [orderProcessorId],
+        );
         expect(connected.length).toBe(1);
-        const connectedNode = await graph.getNode(String(connected[0] as unknown as string));
+        const connectedNode = await graph.getNode(connected[0].out_id);
         expect(connectedNode?.name).toBe("payment-service");
         console.log("[PASS] connects_to traversal: order-processor -> payment-service");
 
-        const managed = await graph.traverse<string>(orderProcessorId, "->manages->data_entity");
+        const managed = await graph.query<{ out_id: string }>(
+            "SELECT out_id FROM manages WHERE in_id = $1",
+            [orderProcessorId],
+        );
         expect(managed.length).toBe(1);
-        const managedNode = await graph.getNode(String(managed[0] as unknown as string));
+        const managedNode = await graph.getNode(managed[0].out_id);
         expect(managedNode?.name).toBe("Order");
         console.log("[PASS] manages traversal: order-processor -> Order");
 
@@ -656,7 +668,7 @@ describe("Direct write, entity graph, ask() and buildContext evaluation (real)",
             '\n[EVAL ask() — "How does order-processor communicate with payment-service?"]',
         );
         console.log(`  Rounds: ${askResult1.rounds}`);
-        console.log(`  Memories used: ${askResult1.memories.length}`);
+        console.log(`  Turns: ${askResult1.turns?.length ?? 0}`);
         console.log(`  Answer: ${askResult1.answer}`);
         const answer1Lower = askResult1.answer.toLowerCase();
         const mentionsSQS = answer1Lower.includes("sqs");
@@ -668,7 +680,7 @@ describe("Direct write, entity graph, ask() and buildContext evaluation (real)",
 
         console.log('\n[EVAL ask() — "Why is payment data stored separately?"]');
         console.log(`  Rounds: ${askResult2.rounds}`);
-        console.log(`  Memories used: ${askResult2.memories.length}`);
+        console.log(`  Turns: ${askResult2.turns?.length ?? 0}`);
         console.log(`  Answer: ${askResult2.answer}`);
         const answer2Lower = askResult2.answer.toLowerCase();
         const mentionsPCI = answer2Lower.includes("pci");
@@ -683,7 +695,7 @@ describe("Direct write, entity graph, ask() and buildContext evaluation (real)",
 
         console.log("\n[EVAL ask() — business audience question]");
         console.log(`  Rounds: ${askResult3.rounds}`);
-        console.log(`  Memories used: ${askResult3.memories.length}`);
+        console.log(`  Turns: ${askResult3.turns?.length ?? 0}`);
         console.log(`  Answer: ${askResult3.answer}`);
         const answer3Lower = askResult3.answer.toLowerCase();
         const mentionsCooling = answer3Lower.includes("48") || answer3Lower.includes("cooling");

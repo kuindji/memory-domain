@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { PgClient } from "../adapters/pg/types.js";
 import { JsonbParam } from "../adapters/pg/types.js";
 import type { Edge, GraphApi, Node } from "./types.js";
+import { quoteIdent } from "./sql/identifiers.js";
 
 /**
  * Lookup hook the engine plugs in so GraphStore knows which columns are jsonb.
@@ -117,7 +118,7 @@ class GraphStore implements GraphApi {
         const table = TABLE_FROM_ID(id);
         const { columns, placeholders, values } = buildInsert(table, id, data, this.isJsonb);
         await this.db.query(
-            `INSERT INTO ${table} (${columns.join(", ")}) VALUES (${placeholders.join(", ")})`,
+            `INSERT INTO ${quoteIdent(table)} (${columns.join(", ")}) VALUES (${placeholders.join(", ")})`,
             values,
         );
         return id;
@@ -125,7 +126,9 @@ class GraphStore implements GraphApi {
 
     async getNode<T extends Node = Node>(id: string): Promise<T | null> {
         const table = TABLE_FROM_ID(id);
-        const rows = await this.db.query<T>(`SELECT * FROM ${table} WHERE id = $1`, [id]);
+        const rows = await this.db.query<T>(`SELECT * FROM ${quoteIdent(table)} WHERE id = $1`, [
+            id,
+        ]);
         return rows[0] ?? null;
     }
 
@@ -142,7 +145,7 @@ class GraphStore implements GraphApi {
         const out: T[] = [];
         for (const [table, group] of byTable) {
             const rows = await this.db.query<T>(
-                `SELECT * FROM ${table} WHERE id = ANY($1::text[])`,
+                `SELECT * FROM ${quoteIdent(table)} WHERE id = ANY($1::text[])`,
                 [group],
             );
             out.push(...rows);
@@ -154,7 +157,7 @@ class GraphStore implements GraphApi {
         const table = TABLE_FROM_ID(id);
         const { sets, values } = buildUpdate(table, data, 2, this.isJsonb);
         if (sets.length === 0) return;
-        await this.db.query(`UPDATE ${table} SET ${sets.join(", ")} WHERE id = $1`, [
+        await this.db.query(`UPDATE ${quoteIdent(table)} SET ${sets.join(", ")} WHERE id = $1`, [
             id,
             ...values,
         ]);
@@ -163,7 +166,7 @@ class GraphStore implements GraphApi {
     async deleteNode(id: string): Promise<boolean> {
         const table = TABLE_FROM_ID(id);
         const rows = await this.db.query<{ id: string }>(
-            `DELETE FROM ${table} WHERE id = $1 RETURNING id`,
+            `DELETE FROM ${quoteIdent(table)} WHERE id = $1 RETURNING id`,
             [id],
         );
         return rows.length > 0;
@@ -179,7 +182,9 @@ class GraphStore implements GraphApi {
             else byTable.set(t, [id]);
         }
         for (const [table, group] of byTable) {
-            await this.db.query(`DELETE FROM ${table} WHERE id = ANY($1::text[])`, [group]);
+            await this.db.query(`DELETE FROM ${quoteIdent(table)} WHERE id = ANY($1::text[])`, [
+                group,
+            ]);
         }
     }
 
@@ -193,7 +198,7 @@ class GraphStore implements GraphApi {
         const payload: Record<string, unknown> = { in_id: from, out_id: to, ...(data ?? {}) };
         const { columns, placeholders, values } = buildInsert(edge, id, payload, this.isJsonb);
         await this.db.query(
-            `INSERT INTO ${edge} (${columns.join(", ")}) VALUES (${placeholders.join(", ")})`,
+            `INSERT INTO ${quoteIdent(edge)} (${columns.join(", ")}) VALUES (${placeholders.join(", ")})`,
             values,
         );
         return id;
@@ -236,7 +241,7 @@ class GraphStore implements GraphApi {
         }
 
         await this.db.query(
-            `INSERT INTO ${edge} (${columns.join(", ")}) VALUES ${rowPlaceholders.join(", ")}`,
+            `INSERT INTO ${quoteIdent(edge)} (${columns.join(", ")}) VALUES ${rowPlaceholders.join(", ")}`,
             values,
         );
         return ids;
@@ -244,7 +249,7 @@ class GraphStore implements GraphApi {
 
     async unrelate(from: string, edge: string, to: string): Promise<boolean> {
         const rows = await this.db.query<{ id: string }>(
-            `DELETE FROM ${edge} WHERE in_id = $1 AND out_id = $2 RETURNING id`,
+            `DELETE FROM ${quoteIdent(edge)} WHERE in_id = $1 AND out_id = $2 RETURNING id`,
             [from, to],
         );
         return rows.length > 0;
@@ -252,14 +257,14 @@ class GraphStore implements GraphApi {
 
     async outgoing<T = Edge>(from: string, edge: string): Promise<T[]> {
         return this.db.query<T>(
-            `SELECT id, in_id AS "in", out_id AS "out" FROM ${edge} WHERE in_id = $1`,
+            `SELECT id, in_id AS "in", out_id AS "out" FROM ${quoteIdent(edge)} WHERE in_id = $1`,
             [from],
         );
     }
 
     async incoming<T = Edge>(to: string, edge: string): Promise<T[]> {
         return this.db.query<T>(
-            `SELECT id, in_id AS "in", out_id AS "out" FROM ${edge} WHERE out_id = $1`,
+            `SELECT id, in_id AS "in", out_id AS "out" FROM ${quoteIdent(edge)} WHERE out_id = $1`,
             [to],
         );
     }
@@ -291,7 +296,10 @@ class GraphStore implements GraphApi {
             }
         }
         if (clauses.length === 0) return;
-        await this.db.query(`DELETE FROM ${edge} WHERE ${clauses.join(" AND ")}`, values);
+        await this.db.query(
+            `DELETE FROM ${quoteIdent(edge)} WHERE ${clauses.join(" AND ")}`,
+            values,
+        );
     }
 
     async query<T = unknown>(sql: string, params: unknown[] = []): Promise<T[]> {

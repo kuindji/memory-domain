@@ -20,7 +20,6 @@ import {
     CHAT_EPISODIC_TAG,
     CHAT_SEMANTIC_TAG,
 } from "../src/domains/chat/types.js";
-import { StringRecordId } from "surrealdb";
 import { TOPIC_DOMAIN_ID, TOPIC_TAG } from "../src/domains/topic/types.js";
 import { USER_DOMAIN_ID, USER_TAG } from "../src/domains/user/types.js";
 import {
@@ -127,7 +126,10 @@ describe("Chat message ingestion with cross-domain interaction (real)", () => {
 
         // Verify topics were extracted and linked via about_topic edges
         const graph = engine.getGraph();
-        const msg1Topics = await graph.traverse(msg1.id!, "->about_topic->memory");
+        const msg1Topics = await graph.query<{ out_id: string }>(
+            "SELECT out_id FROM about_topic WHERE in_id = $1",
+            [msg1.id!],
+        );
         console.log(`[TOPIC EXTRACTION] Message 1 linked to ${msg1Topics.length} topic(s)`);
         expect(msg1Topics.length).toBeGreaterThan(0);
 
@@ -221,12 +223,9 @@ describe("Working memory promotion (real)", () => {
         // Verify validFrom is set on episodic memories
         const graph = engine.getGraph();
         for (const mem of episodicMemories) {
-            const attrRows = await graph.query<{ attributes: Record<string, unknown> }[]>(
-                "SELECT attributes FROM owned_by WHERE in = $memId AND out = $domainId",
-                {
-                    memId: new StringRecordId(mem.id),
-                    domainId: new StringRecordId(`domain:${CHAT_DOMAIN_ID}`),
-                },
+            const attrRows = await graph.query<{ attributes: Record<string, unknown> }>(
+                "SELECT attributes FROM owned_by WHERE in_id = $1 AND out_id = $2",
+                [mem.id, `domain:${CHAT_DOMAIN_ID}`],
             );
             expect(attrRows.length).toBe(1);
             expect(attrRows[0].attributes.validFrom).toBeTypeOf("number");
@@ -344,7 +343,10 @@ describe("Full chat lifecycle (real)", () => {
         // Verify summarizes edges on semantic memories
         if (semanticMemories.length > 0) {
             for (const mem of semanticMemories) {
-                const sources = await graph.traverse(mem.id, "->summarizes->memory");
+                const sources = await graph.query<{ out_id: string }>(
+                    "SELECT out_id FROM summarizes WHERE in_id = $1",
+                    [mem.id],
+                );
                 expect(sources.length).toBeGreaterThan(0);
                 console.log(`  Semantic ${mem.id} summarizes ${sources.length} episodic memories`);
             }
@@ -352,12 +354,9 @@ describe("Full chat lifecycle (real)", () => {
 
         // Verify validFrom is set on semantic memories
         for (const mem of semanticMemories) {
-            const attrRows = await graph.query<{ attributes: Record<string, unknown> }[]>(
-                "SELECT attributes FROM owned_by WHERE in = $memId AND out = $domainId",
-                {
-                    memId: new StringRecordId(mem.id),
-                    domainId: new StringRecordId(`domain:${CHAT_DOMAIN_ID}`),
-                },
+            const attrRows = await graph.query<{ attributes: Record<string, unknown> }>(
+                "SELECT attributes FROM owned_by WHERE in_id = $1 AND out_id = $2",
+                [mem.id, `domain:${CHAT_DOMAIN_ID}`],
             );
             if (attrRows.length > 0) {
                 expect(attrRows[0].attributes.validFrom).toBeTypeOf("number");
@@ -374,12 +373,9 @@ describe("Full chat lifecycle (real)", () => {
         });
         let invalidatedCount = 0;
         for (const mem of allEpisodic) {
-            const attrRows = await graph.query<{ attributes: Record<string, unknown> }[]>(
-                "SELECT attributes FROM owned_by WHERE in = $memId AND out = $domainId",
-                {
-                    memId: new StringRecordId(mem.id),
-                    domainId: new StringRecordId(`domain:${CHAT_DOMAIN_ID}`),
-                },
+            const attrRows = await graph.query<{ attributes: Record<string, unknown> }>(
+                "SELECT attributes FROM owned_by WHERE in_id = $1 AND out_id = $2",
+                [mem.id, `domain:${CHAT_DOMAIN_ID}`],
             );
             if (attrRows.length > 0 && attrRows[0].attributes.invalidAt != null) {
                 invalidatedCount++;
@@ -390,7 +386,7 @@ describe("Full chat lifecycle (real)", () => {
         );
 
         // Check for contradicts edges
-        const contradictsEdges = await graph.query<{ id: string }[]>("SELECT id FROM contradicts");
+        const contradictsEdges = await graph.query<{ id: string }>("SELECT id FROM contradicts");
         const contradictsCount = contradictsEdges?.length ?? 0;
         console.log(`[LIFECYCLE] Contradicts edges created: ${contradictsCount}`);
 
@@ -415,12 +411,9 @@ describe("Full chat lifecycle (real)", () => {
             attributes: { layer: "episodic" },
         });
         for (const mem of episodicAfterPruneAll) {
-            const attrRows = await graph.query<{ attributes: Record<string, unknown> }[]>(
-                "SELECT attributes FROM owned_by WHERE in = $memId AND out = $domainId",
-                {
-                    memId: new StringRecordId(mem.id),
-                    domainId: new StringRecordId(`domain:${CHAT_DOMAIN_ID}`),
-                },
+            const attrRows = await graph.query<{ attributes: Record<string, unknown> }>(
+                "SELECT attributes FROM owned_by WHERE in_id = $1 AND out_id = $2",
+                [mem.id, `domain:${CHAT_DOMAIN_ID}`],
             );
             if (attrRows.length > 0 && attrRows[0].attributes.invalidAt != null) {
                 invalidatedAfterPrune++;
