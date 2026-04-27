@@ -609,96 +609,117 @@ class InboxProcessor {
     ): Promise<OwnedMemory[]> {
         if (memoryIds.length === 0) return [];
 
-        const perMemory = await Promise.all(
-            memoryIds.map(async (memId): Promise<OwnedMemory | null> => {
-                const targetDomainId = domainId ? `domain:${domainId}` : null;
+        const targetDomainId = domainId ? `domain:${domainId}` : null;
 
-                const [nodeRows, tagRows, ownedByRows] = await Promise.all([
-                    this.debug.time(
-                        "buildSimilarityBatch.buildOwnedMemoryEntries.getNode",
-                        () =>
-                            this.store.query<RawMemoryRow>(
-                                `SELECT id, content, event_time, created_at, token_count, structured_data
-                                 FROM memory WHERE id = $1`,
-                                [memId],
-                            ),
+        // Three bulk queries instead of 3×N round-trips. EXPLAIN confirms:
+        //   memory     → Index Scan on memory_pkey
+        //   tagged+tag → Bitmap Index Scan on idx_tagged_in + Hash Join on tag.id
+        //   owned_by   → Bitmap Index Scan on idx_owned_by_in
+        // owned_by still filters `out_id` in JS to keep the single-side index
+        // path (PG planner picks idx_owned_by_out when both sides constrained).
+        const [nodeRows, tagRows, ownedByRows] = await Promise.all([
+            this.debug.time(
+                "buildSimilarityBatch.buildOwnedMemoryEntries.getNode",
+                () =>
+                    this.store.query<RawMemoryRow>(
+                        `SELECT id, content, event_time, created_at, token_count, structured_data
+                         FROM memory WHERE id = ANY($1::text[])`,
+                        [memoryIds],
                     ),
-                    this.debug.time(
-                        "buildSimilarityBatch.buildOwnedMemoryEntries.fetchTags",
-                        () =>
-                            this.store.query<{ label: string }>(
-                                `SELECT t.label FROM tagged tg
-                                 JOIN tag t ON t.id = tg.out_id
-                                 WHERE tg.in_id = $1`,
-                                [memId],
-                            ),
+            ),
+            this.debug.time(
+                "buildSimilarityBatch.buildOwnedMemoryEntries.fetchTags",
+                () =>
+                    this.store.query<{ in_id: string; label: string }>(
+                        `SELECT tg.in_id, t.label FROM tagged tg
+                         JOIN tag t ON t.id = tg.out_id
+                         WHERE tg.in_id = ANY($1::text[])`,
+                        [memoryIds],
                     ),
-                    targetDomainId
-                        ? this.debug.time(
-                              "buildSimilarityBatch.buildOwnedMemoryEntries.fetchOwnedBy",
-                              // Filter on `in_id` only and reduce in JS — keeps
-                              // the per-direction `idx_owned_by_in` hit and avoids
-                              // any planner issue when both sides are constrained.
-                              async () => {
-                                  const rows = await this.store.query<{
-                                      attributes: unknown;
-                                      owned_at: number | null;
-                                      out_id: string;
-                                  }>(
-                                      `SELECT attributes, owned_at, out_id
-                                       FROM owned_by WHERE in_id = $1`,
-                                      [memId],
-                                  );
-                                  return rows.filter((r) => r.out_id === targetDomainId);
-                              },
-                          )
-                        : Promise.resolve(null),
-                ]);
+            ),
+            targetDomainId
+                ? this.debug.time(
+                      "buildSimilarityBatch.buildOwnedMemoryEntries.fetchOwnedBy",
+                      async () => {
+                          const rows = await this.store.query<{
+                              in_id: string;
+                              attributes: unknown;
+                              owned_at: number | null;
+                              out_id: string;
+                          }>(
+                              `SELECT in_id, attributes, owned_at, out_id
+                               FROM owned_by WHERE in_id = ANY($1::text[])`,
+                              [memoryIds],
+                          );
+                          return rows.filter((r) => r.out_id === targetDomainId);
+                      },
+                  )
+                : Promise.resolve(null),
+        ]);
 
-                const node = nodeRows[0];
-                if (!node) return null;
+        const nodeById = new Map<string, RawMemoryRow>();
+        for (const row of nodeRows) nodeById.set(row.id, row);
 
-                const memory = this.toMemoryEntry(node);
+        const tagsById = new Map<string, string[]>();
+        for (const row of tagRows) {
+            if (row.label.startsWith("inbox")) continue;
+            const list = tagsById.get(row.in_id);
+            if (list) list.push(row.label);
+            else tagsById.set(row.in_id, [row.label]);
+        }
 
-                const tags = tagRows
-                    .map((r) => r.label)
-                    .filter((label) => !label.startsWith("inbox"));
-
-                const firstOwned = ownedByRows?.[0];
-                const domainAttributes: Record<string, unknown> =
-                    firstOwned && firstOwned.attributes && typeof firstOwned.attributes === "object"
-                        ? (firstOwned.attributes as Record<string, unknown>)
-                        : {};
-
-                const sd = node.structured_data;
-                // Two shapes are supported on `memory.structured_data`:
-                //   1. Flat — `{ country: 'BFA', cameo_root: '14', ... }` — the
-                //      shape ingest callers (GDELT, V-Dem, etc.) pass through
-                //      `engine.ingest({ structuredData: ... })`. Surfaces to
-                //      every domain that owns the memory.
-                //   2. Domain-keyed — `{ "domain:conflict": { ... } }` — the
-                //      shape used when distinct payloads must be visible to
-                //      different owning domains.
-                // Prefer the domain-keyed slice when present; otherwise return
-                // the flat object. The earlier "domain-keyed only" branch
-                // silently dropped structuredData for every flat-shape caller,
-                // breaking conflict-topic-linking matchedSeeds.
-                let structuredData: unknown;
-                if (sd && typeof sd === "object") {
-                    if (domainId && domainId in sd) {
-                        structuredData = (sd as Record<string, unknown>)[domainId];
-                    } else {
-                        structuredData = sd;
-                    }
-                } else {
-                    structuredData = undefined;
+        const ownedByFirstById = new Map<string, { attributes: unknown }>();
+        if (ownedByRows) {
+            // Preserve "first row wins" semantics from the prior per-memId path.
+            for (const row of ownedByRows) {
+                if (!ownedByFirstById.has(row.in_id)) {
+                    ownedByFirstById.set(row.in_id, { attributes: row.attributes });
                 }
+            }
+        }
 
-                return { memory, domainAttributes, tags, structuredData };
-            }),
-        );
+        const out: OwnedMemory[] = [];
+        for (const memId of memoryIds) {
+            const node = nodeById.get(memId);
+            if (!node) continue;
 
-        return perMemory.filter((entry): entry is OwnedMemory => entry !== null);
+            const memory = this.toMemoryEntry(node);
+            const tags = tagsById.get(memId) ?? [];
+
+            const firstOwned = ownedByFirstById.get(memId);
+            const domainAttributes: Record<string, unknown> =
+                firstOwned && firstOwned.attributes && typeof firstOwned.attributes === "object"
+                    ? (firstOwned.attributes as Record<string, unknown>)
+                    : {};
+
+            const sd = node.structured_data;
+            // Two shapes are supported on `memory.structured_data`:
+            //   1. Flat — `{ country: 'BFA', cameo_root: '14', ... }` — the
+            //      shape ingest callers (GDELT, V-Dem, etc.) pass through
+            //      `engine.ingest({ structuredData: ... })`. Surfaces to
+            //      every domain that owns the memory.
+            //   2. Domain-keyed — `{ "domain:conflict": { ... } }` — the
+            //      shape used when distinct payloads must be visible to
+            //      different owning domains.
+            // Prefer the domain-keyed slice when present; otherwise return
+            // the flat object. The earlier "domain-keyed only" branch
+            // silently dropped structuredData for every flat-shape caller,
+            // breaking conflict-topic-linking matchedSeeds.
+            let structuredData: unknown;
+            if (sd && typeof sd === "object") {
+                if (domainId && domainId in sd) {
+                    structuredData = (sd as Record<string, unknown>)[domainId];
+                } else {
+                    structuredData = sd;
+                }
+            } else {
+                structuredData = undefined;
+            }
+
+            out.push({ memory, domainAttributes, tags, structuredData });
+        }
+
+        return out;
     }
 
     // --- Phase 1: Claim Assertion ---
