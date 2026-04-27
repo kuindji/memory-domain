@@ -1,5 +1,3 @@
-import { Surreal } from "surrealdb";
-import { createNodeEngines } from "@surrealdb/node";
 import type {
     LLMAdapter,
     EmbeddingAdapter,
@@ -8,15 +6,6 @@ import type {
     AgentRunResult,
     AgentRunTurn,
 } from "../src/core/types.js";
-
-let dbCounter = 0;
-
-export async function createTestDb(): Promise<Surreal> {
-    const db = new Surreal({ engines: createNodeEngines() });
-    await db.connect("mem://");
-    await db.use({ namespace: "test", database: `test_${++dbCounter}_${Date.now()}` });
-    return db;
-}
 
 export class MockLLMAdapter implements LLMAdapter {
     extractResult: string[] = [];

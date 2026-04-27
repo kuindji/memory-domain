@@ -1,4 +1,3 @@
-import { StringRecordId } from "surrealdb";
 import type { DomainContext } from "../../core/types.js";
 import type { TopicAttributes } from "./types.js";
 import { TOPIC_TAG, MERGE_SIMILARITY_THRESHOLD } from "./types.js";
@@ -115,14 +114,12 @@ async function getTopicAttributesFromGraph(
     context: DomainContext,
     memoryId: string,
 ): Promise<TopicAttributes | null> {
-    const memRef = new StringRecordId(
-        memoryId.startsWith("memory:") ? memoryId : `memory:${memoryId}`,
+    const memId = memoryId.startsWith("memory:") ? memoryId : `memory:${memoryId}`;
+    const domainId = `domain:${context.domain}`;
+    const rows = await context.graph.query<{ attributes: Record<string, unknown> | null }>(
+        "SELECT attributes FROM owned_by WHERE in_id = $1 AND out_id = $2",
+        [memId, domainId],
     );
-    const domainRef = new StringRecordId(`domain:${context.domain}`);
-    const rows = await context.graph.query<{ attributes: Record<string, unknown> }[]>(
-        "SELECT attributes FROM owned_by WHERE in = $memId AND out = $domainId",
-        { memId: memRef, domainId: domainRef },
-    );
-    if (!rows || rows.length === 0) return null;
-    return parseTopicAttributes(rows[0].attributes);
+    if (rows.length === 0) return null;
+    return parseTopicAttributes(rows[0].attributes ?? undefined);
 }

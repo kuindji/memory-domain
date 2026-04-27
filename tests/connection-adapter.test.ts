@@ -11,7 +11,7 @@ import * as tar from "tar";
 describe("ConnectionAdapter types", () => {
     it("ConnectionAdapter has resolve and save methods", () => {
         const adapter: ConnectionAdapter = {
-            resolve: () => Promise.resolve("mem://"),
+            resolve: () => Promise.resolve({ kind: "pglite" } as const),
             save: () => Promise.resolve(),
         };
         expect(typeof adapter.resolve).toBe("function");
@@ -42,7 +42,7 @@ describe("ConnectionAdapter types", () => {
 
     it("EngineConfig accepts adapter instead of connection", () => {
         const adapter: ConnectionAdapter = {
-            resolve: () => Promise.resolve("mem://"),
+            resolve: () => Promise.resolve({ kind: "pglite" } as const),
             save: () => Promise.resolve(),
         };
         const _config = {
@@ -54,19 +54,20 @@ describe("ConnectionAdapter types", () => {
 });
 
 describe("PassthroughAdapter", () => {
-    it("resolve returns the connection string unchanged", async () => {
-        const adapter = new PassthroughAdapter("surrealkv:///path/to/db");
+    it("resolve returns the DbConfig unchanged", async () => {
+        const cfg = { kind: "pglite", dataDir: "/path/to/db" } as const;
+        const adapter = new PassthroughAdapter(cfg);
         const result = await adapter.resolve();
-        expect(result).toBe("surrealkv:///path/to/db");
+        expect(result).toEqual(cfg);
     });
 
     it("save is a no-op", async () => {
-        const adapter = new PassthroughAdapter("mem://");
+        const adapter = new PassthroughAdapter({ kind: "pglite" });
         await adapter.save();
     });
 
     it("implements ConnectionAdapter", () => {
-        const adapter: ConnectionAdapter = new PassthroughAdapter("mem://");
+        const adapter: ConnectionAdapter = new PassthroughAdapter({ kind: "pglite" });
         expect(typeof adapter.resolve).toBe("function");
         expect(typeof adapter.save).toBe("function");
     });
@@ -77,8 +78,6 @@ describe("Engine adapter integration", () => {
         const engine = new MemoryEngine();
         await engine.initialize({
             connection: "mem://",
-            namespace: "test",
-            database: `test_passthrough_${Date.now()}`,
             llm: new MockLLMAdapter(),
         });
         await engine.close();
@@ -89,7 +88,7 @@ describe("Engine adapter integration", () => {
         const mockAdapter: ConnectionAdapter = {
             resolve() {
                 calls.push("resolve");
-                return Promise.resolve("mem://");
+                return Promise.resolve({ kind: "pglite" } as const);
             },
             save() {
                 calls.push("save");
@@ -100,8 +99,6 @@ describe("Engine adapter integration", () => {
         const engine = new MemoryEngine();
         await engine.initialize({
             adapter: mockAdapter,
-            namespace: "test",
-            database: `test_adapter_${Date.now()}`,
             llm: new MockLLMAdapter(),
         });
 
@@ -116,8 +113,6 @@ describe("Engine adapter integration", () => {
         let threw = false;
         try {
             await engine.initialize({
-                namespace: "test",
-                database: "test",
                 llm: new MockLLMAdapter(),
             });
         } catch {
@@ -152,7 +147,7 @@ describe("S3ConnectionAdapter", () => {
         expect(adapter.getLocalDir()).toBe("/tmp/custom-dir");
     });
 
-    it("resolve returns surrealkv connection string", async () => {
+    it("resolve returns a pglite DbConfig pointing at <localDir>/db", async () => {
         const localDir = `/tmp/memory-domain-test-${Date.now()}`;
         const adapter = new S3ConnectionAdapter({
             bucket: "nonexistent-bucket",
@@ -163,8 +158,8 @@ describe("S3ConnectionAdapter", () => {
 
         adapter._setDownloader(() => Promise.resolve(null));
 
-        const connectionString = await adapter.resolve();
-        expect(connectionString).toBe(`surrealkv://${localDir}/db`);
+        const config = await adapter.resolve();
+        expect(config).toEqual({ kind: "pglite", dataDir: `${localDir}/db` });
         expect(existsSync(localDir)).toBe(true);
 
         rmSync(localDir, { recursive: true, force: true });
@@ -189,8 +184,8 @@ describe("S3ConnectionAdapter", () => {
         const archiveBuffer = readFileSync(archivePath);
         adapter._setDownloader(() => Promise.resolve(archiveBuffer));
 
-        const connectionString = await adapter.resolve();
-        expect(connectionString).toBe(`surrealkv://${localDir}/db`);
+        const config = await adapter.resolve();
+        expect(config).toEqual({ kind: "pglite", dataDir: `${localDir}/db` });
         expect(existsSync(join(localDir, "db", "testfile"))).toBe(true);
 
         rmSync(localDir, { recursive: true, force: true });

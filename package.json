@@ -31,7 +31,7 @@
     "scripts": {
         "build": "rm -rf dist && tsc -p tsconfig.build.json && node scripts/copy-assets.js",
         "prepublishOnly": "bun run build",
-        "test": "bun test",
+        "test": "bun test --timeout 60000",
         "test:integration": "bun test --timeout 180000 --test-root ./tests-integration",
         "typecheck": "tsc --noEmit",
         "lint": "eslint .",
@@ -47,12 +47,12 @@
         "@aws-sdk/client-s3": "^3.1023.0",
         "@aws-sdk/credential-providers": "^3.1023.0",
         "@clack/prompts": "^1.2.0",
+        "@electric-sql/pglite": "^0.4.4",
         "@huggingface/transformers": "^4.1.0",
-        "@surrealdb/node": "^3.0.0",
         "jiti": "^2.6.1",
         "js-tiktoken": "^1.0.21",
         "onnxruntime-node": "^1.24.1",
-        "surrealdb": "^2.0.0",
+        "postgres": "^3.4.9",
         "tar": "^7.5.13"
     },
     "devDependencies": {

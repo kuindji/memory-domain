@@ -46,15 +46,37 @@ export interface Edge {
 }
 
 export interface GraphApi {
-    createNode(type: string, data: Record<string, unknown>): Promise<string>;
+    createNode(table: string, data: Record<string, unknown>): Promise<string>;
     createNodeWithId(id: string, data: Record<string, unknown>): Promise<string>;
     getNode<T extends Node = Node>(id: string): Promise<T | null>;
+    getNodes<T extends Node = Node>(ids: string[]): Promise<T[]>;
     updateNode(id: string, data: Record<string, unknown>): Promise<void>;
     deleteNode(id: string): Promise<boolean>;
+    deleteNodes(ids: string[]): Promise<void>;
     relate(from: string, edge: string, to: string, data?: Record<string, unknown>): Promise<string>;
+    /**
+     * Bulk-create N edges that share the same `to` node and the same `data`
+     * payload. Collapses N round-trips to a single multi-row INSERT. Used on
+     * inbox hot paths where a batch of memories all get tagged or owned by
+     * the same target. Returns the generated edge ids in input order.
+     */
+    relateMany(
+        fromIds: string[],
+        edge: string,
+        to: string,
+        data?: Record<string, unknown>,
+    ): Promise<string[]>;
     unrelate(from: string, edge: string, to: string): Promise<boolean>;
-    traverse<T = Node>(from: string, pattern: string): Promise<T[]>;
-    query<T = unknown>(surql: string, vars?: Record<string, unknown>): Promise<T>;
+    outgoing<T = Edge>(from: string, edge: string): Promise<T[]>;
+    incoming<T = Edge>(to: string, edge: string): Promise<T[]>;
+    deleteEdges(
+        edge: string,
+        where: { in?: string | string[]; out?: string | string[] },
+    ): Promise<void>;
+    /** Raw SQL escape hatch — Postgres syntax with positional ($1, $2, ...) params. */
+    query<T = unknown>(sql: string, params?: unknown[]): Promise<T[]>;
+    /** Run a parameter-free statement (DDL etc.). */
+    run(sql: string): Promise<void>;
     transaction<T>(fn: (tx: GraphApi) => Promise<T>): Promise<T>;
 }
 
@@ -331,11 +353,7 @@ export interface DomainConfig {
         execute?(filter: FilterSpec, context: DomainContext): Promise<TableResult>;
     };
     buildContext?:
-        | ((
-              text: string,
-              budgetTokens: number,
-              context: DomainContext,
-          ) => Promise<ContextResult>)
+        | ((text: string, budgetTokens: number, context: DomainContext) => Promise<ContextResult>)
         | BuildContextApi;
     describe?(): string;
     schedules?: DomainSchedule[];
@@ -412,11 +430,7 @@ export type TemplateFn = (
 ) => Promise<TemplateResult>;
 
 export interface BuildContextApi {
-    fromText?(
-        text: string,
-        budgetTokens: number,
-        context: DomainContext,
-    ): Promise<ContextResult>;
+    fromText?(text: string, budgetTokens: number, context: DomainContext): Promise<ContextResult>;
     templates?: Record<string, TemplateFn>;
 }
 
@@ -510,7 +524,9 @@ export interface EmbeddingAdapter {
 // --- Connection adapter types ---
 
 export interface ConnectionAdapter {
-    resolve(): Promise<string>;
+    /** Returns the database config the engine should connect with. */
+    resolve(): Promise<import("../adapters/pg/types.js").DbConfig>;
+    /** Persist the local data dir back to its origin (for tarball-backed adapters). */
     save(): Promise<void>;
 }
 
@@ -544,11 +560,17 @@ export interface BedrockAdapterConfig {
 // --- Config types ---
 
 export interface EngineConfig {
-    connection?: string;
+    /** Postgres database config. Use `{ kind: 'pglite' }` for in-memory tests. */
+    db?: import("../adapters/pg/types.js").DbConfig;
+    /** Optional adapter that resolves to a DbConfig (e.g. file/s3/directory tarball stagers). Overrides `db` when present. */
     adapter?: ConnectionAdapter;
-    namespace?: string;
-    database?: string;
-    credentials?: { user: string; pass: string };
+    /**
+     * Legacy connection-string field parsed to DbConfig:
+     *   `mem://` → in-memory PGLite
+     *   `surrealkv://<path>` or `pglite://<path>` → file-backed PGLite at `<path>`
+     *   `postgres://...` or `postgresql://...` → managed Postgres via Bun.SQL
+     */
+    connection?: string;
     llm: LLMAdapter;
     embedding?: EmbeddingAdapter;
     repetition?: RepetitionConfig;

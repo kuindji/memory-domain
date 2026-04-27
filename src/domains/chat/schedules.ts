@@ -96,10 +96,10 @@ export async function promoteWorkingMemory(
             const lowLlm = context.llmAt("low");
             const facts = lowLlm.extract
                 ? await context.debug.time(
-                    "chat.schedule.promote.extractFacts",
-                    () => lowLlm.extract!(contents.join("\n")),
-                    { memories: promotedIds.length },
-                )
+                      "chat.schedule.promote.extractFacts",
+                      () => lowLlm.extract!(contents.join("\n")),
+                      { memories: promotedIds.length },
+                  )
                 : [];
             if (!facts || facts.length === 0) {
                 for (const memId of promotedIds) {
@@ -367,10 +367,10 @@ export async function consolidateEpisodic(
                 const medLlm = context.llmAt("medium");
                 const merged = medLlm.consolidate
                     ? await context.debug.time(
-                        "chat.schedule.consolidate.semanticMerge",
-                        () => medLlm.consolidate!([summary, dupTarget.content]),
-                        { memories: 2 },
-                    )
+                          "chat.schedule.consolidate.semanticMerge",
+                          () => medLlm.consolidate!([summary, dupTarget.content]),
+                          { memories: 2 },
+                      )
                     : undefined;
 
                 if (merged) {

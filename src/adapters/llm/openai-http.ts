@@ -222,9 +222,7 @@ class OpenAiHttpAdapter implements LLMAdapter {
                     const data = (await res.json()) as ChatCompletionResponse;
                     const content = data.choices?.[0]?.message?.content;
                     if (typeof content !== "string" || content.length === 0) {
-                        throw new Error(
-                            `OpenAI HTTP response missing choices[0].message.content`,
-                        );
+                        throw new Error(`OpenAI HTTP response missing choices[0].message.content`);
                     }
                     return content.trim();
                 } finally {
@@ -239,7 +237,6 @@ class OpenAiHttpAdapter implements LLMAdapter {
         );
     }
 }
-
 
 class OpenAiHttpStatusError extends Error {
     constructor(

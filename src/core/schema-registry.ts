@@ -1,5 +1,6 @@
-import type { Surreal } from "surrealdb";
+import type { PgClient } from "../adapters/pg/types.js";
 import type { DomainSchema, NodeDef, EdgeDef, FieldDef, IndexDef } from "./types.js";
+import { translateFieldType, defaultLiteral } from "./sql/types.js";
 
 interface RegisteredNode {
     name: string;
@@ -12,115 +13,164 @@ interface RegisteredEdge extends EdgeDef {
     contributors: string[];
 }
 
+const IDENT_RE = /^[a-z_][a-z0-9_]*$/i;
+
+const CORE_NODE_TABLES = ["memory", "tag", "domain", "meta"] as const;
+
+const CORE_EDGES = [
+    "tagged",
+    "child_of",
+    "owned_by",
+    "reinforces",
+    "contradicts",
+    "summarizes",
+    "refines",
+    "has_rule",
+] as const;
+
 class SchemaRegistry {
     private registeredNodes = new Map<string, RegisteredNode>();
     private registeredEdges = new Map<string, RegisteredEdge>();
+    // <table> -> set of columns whose pg type is jsonb. Consulted by
+    // GraphStore so it can emit `$N::jsonb` casts on INSERT/UPDATE — without
+    // an explicit cast, Bun.SQL's positional-param binding stores JS objects
+    // as JSON-string literals inside JSONB cells (double-encoded), which
+    // silently breaks every consumer that does `typeof v === 'object'`.
+    private jsonbColumns = new Map<string, Set<string>>();
 
-    constructor(private db: Surreal) {}
+    constructor(private db: PgClient) {
+        // Hardcoded JSONB columns that registerCore creates inline.
+        this.markJsonb("memory", ["request_context", "structured_data", "metadata"]);
+        this.markJsonb("domain", ["settings"]);
+    }
+
+    isJsonbColumn(table: string, column: string): boolean {
+        return this.jsonbColumns.get(table)?.has(column) ?? false;
+    }
+
+    private markJsonb(table: string, columns: string[]): void {
+        let set = this.jsonbColumns.get(table);
+        if (!set) {
+            set = new Set();
+            this.jsonbColumns.set(table, set);
+        }
+        for (const col of columns) set.add(col);
+    }
+
+    private trackJsonbFields(table: string, fields: FieldDef[]): void {
+        const cols: string[] = [];
+        for (const f of fields) {
+            if (translateFieldType(f.type).pgType === "jsonb") cols.push(f.name);
+        }
+        if (cols.length > 0) this.markJsonb(table, cols);
+    }
 
     async registerCore(embeddingDimension?: number): Promise<void> {
-        // Core node tables
-        await this.db.query(`
-      DEFINE TABLE IF NOT EXISTS memory SCHEMAFULL;
-      DEFINE FIELD IF NOT EXISTS content ON memory TYPE string;
-      DEFINE FIELD IF NOT EXISTS embedding ON memory TYPE option<array<float>>;
-      DEFINE FIELD IF NOT EXISTS event_time ON memory TYPE option<int>;
-      DEFINE FIELD IF NOT EXISTS created_at ON memory TYPE int;
-      DEFINE FIELD IF NOT EXISTS token_count ON memory TYPE int DEFAULT 0;
-      DEFINE FIELD IF NOT EXISTS request_context ON memory TYPE option<object> FLEXIBLE;
-      DEFINE FIELD IF NOT EXISTS structured_data ON memory TYPE option<object> FLEXIBLE;
-      DEFINE FIELD IF NOT EXISTS metadata ON memory TYPE option<object> FLEXIBLE;
-      DEFINE FIELD IF NOT EXISTS answers_question ON memory TYPE option<string>;
-    `);
+        await this.db.run("CREATE EXTENSION IF NOT EXISTS vector");
 
-        await this.db.query(`
-      DEFINE TABLE IF NOT EXISTS tag SCHEMAFULL;
-      DEFINE FIELD IF NOT EXISTS label ON tag TYPE string;
-      DEFINE FIELD IF NOT EXISTS created_at ON tag TYPE int;
-    `);
+        // memory table — embedding column only added when dimension is known,
+        // matching the existing prime-then-define HNSW pattern.
+        const embeddingCol = embeddingDimension ? `embedding vector(${embeddingDimension}),` : "";
+        await this.db.run(`
+            CREATE TABLE IF NOT EXISTS memory (
+                id text PRIMARY KEY,
+                content text NOT NULL,
+                ${embeddingCol}
+                event_time bigint,
+                created_at bigint NOT NULL,
+                token_count bigint NOT NULL DEFAULT 0,
+                request_context jsonb,
+                structured_data jsonb,
+                metadata jsonb,
+                answers_question text
+            );
+        `);
 
-        await this.db.query(`
-      DEFINE TABLE IF NOT EXISTS domain SCHEMAFULL;
-      DEFINE FIELD IF NOT EXISTS name ON domain TYPE string;
-      DEFINE FIELD IF NOT EXISTS settings ON domain TYPE option<object> FLEXIBLE;
-    `);
+        // If memory existed without embedding column and dim is now known, add it.
+        if (embeddingDimension) {
+            const exists = await this.columnExists("memory", "embedding");
+            if (!exists) {
+                await this.db.run(
+                    `ALTER TABLE memory ADD COLUMN embedding vector(${embeddingDimension})`,
+                );
+            }
+        }
 
-        await this.db.query(`
-      DEFINE TABLE IF NOT EXISTS meta SCHEMAFULL;
-      DEFINE FIELD IF NOT EXISTS value ON meta TYPE option<string>;
-    `);
+        await this.db.run(`
+            CREATE TABLE IF NOT EXISTS tag (
+                id text PRIMARY KEY,
+                label text NOT NULL,
+                created_at bigint NOT NULL
+            );
+        `);
 
-        // Core edge tables
-        await this.db.query(`
-      DEFINE TABLE IF NOT EXISTS tagged SCHEMALESS TYPE RELATION IN memory OUT tag;
-      DEFINE TABLE IF NOT EXISTS child_of SCHEMALESS TYPE RELATION IN tag OUT tag;
-      DEFINE TABLE IF NOT EXISTS owned_by SCHEMALESS TYPE RELATION IN memory OUT domain;
-    `);
+        await this.db.run(`
+            CREATE TABLE IF NOT EXISTS domain (
+                id text PRIMARY KEY,
+                name text NOT NULL,
+                settings jsonb
+            );
+        `);
 
-        await this.db.query(`
-      DEFINE TABLE IF NOT EXISTS reinforces SCHEMALESS TYPE RELATION IN memory OUT memory;
-      DEFINE FIELD IF NOT EXISTS strength ON reinforces TYPE option<float>;
-      DEFINE FIELD IF NOT EXISTS detected_at ON reinforces TYPE option<int>;
-      DEFINE TABLE IF NOT EXISTS contradicts SCHEMALESS TYPE RELATION IN memory OUT memory;
-      DEFINE FIELD IF NOT EXISTS strength ON contradicts TYPE option<float>;
-      DEFINE FIELD IF NOT EXISTS detected_at ON contradicts TYPE option<int>;
-      DEFINE TABLE IF NOT EXISTS summarizes SCHEMALESS TYPE RELATION IN memory OUT memory;
-      DEFINE TABLE IF NOT EXISTS refines SCHEMALESS TYPE RELATION IN memory OUT memory;
-    `);
+        await this.db.run(`
+            CREATE TABLE IF NOT EXISTS meta (
+                id text PRIMARY KEY,
+                value text
+            );
+        `);
 
-        await this.db.query(`
-      DEFINE TABLE IF NOT EXISTS has_rule SCHEMALESS TYPE RELATION IN tag OUT domain;
-    `);
+        // Edge tables.
+        for (const edge of CORE_EDGES) {
+            await this.createEdgeTable(edge, []);
+        }
+        // Edge-specific fields.
+        await this.addEdgeFields("reinforces", [
+            { name: "strength", type: "option<float>" },
+            { name: "detected_at", type: "option<int>" },
+        ]);
+        await this.addEdgeFields("contradicts", [
+            { name: "strength", type: "option<float>" },
+            { name: "detected_at", type: "option<int>" },
+        ]);
+        // owned_by carries domain-supplied attributes + a write timestamp.
+        await this.addEdgeFields("owned_by", [
+            { name: "attributes", type: "option<object>" },
+            { name: "owned_at", type: "option<int>" },
+        ]);
+        this.markJsonb("owned_by", ["attributes"]);
 
-        // Indexes on relation edge fields: SurrealDB does not auto-index `in`/`out`
-        // on RELATION tables, so queries like `WHERE in = $id` or `WHERE out IN $ids`
-        // fall back to full table scans. Add explicit indexes on both directions for
-        // every core edge table.
-        const coreEdges = [
-            "tagged",
-            "child_of",
-            "owned_by",
-            "reinforces",
-            "contradicts",
-            "summarizes",
-            "refines",
-            "has_rule",
-        ];
-        for (const edge of coreEdges) {
-            await this.defineIndex(edge, { name: `idx_${edge}_in`, fields: ["in"] });
-            await this.defineIndex(edge, { name: `idx_${edge}_out`, fields: ["out"] });
+        // Indexes on edge endpoints. Two indexes per edge (one per direction)
+        // to support traversal from either side.
+        for (const edge of CORE_EDGES) {
+            await this.createSimpleIndex(edge, `idx_${edge}_in`, ["in_id"]);
+            await this.createSimpleIndex(edge, `idx_${edge}_out`, ["out_id"]);
         }
 
         if (embeddingDimension) {
-            await this.defineIndex("memory", {
-                name: "idx_memory_embedding",
-                fields: ["embedding"],
-                type: "hnsw",
-                config: { dimension: embeddingDimension, dist: "COSINE" },
-            });
+            await this.ensureHnswIndex(
+                "memory",
+                "idx_memory_embedding",
+                "embedding",
+                embeddingDimension,
+            );
         }
 
-        await this.db.query(
-            `DEFINE ANALYZER IF NOT EXISTS memory_content TOKENIZERS class, punct FILTERS lowercase, ascii`,
+        // Fulltext: replace Surreal BM25 with Postgres tsvector GIN. Functional
+        // index avoids materializing a tsvector column. The Postgres planner
+        // matches `to_tsvector('english', content) @@ ...` queries against this.
+        await this.db.run(
+            `CREATE INDEX IF NOT EXISTS idx_memory_content
+             ON memory USING GIN (to_tsvector('english', content))`,
         );
-        await this.defineIndex("memory", {
-            name: "idx_memory_content",
-            fields: ["content"],
-            type: "search",
-            config: { analyzer: "memory_content" },
-        });
-        await this.defineIndex("memory", {
-            name: "idx_memory_answers_question",
-            fields: ["answers_question"],
-            type: "search",
-            config: { analyzer: "memory_content" },
-        });
-        await this.defineIndex("memory", {
-            name: "idx_memory_event_time",
-            fields: ["event_time"],
-        });
+        await this.db.run(
+            `CREATE INDEX IF NOT EXISTS idx_memory_answers_question
+             ON memory USING GIN (to_tsvector('english', coalesce(answers_question, '')))`,
+        );
+        await this.db.run(
+            `CREATE INDEX IF NOT EXISTS idx_memory_event_time ON memory (event_time)`,
+        );
 
-        // Track core nodes in memory
+        // Track registered shape for verifyIndexes / introspection.
         const coreMemoryIndexes: IndexDef[] = [
             { name: "idx_memory_content", fields: ["content"], type: "search" },
             { name: "idx_memory_answers_question", fields: ["answers_question"], type: "search" },
@@ -145,6 +195,7 @@ class SchemaRegistry {
                 { name: "token_count", type: "int" },
                 { name: "request_context", type: "option<object>" },
                 { name: "structured_data", type: "option<object>" },
+                { name: "metadata", type: "option<object>" },
                 { name: "answers_question", type: "option<string>" },
             ],
             indexes: coreMemoryIndexes,
@@ -174,6 +225,15 @@ class SchemaRegistry {
             indexes: [],
             contributors: ["core"],
         });
+
+        for (const edge of CORE_EDGES) {
+            this.registeredEdges.set(edge, {
+                name: edge,
+                from: this.coreEdgeFromTo(edge).from,
+                to: this.coreEdgeFromTo(edge).to,
+                contributors: ["core"],
+            });
+        }
     }
 
     async registerDomain(domainId: string, schema: DomainSchema): Promise<void> {
@@ -189,15 +249,32 @@ class SchemaRegistry {
         return [...this.registeredEdges.keys()];
     }
 
+    private coreEdgeFromTo(edge: (typeof CORE_EDGES)[number]): { from: string; to: string } {
+        switch (edge) {
+            case "tagged":
+                return { from: "memory", to: "tag" };
+            case "child_of":
+                return { from: "tag", to: "tag" };
+            case "owned_by":
+                return { from: "memory", to: "domain" };
+            case "reinforces":
+            case "contradicts":
+            case "summarizes":
+            case "refines":
+                return { from: "memory", to: "memory" };
+            case "has_rule":
+                return { from: "tag", to: "domain" };
+        }
+    }
+
     private async registerNodes(nodes: NodeDef[], contributor: string): Promise<void> {
         for (const node of nodes) {
-            if (!/^[a-z_][a-z0-9_]*$/i.test(node.name)) {
+            if (!IDENT_RE.test(node.name)) {
                 throw new Error(`Invalid node name: "${node.name}"`);
             }
             const existing = this.registeredNodes.get(node.name);
 
             if (existing) {
-                // Check for field type conflicts
                 for (const field of node.fields) {
                     const existingField = existing.fields.find((f) => f.name === field.name);
                     if (existingField && existingField.type !== field.type) {
@@ -208,16 +285,15 @@ class SchemaRegistry {
                     }
                 }
 
-                // Add new fields only
                 const newFields = node.fields.filter(
                     (f) => !existing.fields.some((ef) => ef.name === f.name),
                 );
                 for (const field of newFields) {
-                    await this.defineField(node.name, field);
+                    await this.addColumn(node.name, field);
                 }
                 existing.fields.push(...newFields);
+                this.trackJsonbFields(node.name, newFields);
 
-                // Also create any declared indexes for existing nodes
                 if (node.indexes) {
                     for (const idx of node.indexes) {
                         await this.defineIndex(node.name, idx);
@@ -229,14 +305,7 @@ class SchemaRegistry {
 
                 existing.contributors.push(contributor);
             } else {
-                // New table
-                const schemafull = node.schemafull !== false;
-                await this.db.query(
-                    `DEFINE TABLE IF NOT EXISTS ${node.name} ${schemafull ? "SCHEMAFULL" : "SCHEMALESS"}`,
-                );
-                for (const field of node.fields) {
-                    await this.defineField(node.name, field);
-                }
+                await this.createNodeTable(node);
                 if (node.indexes) {
                     for (const idx of node.indexes) {
                         await this.defineIndex(node.name, idx);
@@ -248,146 +317,182 @@ class SchemaRegistry {
                     indexes: node.indexes ? [...node.indexes] : [],
                     contributors: [contributor],
                 });
+                this.trackJsonbFields(node.name, node.fields);
             }
         }
     }
 
     private async registerEdges(edges: EdgeDef[], contributor: string): Promise<void> {
         for (const edge of edges) {
-            if (!/^[a-z_][a-z0-9_]*$/i.test(edge.name)) {
+            if (!IDENT_RE.test(edge.name)) {
                 throw new Error(`Invalid edge name: "${edge.name}"`);
             }
             const existing = this.registeredEdges.get(edge.name);
             if (existing) {
                 existing.contributors.push(contributor);
                 if (edge.fields) {
+                    const newFields: FieldDef[] = [];
                     for (const field of edge.fields) {
                         const existingField = existing.fields?.find((f) => f.name === field.name);
                         if (!existingField) {
-                            await this.defineField(edge.name, field);
+                            await this.addColumn(edge.name, field);
                             existing.fields = existing.fields ?? [];
                             existing.fields.push(field);
+                            newFields.push(field);
                         }
                     }
+                    if (newFields.length > 0) this.trackJsonbFields(edge.name, newFields);
                 }
             } else {
-                const inTypes = Array.isArray(edge.from) ? edge.from.join(" | ") : edge.from;
-                const outTypes = Array.isArray(edge.to) ? edge.to.join(" | ") : edge.to;
-                await this.db.query(
-                    `DEFINE TABLE IF NOT EXISTS ${edge.name} SCHEMALESS TYPE RELATION IN ${inTypes} OUT ${outTypes}`,
-                );
-                if (edge.fields) {
-                    for (const field of edge.fields) {
-                        await this.defineField(edge.name, field);
-                    }
-                }
-                // Index on in/out so WHERE in = $id / WHERE out IN $ids don't full-scan
-                await this.defineIndex(edge.name, { name: `idx_${edge.name}_in`, fields: ["in"] });
-                await this.defineIndex(edge.name, {
-                    name: `idx_${edge.name}_out`,
-                    fields: ["out"],
-                });
+                await this.createEdgeTable(edge.name, edge.fields ?? []);
+                await this.createSimpleIndex(edge.name, `idx_${edge.name}_in`, ["in_id"]);
+                await this.createSimpleIndex(edge.name, `idx_${edge.name}_out`, ["out_id"]);
                 this.registeredEdges.set(edge.name, { ...edge, contributors: [contributor] });
+                if (edge.fields) this.trackJsonbFields(edge.name, edge.fields);
             }
         }
     }
 
-    private async defineField(table: string, field: FieldDef): Promise<void> {
-        const typeStr = field.required === false ? `option<${field.type}>` : field.type;
-        let query = `DEFINE FIELD IF NOT EXISTS ${field.name} ON ${table} TYPE ${typeStr}`;
-        if (field.default !== undefined) {
-            const defaultVal =
-                typeof field.default === "string" ? `'${field.default}'` : `${field.default}`;
-            query += ` DEFAULT ${defaultVal}`;
+    private async createNodeTable(node: NodeDef): Promise<void> {
+        const cols: string[] = ["id text PRIMARY KEY"];
+        for (const field of node.fields) {
+            cols.push(this.fieldColumnSql(field));
         }
-        if (field.computed) {
-            query += ` VALUE ${field.computed}`;
+        await this.db.run(`CREATE TABLE IF NOT EXISTS ${node.name} (${cols.join(", ")})`);
+    }
+
+    private async createEdgeTable(name: string, fields: FieldDef[]): Promise<void> {
+        const cols: string[] = [
+            "id text PRIMARY KEY",
+            "in_id text NOT NULL",
+            "out_id text NOT NULL",
+        ];
+        for (const field of fields) {
+            cols.push(this.fieldColumnSql(field));
         }
-        await this.db.query(query);
+        await this.db.run(`CREATE TABLE IF NOT EXISTS ${name} (${cols.join(", ")})`);
+    }
+
+    private async addEdgeFields(table: string, fields: FieldDef[]): Promise<void> {
+        for (const field of fields) {
+            const exists = await this.columnExists(table, field.name);
+            if (!exists) await this.addColumn(table, field);
+        }
+    }
+
+    private fieldColumnSql(field: FieldDef): string {
+        const { pgType, nullable } = translateFieldType(field.type);
+        const required = field.required !== false && !nullable;
+        let sql = `${field.name} ${pgType}`;
+        if (required) sql += " NOT NULL";
+        if (field.default !== undefined && field.default !== null) {
+            sql += ` DEFAULT ${defaultLiteral(field.default)}`;
+        }
+        return sql;
+    }
+
+    private async addColumn(table: string, field: FieldDef): Promise<void> {
+        const { pgType, nullable } = translateFieldType(field.type);
+        const required = field.required !== false && !nullable;
+        let sql = `ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS ${field.name} ${pgType}`;
+        if (required) sql += " NOT NULL";
+        if (field.default !== undefined && field.default !== null) {
+            sql += ` DEFAULT ${defaultLiteral(field.default)}`;
+        }
+        await this.db.run(sql);
+    }
+
+    private async columnExists(table: string, column: string): Promise<boolean> {
+        const rows = await this.db.query<{ exists: boolean }>(
+            `SELECT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = $1 AND column_name = $2
+             ) AS exists`,
+            [table, column],
+        );
+        return rows[0]?.exists === true;
     }
 
     /**
-     * Ensure an HNSW index exists with the specified dimension. Handles three cases:
-     *   1. Index absent — define it fresh.
-     *   2. Index present but NOT HNSW, OR dimension mismatch — drop and redefine.
-     *   3. Index present, HNSW, correct dimension — no-op.
+     * HNSW lifecycle. Three cases:
+     *   1. Index absent — create.
+     *   2. Index present, dimension matches — no-op.
+     *   3. Index present, dimension mismatch — drop + recreate.
      *
-     * Needed because `DEFINE INDEX IF NOT EXISTS` does not upgrade a stub index and
-     * because some SurrealDB builds have been observed to drop the HNSW structure
-     * across restarts (e.g. after a process crash); a plain bootstrap would then
-     * silently run with no vector index and fall back to TableScan.
+     * pgvector encodes dimension on the column type, not the index. We compare
+     * the column's typmod to detect drift.
      */
     private async ensureHnswIndex(
         table: string,
         name: string,
         field: string,
-        config: { dimension: number; dist: string },
+        dimension: number,
     ): Promise<void> {
-        const defineStmt = `DEFINE INDEX ${name} ON ${table} FIELDS ${field} HNSW DIMENSION ${config.dimension} DIST ${config.dist}`;
+        // Postgres column type for vector(N) reports as e.g. "vector(384)".
+        const colInfo = await this.db.query<{ data_type: string }>(
+            `SELECT format_type(atttypid, atttypmod) AS data_type
+             FROM pg_attribute
+             WHERE attrelid = $1::regclass AND attname = $2 AND NOT attisdropped`,
+            [table, field],
+        );
+        const currentType = colInfo[0]?.data_type ?? "";
+        const dimMatch = currentType.match(/vector\((\d+)\)/);
+        const currentDim = dimMatch ? Number(dimMatch[1]) : null;
 
-        let current: string | undefined;
-        try {
-            const raw: unknown = await this.db.query(`INFO FOR TABLE ${table}`);
-            const info = (Array.isArray(raw) ? raw[0] : raw) as
-                | { indexes?: Record<string, string> }
-                | undefined;
-            current = info?.indexes?.[name];
-        } catch {
-            // Treat as missing — we'll try to define fresh.
+        if (currentDim !== dimension) {
+            // Either column is missing dim entirely or has wrong one. Recast.
+            await this.db.run(`DROP INDEX IF EXISTS ${name}`);
+            await this.db.run(
+                `ALTER TABLE ${table} ALTER COLUMN ${field} TYPE vector(${dimension})`,
+            );
         }
 
-        if (current) {
-            const isHnsw = /\bHNSW\b/i.test(current);
-            const dimMatch = current.match(/DIMENSION\s+(\d+)/i);
-            const currentDim = dimMatch ? Number(dimMatch[1]) : undefined;
-            if (isHnsw && currentDim === config.dimension) {
-                return;
-            }
-            await this.db.query(`REMOVE INDEX IF EXISTS ${name} ON ${table}`);
-        }
+        const idxRows = await this.db.query<{ indexdef: string }>(
+            `SELECT indexdef FROM pg_indexes WHERE indexname = $1 AND tablename = $2`,
+            [name, table],
+        );
+        const existing = idxRows[0]?.indexdef ?? "";
+        const isHnsw = /USING\s+hnsw/i.test(existing);
+        if (isHnsw && currentDim === dimension) return;
 
-        await this.db.query(defineStmt);
+        if (existing) await this.db.run(`DROP INDEX IF EXISTS ${name}`);
+        await this.db.run(
+            `CREATE INDEX ${name} ON ${table} USING hnsw (${field} vector_cosine_ops)`,
+        );
+    }
+
+    private async createSimpleIndex(table: string, name: string, fields: string[]): Promise<void> {
+        await this.db.run(`CREATE INDEX IF NOT EXISTS ${name} ON ${table} (${fields.join(", ")})`);
     }
 
     private async defineIndex(table: string, idx: IndexDef): Promise<void> {
         if (idx.type === "hnsw") {
             const dim = (idx.config?.dimension as number) ?? 384;
-            const dist = (idx.config?.dist as string) ?? "COSINE";
-            await this.ensureHnswIndex(table, idx.name, idx.fields.join(", "), {
-                dimension: dim,
-                dist,
-            });
+            await this.ensureHnswIndex(table, idx.name, idx.fields[0], dim);
             return;
         }
-        let query = `DEFINE INDEX IF NOT EXISTS ${idx.name} ON ${table} FIELDS ${idx.fields.join(", ")}`;
+        if (idx.type === "search") {
+            // Functional GIN tsvector index. Combines all listed fields with
+            // coalesce so nullable columns don't break to_tsvector.
+            const expr = idx.fields.map((f) => `coalesce(${f}, '')`).join(" || ' ' || ");
+            await this.db.run(
+                `CREATE INDEX IF NOT EXISTS ${idx.name}
+                 ON ${table} USING GIN (to_tsvector('english', ${expr}))`,
+            );
+            return;
+        }
         if (idx.type === "unique") {
-            query += " UNIQUE";
-        } else if (idx.type === "search") {
-            const analyzer = (idx.config?.analyzer as string) ?? "ascii";
-            const k1 = idx.config?.k1 as number | undefined;
-            const b = idx.config?.b as number | undefined;
-            if (k1 !== undefined && b !== undefined) {
-                query += ` FULLTEXT ANALYZER ${analyzer} BM25(${k1}, ${b})`;
-            } else {
-                query += ` FULLTEXT ANALYZER ${analyzer} BM25`;
-            }
+            await this.db.run(
+                `CREATE UNIQUE INDEX IF NOT EXISTS ${idx.name} ON ${table} (${idx.fields.join(", ")})`,
+            );
+            return;
         }
-        if (idx.condition) {
-            try {
-                await this.db.query(`${query} WHERE ${idx.condition}`);
-                return;
-            } catch {
-                // WHERE condition not supported by this engine version; fall back to creating without it
-            }
-        }
-        await this.db.query(query);
+        await this.createSimpleIndex(table, idx.name, idx.fields);
     }
 
     /**
-     * Verify that every registered edge table has `idx_<edge>_in` / `idx_<edge>_out`
-     * defined, and every node table has all declared indexes. Returns a list of
-     * `<table>.<index_name>` identifiers that are missing. Intended for debug mode —
-     * does not throw.
+     * Verify that every registered edge table has its endpoint indexes and every
+     * node table has its declared indexes. Returns missing identifiers.
      */
     async verifyIndexes(): Promise<string[]> {
         const missing: string[] = [];
@@ -413,16 +518,15 @@ class SchemaRegistry {
 
     private async listTableIndexes(table: string): Promise<Set<string>> {
         try {
-            const rows = await this.db.query<[{ indexes?: Record<string, unknown> }]>(
-                `INFO FOR TABLE ${table}`,
+            const rows = await this.db.query<{ indexname: string }>(
+                `SELECT indexname FROM pg_indexes WHERE tablename = $1`,
+                [table],
             );
-            const info = Array.isArray(rows) ? rows[0] : rows;
-            const indexes = info?.indexes ?? {};
-            return new Set(Object.keys(indexes));
+            return new Set(rows.map((r) => r.indexname));
         } catch {
             return new Set();
         }
     }
 }
 
-export { SchemaRegistry };
+export { SchemaRegistry, CORE_NODE_TABLES, CORE_EDGES };

@@ -4,7 +4,18 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
     {
-        ignores: ["node_modules/", "dist/", "scripts/", "*.js"],
+        ignores: [
+            "node_modules/",
+            "dist/",
+            "scripts/",
+            "*.js",
+            "tests-integration/",
+            // Domain directories not yet ported to Postgres (still import from surrealdb).
+            "src/domains/chat/",
+            "src/domains/kb/",
+            "src/domains/user/",
+            "src/domains/code-repo/",
+        ],
     },
 
     eslint.configs.recommended,

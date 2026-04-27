@@ -79,11 +79,9 @@ class BgeM3EmbeddingAdapter implements EmbeddingAdapter {
             if (this.cacheDir) {
                 transformers.env.cacheDir = this.cacheDir;
             }
-            const extractor = await transformers.pipeline(
-                "feature-extraction",
-                this.modelId,
-                { dtype: this.dtype },
-            );
+            const extractor = await transformers.pipeline("feature-extraction", this.modelId, {
+                dtype: this.dtype,
+            });
 
             const probe = await extractor("hello", { pooling: "cls", normalize: true });
             const dims = probe.dims;

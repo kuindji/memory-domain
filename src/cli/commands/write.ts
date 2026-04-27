@@ -13,7 +13,7 @@ const writeCommand: CommandHandler = async (engine, parsed) => {
     if (parsed.flags["tags"]) options.tags = (parsed.flags["tags"] as string).split(",");
 
     const attr = parsed.flags["attr"];
-    if (attr && typeof attr === "object") options.attributes = attr as Record<string, unknown>;
+    if (attr && typeof attr === "object") options.attributes = attr;
 
     const meta = parseMeta(parsed.flags);
     if (meta) options.context = meta;

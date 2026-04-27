@@ -15,18 +15,10 @@ function makeTabularDomain(rows: TableResult["rows"]): DomainRegistration {
             name: "Tabular Test",
             async processInboxBatch() {},
             search: {
-                execute(
-                    filter: FilterSpec,
-                    _ctx: DomainContext,
-                ): Promise<TableResult> {
-                    const yearEq =
-                        typeof filter.year === "number"
-                            ? filter.year
-                            : undefined;
+                execute(filter: FilterSpec, _ctx: DomainContext): Promise<TableResult> {
+                    const yearEq = typeof filter.year === "number" ? filter.year : undefined;
                     const filtered =
-                        yearEq !== undefined
-                            ? rows.filter((r) => r.year === yearEq)
-                            : rows;
+                        yearEq !== undefined ? rows.filter((r) => r.year === yearEq) : rows;
                     return Promise.resolve({
                         rows: filtered,
                         columns: ["country", "year", "value"],
@@ -55,9 +47,7 @@ describe("MemoryEngine.searchTable", () => {
         );
 
         const result = await engine.searchTable("tabular", { year: 2010 });
-        expect(result.rows).toEqual([
-            { country: "USA", year: 2010, value: 100 },
-        ]);
+        expect(result.rows).toEqual([{ country: "USA", year: 2010, value: 100 }]);
         expect(result.columns).toEqual(["country", "year", "value"]);
         expect(result.source).toBe("test");
 
@@ -72,9 +62,7 @@ describe("MemoryEngine.searchTable", () => {
             database: `test_searchtable_unknown_${Date.now()}`,
             llm: new MockLLMAdapter(),
         });
-        expect(engine.searchTable("does-not-exist", {})).rejects.toThrow(
-            /unknown domain/i,
-        );
+        expect(engine.searchTable("does-not-exist", {})).rejects.toThrow(/unknown domain/i);
         await engine.close();
     });
 
@@ -94,9 +82,7 @@ describe("MemoryEngine.searchTable", () => {
                 search: { rank: (_q, c) => c },
             },
         });
-        expect(engine.searchTable("rank-only", {})).rejects.toThrow(
-            /does not support tabular/i,
-        );
+        expect(engine.searchTable("rank-only", {})).rejects.toThrow(/does not support tabular/i);
         await engine.close();
     });
 });
@@ -129,9 +115,7 @@ describe("MemoryEngine.getDomainContext", () => {
             database: `test_getctx_unknown_${Date.now()}`,
             llm: new MockLLMAdapter(),
         });
-        expect(() => engine.getDomainContext("does-not-exist")).toThrow(
-            /unknown domain/i,
-        );
+        expect(() => engine.getDomainContext("does-not-exist")).toThrow(/unknown domain/i);
         await engine.close();
     });
 });

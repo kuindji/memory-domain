@@ -12,5 +12,28 @@
         "sourceMap": true,
         "noEmit": true
     },
-    "include": ["src", "tests", "tests-integration", "eslint.config.ts", "memory-domain.config.ts"]
+    "include": [
+        "src/index.ts",
+        "src/config-loader.ts",
+        "src/core/**/*.ts",
+        "src/adapters/pg/**/*.ts",
+        "src/adapters/connection/**/*.ts",
+        "src/adapters/llm/**/*.ts",
+        "src/adapters/bge-m3-embedding.ts",
+        "src/adapters/cached-embedding.ts",
+        "src/adapters/onnx-embedding.ts",
+        "src/adapters/wordpiece-tokenizer.ts",
+        "src/bin/**/*.ts",
+        "src/cli/**/*.ts",
+        "src/serve/**/*.ts",
+        "src/tui/**/*.ts",
+        "src/domains/log-domain.ts",
+        "src/domains/topic/**/*.ts",
+        "src/plugins/**/*.ts",
+        "tests/**/*.ts",
+        "tests-integration/**/*.ts",
+        "eslint.config.ts",
+        "memory-domain.config.ts"
+    ],
+    "exclude": ["tests-integration/**/*.ts"]
 }

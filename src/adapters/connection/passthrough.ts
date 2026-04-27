@@ -1,14 +1,11 @@
 import type { ConnectionAdapter } from "../../core/types.js";
+import type { DbConfig } from "../pg/types.js";
 
 class PassthroughAdapter implements ConnectionAdapter {
-    private connection: string;
+    constructor(private dbConfig: DbConfig) {}
 
-    constructor(connection: string) {
-        this.connection = connection;
-    }
-
-    resolve(): Promise<string> {
-        return Promise.resolve(this.connection);
+    resolve(): Promise<DbConfig> {
+        return Promise.resolve(this.dbConfig);
     }
 
     save(): Promise<void> {

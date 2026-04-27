@@ -74,7 +74,7 @@ describe("OpenAiHttpAdapter.extract", () => {
         expect(body.model).toBe("qwen2.5-3b");
         expect(body.stream).toBe(false);
         expect(body.messages).toHaveLength(1);
-        const msg0 = body.messages[0] as { role: string; content: string };
+        const msg0 = body.messages[0];
         expect(msg0.role).toBe("user");
         expect(msg0.content).toContain("Alice moved to Paris on Friday.");
     });
@@ -130,7 +130,7 @@ describe("OpenAiHttpAdapter.withLevel", () => {
             model: "default-model",
             modelLevels: { low: "tiny", high: "big" },
         });
-        await adapter.withLevel!("high").extract!("anything");
+        await adapter.withLevel("high").extract!("anything");
         const req0 = captured[0];
         const body = req0.body as { model: string };
         expect(body.model).toBe("big");
@@ -144,7 +144,7 @@ describe("OpenAiHttpAdapter.withLevel", () => {
             model: "default-model",
             modelLevels: { low: "tiny" },
         });
-        await adapter.withLevel!("medium").extract!("anything");
+        await adapter.withLevel("medium").extract!("anything");
         const req0 = captured[0];
         const body = req0.body as { model: string };
         expect(body.model).toBe("default-model");

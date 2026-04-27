@@ -147,26 +147,33 @@ function renderMarkdownTable(columns: string[], rows: Record<string, TableCell>[
     const cellStrings = rows.map((r) => columns.map((c) => formatCell(r[c] ?? null)));
     const widths = columns.map((c, i) => {
         let w = c.length;
-        for (const row of cellStrings) w = Math.max(w, row[i]!.length);
+        for (const row of cellStrings) w = Math.max(w, row[i].length);
         return w;
     });
     const pad = (s: string, w: number): string => s + " ".repeat(Math.max(0, w - s.length));
-    const header = `| ${columns.map((c, i) => pad(c, widths[i]!)).join(" | ")} |`;
+    const header = `| ${columns.map((c, i) => pad(c, widths[i])).join(" | ")} |`;
     const sep = `| ${widths.map((w) => "-".repeat(Math.max(3, w))).join(" | ")} |`;
     const body = cellStrings
-        .map((row) => `| ${row.map((s, i) => pad(s, widths[i]!)).join(" | ")} |`)
+        .map((row) => `| ${row.map((s, i) => pad(s, widths[i])).join(" | ")} |`)
         .join("\n");
     return body.length > 0 ? `${header}\n${sep}\n${body}` : `${header}\n${sep}`;
 }
 
-function formatResultMeta(source: string, meta: Record<string, unknown> | undefined, extra: string[]): string {
+function formatResultMeta(
+    source: string,
+    meta: Record<string, unknown> | undefined,
+    extra: string[],
+): string {
     const parts = [`source: ${source}`, ...extra];
     if (meta && typeof meta === "object") {
         const dw = meta["dataWindow"];
         if (dw && typeof dw === "object" && dw !== null) {
             const from = (dw as { from?: unknown }).from;
             const to = (dw as { to?: unknown }).to;
-            if (from !== undefined && to !== undefined) {
+            if (
+                (typeof from === "string" || typeof from === "number") &&
+                (typeof to === "string" || typeof to === "number")
+            ) {
                 parts.push(`data window: ${String(from)}–${String(to)}`);
             }
         }
@@ -176,14 +183,14 @@ function formatResultMeta(source: string, meta: Record<string, unknown> | undefi
 
 function formatSearchTable(data: TableResult): string {
     const header = formatResultMeta(data.source, data.meta, []);
-    const table = renderMarkdownTable(data.columns, data.rows as Record<string, TableCell>[]);
+    const table = renderMarkdownTable(data.columns, data.rows);
     const count = `${data.rows.length} row${data.rows.length === 1 ? "" : "s"}`;
     return `${header}\n\n${table}\n\n${count}`;
 }
 
 function formatRunTemplate(data: TemplateResult): string {
     const header = formatResultMeta(data.source, data.meta, [`template: ${data.template}`]);
-    const table = renderMarkdownTable(data.columns, data.rows as Record<string, TableCell>[]);
+    const table = renderMarkdownTable(data.columns, data.rows);
     const count = `${data.rows.length} row${data.rows.length === 1 ? "" : "s"}`;
     const narrative = data.narrative ? `\n\n${data.narrative}` : "";
     return `${header}\n\n${table}\n\n${count}${narrative}`;
@@ -211,9 +218,7 @@ function formatOutput(command: string, data: unknown, pretty: boolean): string {
             return (data as { content: string }).content;
 
         case "skill-index":
-            return formatSkillIndex(
-                data as { overview: string; index: SkillIndexEntry[] },
-            );
+            return formatSkillIndex(data as { overview: string; index: SkillIndexEntry[] });
 
         case "ingest":
             return formatIngest(data as IngestResult);
