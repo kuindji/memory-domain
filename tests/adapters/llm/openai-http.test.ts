@@ -130,7 +130,7 @@ describe("OpenAiHttpAdapter.withLevel", () => {
             model: "default-model",
             modelLevels: { low: "tiny", high: "big" },
         });
-        await adapter.withLevel("high").extract("anything");
+        await adapter.withLevel!("high").extract!("anything");
         const req0 = captured[0];
         const body = req0.body as { model: string };
         expect(body.model).toBe("big");
@@ -144,7 +144,7 @@ describe("OpenAiHttpAdapter.withLevel", () => {
             model: "default-model",
             modelLevels: { low: "tiny" },
         });
-        await adapter.withLevel("medium").extract("anything");
+        await adapter.withLevel!("medium").extract!("anything");
         const req0 = captured[0];
         const body = req0.body as { model: string };
         expect(body.model).toBe("default-model");

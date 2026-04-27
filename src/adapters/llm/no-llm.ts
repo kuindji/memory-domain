@@ -14,27 +14,10 @@ import type { LLMAdapter, ScoredMemory, ModelLevel, AgentRunSpec, AgentRunResult
  * them without an opt-in, that path is buggy — the throw surfaces it loudly.
  */
 class NoLlmAdapter implements LLMAdapter {
-    private fail(method: string): never {
-        throw new Error(
-            `LLM.${method}() was called but no LLM provider is configured. ` +
-            `LLM usage must be explicitly enabled by the caller (e.g. pass ` +
-            `--judge or construct an adapter). This invariant prevents silent ` +
-            `LLM fallbacks during supposedly LLM-free ingestion paths.`,
-        );
-    }
-
-    async extract(_text: string, _prompt?: string): Promise<string[]> {
-        this.fail("extract");
-    }
-
-    async consolidate(_memories: string[]): Promise<string> {
-        this.fail("consolidate");
-    }
-
-    // Optional methods are intentionally not implemented. Their absence
-    // satisfies `if (context.llm.extractStructured)` guards (value is
-    // `undefined` on this adapter), so plugins that gate optional LLM usage
-    // behind that check will skip the LLM branch.
+    // Every LLMAdapter method is optional. NoLlmAdapter implements none of
+    // them, so `if (context.llm.<method>)` short-circuits cleanly in every
+    // pluggable code path. Callers that invoke an LLM method without first
+    // checking presence are buggy by definition.
 }
 
 export { NoLlmAdapter };

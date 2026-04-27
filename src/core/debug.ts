@@ -60,21 +60,24 @@ function createDebugTools(scope: string, config?: DebugConfig): DebugTools {
 }
 
 function wrapLLMAdapter(adapter: LLMAdapter, debug: DebugTools, scope: string): LLMAdapter {
-    const wrapped: LLMAdapter = {
-        extract(text: string, prompt?: string): Promise<string[]> {
-            return debug.time(`${scope}.extract`, () => adapter.extract(text, prompt), {
+    const wrapped: LLMAdapter = {};
+
+    if (adapter.extract) {
+        wrapped.extract = (text: string, prompt?: string): Promise<string[]> =>
+            debug.time(`${scope}.extract`, () => adapter.extract!(text, prompt), {
                 chars: text.length,
             });
-        },
+    }
 
-        consolidate(memories: string[]): Promise<string> {
+    if (adapter.consolidate) {
+        wrapped.consolidate = (memories: string[]): Promise<string> => {
             const chars = memories.reduce((sum, memory) => sum + memory.length, 0);
-            return debug.time(`${scope}.consolidate`, () => adapter.consolidate(memories), {
+            return debug.time(`${scope}.consolidate`, () => adapter.consolidate!(memories), {
                 memories: memories.length,
                 chars,
             });
-        },
-    };
+        };
+    }
 
     if (adapter.extractStructured) {
         wrapped.extractStructured = (

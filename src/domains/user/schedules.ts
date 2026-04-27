@@ -43,7 +43,9 @@ export async function consolidateUserProfile(context: DomainContext): Promise<vo
         if (contents.length === 0) continue;
 
         // Synthesize profile summary
-        const summary = await context.llmAt("medium").consolidate(contents);
+        const medLlm = context.llmAt("medium");
+        if (!medLlm.consolidate) continue;
+        const summary = await medLlm.consolidate(contents);
         if (!summary.trim()) continue;
 
         // Find existing profile summary for this user
