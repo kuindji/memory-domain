@@ -5,7 +5,7 @@ Commands:
   init            Initialize database, schemas, and optionally bootstrap domains
   ingest          Store new memory from text or stdin
   search          Search memories by query
-  search-table    Run a domain tabular query (e.g. financial indicators)
+  search-table    Run a domain tabular query (for domains that expose one)
   run-template    Run a named template from a domain's buildContext registry
   ask             Ask a question against stored memories
   build-context   Build a context block from relevant memories
@@ -87,43 +87,44 @@ Options:
 Examples:
   memory-domain search "project deadlines" --mode vector --limit 5
   memory-domain search "shopping list" --domains personal --meta user-id=abc
-  memory-domain search "ISIS Iraq Syria" --domains conflict --after-time 2014-01-01 --before-time 2014-12-31
+  memory-domain search "design review" --domains kb --after-time 2024-01-01 --before-time 2024-12-31
 `.trim(),
 
     "search-table": `
 Usage: memory-domain search-table <domain> [--filter <json>] [--filter-file <path>]
 
 Run a domain's tabular query (domain.search.execute). Returns {columns, rows, source, rowMeta?}.
+Available only for domains that opt in to tabular access; check 'memory-domain domain <id> structure'.
 
 Arguments:
-  <domain>             Domain id (must support tabular access, e.g. "financial")
+  <domain>             Domain id that supports tabular access
 
 Options:
   --filter <json>      FilterSpec as a JSON object (default: {})
   --filter-file <path> Read FilterSpec JSON from a file (overrides --filter)
 
 Examples:
-  memory-domain search-table financial --filter '{"countries":["USA"],"indicators":["NY.GDP.MKTP.KD.ZG"],"yearRange":{"from":2001,"to":2005}}'
-  memory-domain search-table financial --filter-file ./q2.json
+  memory-domain search-table <domain> --filter '{"field":"value","range":{"from":1,"to":10}}'
+  memory-domain search-table <domain> --filter-file ./query.json
 `.trim(),
 
     "run-template": `
 Usage: memory-domain run-template <domain> <template-name> [--params <json>] [--params-file <path>]
 
 Run a named template from a domain's buildContext.templates registry. Returns a TemplateResult {template, rows, columns, source, narrative?}.
+Available only for domains that opt in to template tooling; check 'memory-domain domain <id> structure'.
 
 Arguments:
-  <domain>             Domain id (must expose buildContext.templates, e.g. "financial")
-  <template-name>      Template name (e.g. "macro_snapshot", "indicator_trend")
+  <domain>             Domain id that exposes buildContext.templates
+  <template-name>      Template name registered by the domain
 
 Options:
   --params <json>      Template params as a JSON object (default: {})
   --params-file <path> Read params JSON from a file (overrides --params)
 
 Examples:
-  memory-domain run-template financial macro_snapshot --params '{"country":"USA","year":2005}'
-  memory-domain run-template financial peer_comparison --params '{"country":"USA","indicator":"NY.GDP.PCAP.KD","year":2005,"peerSet":"G7"}'
-  memory-domain run-template financial indicator_trend --params-file ./query.json
+  memory-domain run-template <domain> <template> --params '{"key":"value"}'
+  memory-domain run-template <domain> <template> --params-file ./query.json
 `.trim(),
 
     ask: `

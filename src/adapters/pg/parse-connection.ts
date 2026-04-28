@@ -1,8 +1,7 @@
 import type { DbConfig } from "./types.js";
 
 /**
- * Parse a legacy connection string into a DbConfig. Supports the strings the
- * memory-domain CLI and existing Silentium scripts already pass:
+ * Parse a connection string into a DbConfig. Supported forms:
  *
  *   `mem://`                       — in-memory PGLite
  *   `pglite://<path>`              — file-backed PGLite at <path>

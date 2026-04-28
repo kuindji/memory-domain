@@ -72,7 +72,7 @@ async function runJsonAgentLoop(
         ).length;
         const retryHint =
             repeatCount >= 2 && callResult.exitCode !== 0
-                ? "\n\nSTOP. You have repeated this failing call. Change your approach — try `list_indicators` to discover the right indicator code, or switch country codes to ISO-3 (USA/JPN/DEU/CHN, not US/JP/DE/CN)."
+                ? "\n\nSTOP. You have repeated this failing call. Change your approach — read the stderr above carefully and adjust the tool, args, or values; do not retry the same call."
                 : "";
         const toolMessage = [
             `exit=${callResult.exitCode}`,
@@ -102,19 +102,16 @@ function buildAgentSystemPrompt(skill: string): string {
         '  Call a tool:  {"tool":"<subcommand>","args":["<arg1>","<arg2>", ...]}  (runs `memory-domain <subcommand> <arg1> <arg2> ...`)',
         '  Final answer: {"answer":"<final prose answer>"}                          (ends the loop)',
         "",
-        "Country codes are always **ISO-3** (USA, JPN, DEU, CHN, BRA, ARG) — never ISO-2 (US, JP, DE). The CLI rejects ISO-2 with an error.",
         "`args` is a FLAT ARRAY OF STRINGS — the shell argv. JSON filter/params objects must be serialized as a single string with the JSON embedded and properly escaped.",
-        'Good example:  {"tool":"search-table","args":["financial","--filter","{\\"countries\\":[\\"USA\\"],\\"indicators\\":[\\"NY.GDP.MKTP.KD.ZG\\"],\\"yearRange\\":{\\"from\\":2005,\\"to\\":2005}}"]}',
-        'Good example:  {"tool":"run-template","args":["financial","macro_snapshot","--params","{\\"country\\":\\"USA\\",\\"year\\":2005}"]}',
-        'Bad  example:  {"tool":"search-table","args":["financial","countries":["USA"]]} — args must not contain bare JSON fragments, only strings.',
         "",
         "## Hard rules",
         "1. Your FIRST reply MUST be a tool call, never an answer. You have no data yet — retrieve some.",
-        "2. Every number in the final answer must appear in a tool result you received this loop. Do not answer numbers from general knowledge; they will be wrong for this domain.",
+        "2. Every fact in the final answer must appear in a tool result you received this loop. Do not answer from general knowledge.",
         "3. Do not emit the final answer until at least one tool call has returned non-empty `stdout` containing data relevant to the question.",
-        "4. Allowed subcommands: search, search-table, run-template, build-context, memory, domain, domains, skill, core-memory. `ask` is forbidden.",
-        "5. After each tool call you receive a user message with stdout/stderr — use it to plan the next step.",
-        '6. Keep tool calls focused (usually ≤6 total). When you have enough data, emit the final {"answer":...} object.',
+        "4. After each tool call you receive a user message with stdout/stderr — use it to plan the next step.",
+        '5. Keep tool calls focused (usually ≤6 total). When you have enough data, emit the final {"answer":...} object.',
+        "",
+        "Available tools and how to use them are described in the domain skill above.",
     ].join("\n");
 }
 

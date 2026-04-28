@@ -712,17 +712,14 @@ class InboxProcessor {
 
             const sd = node.structured_data;
             // Two shapes are supported on `memory.structured_data`:
-            //   1. Flat — `{ country: 'BFA', cameo_root: '14', ... }` — the
-            //      shape ingest callers (GDELT, V-Dem, etc.) pass through
-            //      `engine.ingest({ structuredData: ... })`. Surfaces to
-            //      every domain that owns the memory.
-            //   2. Domain-keyed — `{ "domain:conflict": { ... } }` — the
-            //      shape used when distinct payloads must be visible to
-            //      different owning domains.
+            //   1. Flat — `{ key: value, ... }` — passed by ingest callers via
+            //      `engine.ingest({ structuredData: ... })`. Surfaces to every
+            //      domain that owns the memory.
+            //   2. Domain-keyed — `{ "domain:<id>": { ... } }` — used when
+            //      distinct payloads must be visible to different owning
+            //      domains.
             // Prefer the domain-keyed slice when present; otherwise return
-            // the flat object. The earlier "domain-keyed only" branch
-            // silently dropped structuredData for every flat-shape caller,
-            // breaking conflict-topic-linking matchedSeeds.
+            // the flat object.
             let structuredData: unknown;
             if (sd && typeof sd === "object") {
                 if (domainId && domainId in sd) {

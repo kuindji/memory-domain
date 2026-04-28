@@ -1,3 +1,7 @@
+@include core-tools
+
+## Answering
+
 Answer the following query about the codebase using ONLY the retrieved information below.
 If the information doesn't fully answer the question, state what's missing rather than guessing.
 

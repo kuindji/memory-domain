@@ -39,11 +39,9 @@ function bindValue(value: unknown, jsonb: boolean): unknown {
         // JSONB columns: hand the raw object/array (or scalar) off to the
         // adapter wrapped in JsonbParam. Bun.SQL serializes JS objects to
         // jsonb natively; pre-stringifying causes Bun.SQL to JSON-encode the
-        // string AGAIN, leaving a quoted string literal in the jsonb cell
-        // (the silent corruption that broke conflict-topic-linking and
-        // owned_by.attributes after the SurrealDB→Postgres migration). PGLite
-        // unwraps and JSON.stringifies in its adapter to match its own
-        // binding contract.
+        // string AGAIN, leaving a quoted string literal in the jsonb cell.
+        // PGLite unwraps and JSON.stringifies in its adapter to match its
+        // own binding contract.
         return new JsonbParam(value);
     }
     if (typeof value === "object") return JSON.stringify(value);

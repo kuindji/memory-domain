@@ -677,8 +677,8 @@ class MemoryEngine {
         // Compute the memory id client-side so we can fan the row insert and
         // the inbox-tag edge insert out in parallel — they have no DB-level
         // dependency on each other and the two round-trips were ~14ms each
-        // sequentially, dominating per-narrative ingest cost during bulk
-        // ingestion (e.g. GDELT 6k narratives/month).
+        // sequentially, dominating per-record ingest cost during high-volume
+        // bulk ingestion.
         const memId = `memory:${randomUUID()}`;
         await Promise.all([
             this.graph.createNodeWithId(memId, memData),

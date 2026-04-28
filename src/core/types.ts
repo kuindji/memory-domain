@@ -197,7 +197,7 @@ export interface TableResult {
     rows: TableRow[];
     /** Column names in display order. Length > 0 even if rows is empty. */
     columns: string[];
-    /** Domain-declared source identifier (e.g. 'wdi', 'commodities'). */
+    /** Domain-declared source identifier. */
     source: string;
     /** Optional per-row metadata (unit, source_ref, etc.) not shown in table. */
     rowMeta?: Record<string, unknown>[];
@@ -408,7 +408,7 @@ export interface TemplateResult {
     rows: TableRow[];
     /** Column names in display order. */
     columns: string[];
-    /** Domain source identifier, e.g. 'wdi'. Matches TableResult.source. */
+    /** Domain source identifier. Matches TableResult.source. */
     source: string;
     /** Optional LLM-rendered paragraph. Populated only when caller requests it. */
     narrative?: string;
