@@ -22,6 +22,7 @@
         "src/tui/**/*.ts",
         "src/domains/log-domain.ts",
         "src/domains/topic/**/*.ts",
+        "src/domains/kb/**/*.ts",
         "src/plugins/topic-linking.ts"
     ],
     "exclude": ["src/**/*.test.ts", "src/**/*.spec.ts"]

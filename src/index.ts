@@ -86,11 +86,12 @@ export type {
 export { isDomainRegistration } from "./core/types.js";
 
 // Domains
-// NOTE: bundled framework domains (user, code-repo, kb) still hold raw
-// SurrealQL after the Postgres migration and are not re-exported until
-// they're rewritten in a follow-up cleanup pass.
+// NOTE: chat / code-repo / user framework domains still hold raw SurrealQL
+// after the Postgres migration and are not re-exported until they're
+// rewritten in a follow-up cleanup pass.
 export { logDomain } from "./domains/log-domain.js";
 export { createTopicDomain, topicDomain } from "./domains/topic/index.js";
+export { createKbDomain } from "./domains/kb/kb-domain.js";
 export { createTopicLinkingPlugin } from "./plugins/topic-linking.js";
 export type { TopicLinkingOptions, ExtractedTopic, LinkResult } from "./plugins/topic-linking.js";
 
