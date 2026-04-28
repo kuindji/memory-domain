@@ -1491,7 +1491,12 @@ class MemoryEngine {
                     exitCode: 2,
                 };
             }
-            if (call.args[0] === "ask") {
+            // Small-model robustness: agents sometimes echo the binary name as the
+            // first arg ('memory-domain search ...'). Treat that as a no-op prefix
+            // rather than dispatching to a non-existent 'memory-domain' command.
+            const args =
+                call.args[0] === "memory-domain" ? call.args.slice(1) : call.args;
+            if (args[0] === "ask") {
                 return {
                     stdout: "",
                     stderr: "ask is not available inside ask(); answer from the data you already have.",
@@ -1500,7 +1505,7 @@ class MemoryEngine {
             }
             let parsed;
             try {
-                parsed = parseArgs(call.args);
+                parsed = parseArgs(args);
             } catch (err) {
                 return {
                     stdout: "",

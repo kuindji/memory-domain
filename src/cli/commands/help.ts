@@ -66,7 +66,7 @@ Examples:
 `.trim(),
 
     search: `
-Usage: memory-domain search <query> [--mode vector|fulltext|graph|hybrid] [--domains d1,d2] [--tags t1,t2] [--limit N] [--budget N] [--min-score N] [--meta key=value]
+Usage: memory-domain search <query> [--mode vector|fulltext|graph|hybrid] [--domains d1,d2] [--tags t1,t2] [--limit N] [--budget N] [--min-score N] [--after-time <ts>] [--before-time <ts>] [--meta key=value]
 
 Search stored memories by query string.
 
@@ -80,11 +80,14 @@ Options:
   --limit <N>          Maximum number of results to return
   --budget <N>         Token budget for results
   --min-score <N>      Minimum relevance score threshold
+  --after-time <ts>    Only return memories with event_time >= ts (ISO date or unix-ms)
+  --before-time <ts>   Only return memories with event_time <= ts (ISO date or unix-ms)
   --meta key=value     Request context metadata (repeatable)
 
 Examples:
   memory-domain search "project deadlines" --mode vector --limit 5
   memory-domain search "shopping list" --domains personal --meta user-id=abc
+  memory-domain search "ISIS Iraq Syria" --domains conflict --after-time 2014-01-01 --before-time 2014-12-31
 `.trim(),
 
     "search-table": `
