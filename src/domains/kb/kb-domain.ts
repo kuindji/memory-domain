@@ -185,12 +185,23 @@ export function createKbDomain(options?: KbDomainOptions): DomainRegistration {
             // Search with original text, no intent filters.
             // Classification at 54% accuracy hurts more than it helps as a search filter.
             // Classification is used for output grouping via stored attributes instead.
+            //
+            // Note on thresholds: framework-level `minScore` and `rerankThreshold`
+            // are deliberately set low (0) so the kb pipeline gets the full
+            // candidate set. The tunable `minScore` is then applied here, after
+            // the supplemental keyword/question/topic-graph merges have run, so
+            // graph candidates and atomic-fact embedding hits in the 0.3-0.5
+            // range survive long enough to be reranked by their best signal.
+            // rerankByEmbedding REPLACES candidate scores with raw query-content
+            // cosine, so passing minScore=0.5 directly into the framework chops
+            // every short-fact memory the model needs — that's the regression
+            // that drove the 2.44/5 eval at default tuning.
             const results = await context.search({
                 text,
                 tags: [KB_TAG],
-                minScore,
+                minScore: 0,
                 rerank: useEmbeddingRerank,
-                rerankThreshold: minScore,
+                rerankThreshold: 0,
                 tokenBudget: budgetTokens * 3,
             });
 
@@ -207,6 +218,14 @@ export function createKbDomain(options?: KbDomainOptions): DomainRegistration {
 
             // Step 4.5b: Keyword search — catches entries the embedding rerank missed
             entries = await mergeKeywordSearch(entries, text, context, domainId);
+
+            // Step 4.5c: Topic-graph search — pulls in entries linked to topics
+            // matching the query keywords. The topic-linking plugin's expandSearch
+            // already does this at framework level, but those graph candidates get
+            // killed by hybrid mergeScores (penalizeMissing) and the embedding
+            // rerank threshold. Running it here as a supplemental merge bypasses
+            // both gates, the same way mergeKeywordSearch and mergeQuestionSearch do.
+            entries = await mergeTopicGraphSearch(entries, text, context, domainId);
 
             // Step 5: Optional LLM rerank
             if (useLlmRerank && context.llm) {
@@ -698,6 +717,143 @@ async function mergeKeywordSearch(
                 eventTime: row.event_time ?? null,
                 createdAt: row.created_at,
                 tokenCount: row.token_count,
+            });
+        }
+
+        return [...entries, ...newEntries];
+    } catch {
+        return entries;
+    }
+}
+
+const TOPIC_SEARCH_STOP_WORDS = new Set([
+    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
+    "have", "has", "had", "do", "does", "did", "will", "would", "could",
+    "should", "may", "might", "shall", "can", "to", "of", "in", "for", "on",
+    "with", "at", "by", "from", "as", "and", "or", "if", "but", "what",
+    "which", "who", "whom", "this", "that", "these", "those", "it", "its",
+    "how", "why", "when", "where", "all", "any", "some", "such", "no", "not",
+    "about", "tell", "list", "show", "give", "explain",
+]);
+
+/**
+ * Topic-graph supplemental search. The topic-linking plugin owns the
+ * about_topic edge and registers a framework-level expandSearch that adds
+ * a graph traversal to the SearchQuery; however, in hybrid mode those
+ * graph-only candidates lose to the merged-score floor (penalizeMissing
+ * divides graph weight 0.2 by the full weight sum 1.0, yielding 0.2 — below
+ * minScore=0.5) and to rerankByEmbedding, which replaces score with raw
+ * cosine to the query and drops anything under threshold. The whole point
+ * of graph candidates is to bypass embedding similarity, so the rerank gate
+ * destroys the mechanism. Running the same traversal here as a supplemental
+ * merge — like mergeKeywordSearch and mergeQuestionSearch — lets these
+ * entries land in MMR budget fill at a modest base score without touching
+ * framework code or affecting other consumers of topic-linking.
+ */
+async function mergeTopicGraphSearch(
+    entries: ScoredMemory[],
+    queryText: string,
+    context: DomainContext,
+    domainId: string = KB_DOMAIN_ID,
+): Promise<ScoredMemory[]> {
+    const now = Date.now();
+
+    const keywords = queryText
+        .toLowerCase()
+        .replace(/[^\w\s-]/g, "")
+        .split(/\s+/)
+        .filter((w) => w.length > 3 && !TOPIC_SEARCH_STOP_WORDS.has(w));
+
+    if (keywords.length === 0) return entries;
+
+    try {
+        // Find topic-tagged memories whose content matches any query keyword.
+        // ILIKE-OR keeps the SurrealDB-era semantics — substring match, not
+        // tsvector — because topic names are short (1-3 words) and stemming
+        // hurts more than it helps on them.
+        const ilikeClauses = keywords.map((_, i) => `lower(m.content) LIKE $${i + 1}`);
+        const ilikeValues = keywords.map((kw) => `%${kw}%`);
+
+        const topicRows = await context.graph.query<{ id: string }>(
+            `SELECT m.id
+             FROM memory m
+             JOIN tagged tg ON tg.in_id = m.id
+             WHERE tg.out_id = 'tag:topic'
+               AND (${ilikeClauses.join(" OR ")})
+             LIMIT 50`,
+            ilikeValues,
+        );
+
+        if (!topicRows || topicRows.length === 0) return entries;
+
+        const topicIds = topicRows.map((r) => String(r.id));
+
+        // Traverse about_topic edges: in_id = memory, out_id = topic. So
+        // memories "about" the matching topics have out_id IN topicIds.
+        // Restrict to memories owned by the kb domain (the same
+        // `domainId` parameter used elsewhere) so cross-domain leakage
+        // doesn't pollute kb retrieval.
+        const linkedRows = await context.graph.query<{
+            id: string;
+            content: string;
+            event_time: number | null;
+            created_at: number;
+            token_count: number | null;
+            attributes: Record<string, unknown> | null;
+            match_count: number;
+        }>(
+            `SELECT m.id, m.content, m.event_time, m.created_at, m.token_count,
+                    ob.attributes,
+                    COUNT(DISTINCT at.out_id)::int AS match_count
+             FROM memory m
+             JOIN about_topic at ON at.in_id = m.id
+             JOIN owned_by ob ON ob.in_id = m.id AND ob.out_id = $1
+             WHERE at.out_id = ANY($2::text[])
+             GROUP BY m.id, m.content, m.event_time, m.created_at, m.token_count, ob.attributes
+             ORDER BY match_count DESC
+             LIMIT 50`,
+            [`domain:${domainId}`, topicIds],
+        );
+
+        if (!linkedRows || linkedRows.length === 0) return entries;
+
+        const existingMap = new Map(entries.map((e) => [e.id, e]));
+        const topicMatchCount = topicIds.length;
+        const newEntries: ScoredMemory[] = [];
+
+        for (const row of linkedRows) {
+            const id = String(row.id);
+            // Score reflects how many of the query's matching topics this
+            // memory is linked to. Capped at 0.7 so existing vector/fulltext
+            // hits (often 0.5-1.0) still win when they're genuinely better,
+            // but graph candidates clear the 0.5 minScore implied for kb.
+            const matchRatio = Math.min(1, row.match_count / Math.max(1, topicMatchCount));
+            const baseScore = 0.5 + 0.2 * matchRatio;
+
+            const existing = existingMap.get(id);
+            if (existing) {
+                // Boost entries already in the candidate set — multi-signal
+                // wins (vector + topic graph) should rank above single-signal.
+                existing.score = Math.max(existing.score, existing.score * 1.3);
+                existing.scores = { ...existing.scores, graph: baseScore };
+                continue;
+            }
+
+            const domainAttributes = row.attributes
+                ? { [domainId]: row.attributes }
+                : {};
+            if (!isEntryValid(getKbAttrs(domainAttributes, domainId), now)) continue;
+
+            newEntries.push({
+                id,
+                content: row.content,
+                score: baseScore,
+                scores: { graph: baseScore },
+                tags: [],
+                domainAttributes,
+                eventTime: row.event_time ?? null,
+                createdAt: row.created_at,
+                tokenCount: row.token_count ?? undefined,
             });
         }
 

@@ -1,6 +1,6 @@
 {
     "name": "@kuindji/memory-domain",
-    "version": "0.0.6",
+    "version": "0.0.7",
     "type": "module",
     "description": "Domain-driven memory engine with graph storage, embeddings, and semantic search",
     "license": "MIT",
